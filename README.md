@@ -1,13 +1,13 @@
 # Employee Management System
 
-A full-stack CRUD application for managing employees built with Node.js, TypeScript, Express, React, and PostgreSQL.
+A full-stack CRUD application for managing employees built with Node.js, TypeScript, Express, React, and MySQL.
 
 ## Features
 
 - Create, Read, Update, and Delete employee records
 - Modern React UI with TypeScript
 - RESTful API backend with Express and TypeScript
-- PostgreSQL database integration
+- MySQL database integration
 - Responsive design
 
 ## Prerequisites
@@ -18,10 +18,10 @@ A full-stack CRUD application for managing employees built with Node.js, TypeScr
 
 ## Quick Start with Docker (Recommended)
 
-### 1. Start PostgreSQL Database
+### 1. Start MySQL Database
 
 ```bash
-# Start PostgreSQL in Docker
+# Start MySQL in Docker
 docker-compose up -d
 
 # Verify it's running
@@ -30,12 +30,12 @@ docker-compose ps
 
 The database will be automatically created with these credentials:
 - **Host**: localhost
-- **Port**: 5433 (mapped from container port 5432)
+- **Port**: 3307 (mapped from container port 3306)
 - **Database**: employee_db
-- **User**: postgres
-- **Password**: postgres
+- **User**: mysql_user
+- **Password**: mysql_password
 
-**Note**: Port 5433 is used to avoid conflicts with other PostgreSQL instances. The `.env` file is already configured correctly.
+**Note**: Port 3307 is used to avoid conflicts with other MySQL instances. The `.env` file is already configured correctly.
 
 ### 2. Backend Setup
 
@@ -46,7 +46,7 @@ cd backend
 # Install dependencies
 npm install
 
-# The .env file is already configured for Docker PostgreSQL
+# The .env file is already configured for Docker MySQL
 # No need to change anything if using Docker!
 
 # Run the backend server (development mode)
@@ -77,14 +77,14 @@ The frontend will start on `http://localhost:3000`
 ## Docker Commands
 
 ```bash
-# Start PostgreSQL database
+# Start MySQL database
 docker-compose up -d
 
-# Stop PostgreSQL database
+# Stop MySQL database
 docker-compose down
 
 # View database logs
-docker-compose logs postgres
+docker-compose logs mysql
 
 # Stop and remove all data (fresh start)
 docker-compose down -v
@@ -92,11 +92,11 @@ docker-compose down -v
 
 ## Manual Database Setup (Alternative)
 
-If you prefer not to use Docker, you can set up PostgreSQL manually:
+If you prefer not to use Docker, you can set up MySQL manually:
 
-1. Install and start PostgreSQL on your system
+1. Install and start MySQL on your system
 2. Create database: `CREATE DATABASE employee_db;`
-3. Update `backend/.env` with your PostgreSQL credentials
+3. Update `backend/.env` with your MySQL credentials
 4. See [Troubleshooting](#troubleshooting) section for help
 
 ## Project Structure
@@ -154,20 +154,20 @@ sample-project/
 
 **If Docker container won't start:**
 ```bash
-# Check if port 5432 is already in use
-lsof -i :5432
+# Check if port 3306 is already in use
+lsof -i :3306
 
-# If port is in use, stop local PostgreSQL or change port in docker-compose.yml
+# If port is in use, stop local MySQL or change port in docker-compose.yml
 ```
 
 **If you get connection errors:**
 - Make sure Docker container is running: `docker-compose ps`
-- Check container logs: `docker-compose logs postgres`
+- Check container logs: `docker-compose logs mysql`
 - Verify .env file has correct credentials (should match docker-compose.yml)
 
-### PostgreSQL Password Authentication Error (Manual Setup)
+### MySQL Authentication Error (Manual Setup)
 
-If you see `password authentication failed for user "postgres"`:
+If you see `Access denied for user` error:
 
 1. **Use Docker instead** (recommended): `docker-compose up -d`
 
@@ -179,14 +179,14 @@ If you see `password authentication failed for user "postgres"`:
 
 3. **Update `.env` file** with correct credentials:
    - Open `backend/.env`
-   - Update `DB_PASSWORD` with your PostgreSQL password
+   - Update `DB_PASSWORD` with your MySQL password
 
 4. **See detailed guide**: Check `backend/SETUP.md` for more troubleshooting steps.
 
 ## Technologies Used
 
-- **Backend**: Node.js, Express, TypeScript, PostgreSQL (pg)
+- **Backend**: Node.js, Express, TypeScript, MySQL (mysql2)
 - **Frontend**: React, TypeScript, Vite, Axios
-- **Database**: PostgreSQL (via Docker)
+- **Database**: MySQL (via Docker)
 - **Containerization**: Docker & Docker Compose
 

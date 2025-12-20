@@ -1,81 +1,73 @@
 # Database Setup Guide
 
-## Fixing PostgreSQL Password Authentication Error
+## Fixing MySQL Authentication Error
 
-If you're getting a password authentication error, follow these steps:
+If you're getting an authentication error, follow these steps:
 
-### Option 1: Set PostgreSQL Password (Recommended)
+### Option 1: Use Docker (Recommended)
 
-1. **Connect to PostgreSQL** (try one of these):
+The easiest way is to use Docker with the provided configuration:
+
+```bash
+# Start MySQL container
+docker-compose up -d
+
+# Verify it's running
+docker-compose ps
+
+# Check logs
+docker-compose logs mysql
+```
+
+The `.env` file should be:
+```
+DB_HOST=localhost
+DB_PORT=3307
+DB_USER=mysql_user
+DB_PASSWORD=mysql_password
+DB_NAME=employee_db
+```
+
+### Option 2: Set MySQL Password (Manual Installation)
+
+If you have MySQL installed locally:
+
+1. **Connect to MySQL**:
    ```bash
-   psql -U postgres
-   # OR
-   psql postgres
-   # OR  
-   psql -U $(whoami)
-   ```
-
-2. **If connection succeeds**, set a password:
-   ```sql
-   ALTER USER postgres WITH PASSWORD 'your_password_here';
-   ```
-
-3. **Update your `.env` file** in the backend folder:
-   ```
-   DB_PASSWORD=your_password_here
-   ```
-
-### Option 2: Use Your System User
-
-If PostgreSQL is configured to use your system user:
-
-1. **Update `.env` file**:
-   ```
-   DB_USER=vivek.a
-   DB_PASSWORD=
-   ```
-
-### Option 3: Reset PostgreSQL Password
-
-If you can't remember the password:
-
-1. **Stop PostgreSQL**:
-   ```bash
-   brew services stop postgresql
-   # OR
-   pg_ctl -D /usr/local/var/postgres stop
-   ```
-
-2. **Start PostgreSQL in single-user mode**:
-   ```bash
-   postgres --single -D /usr/local/var/postgres postgres
-   ```
-
-3. **In the PostgreSQL prompt**, run:
-   ```sql
-   ALTER USER postgres WITH PASSWORD 'newpassword';
-   \q
-   ```
-
-4. **Restart PostgreSQL normally**:
-   ```bash
-   brew services start postgresql
-   ```
-
-### Option 4: Create Database with Current User
-
-If you can connect with your system user:
-
-1. **Connect**:
-   ```bash
-   psql postgres
+   mysql -u root -p
    ```
 
 2. **Create database and user**:
    ```sql
    CREATE DATABASE employee_db;
-   CREATE USER postgres WITH PASSWORD 'postgres';
-   GRANT ALL PRIVILEGES ON DATABASE employee_db TO postgres;
+   CREATE USER 'mysql_user'@'localhost' IDENTIFIED BY 'mysql_password';
+   GRANT ALL PRIVILEGES ON employee_db.* TO 'mysql_user'@'localhost';
+   FLUSH PRIVILEGES;
+   ```
+
+3. **Update your `.env` file** in the backend folder:
+   ```
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=mysql_user
+   DB_PASSWORD=mysql_password
+   DB_NAME=employee_db
+   ```
+
+### Option 3: Use Root User
+
+1. **Update `.env` file**:
+   ```
+   DB_HOST=localhost
+   DB_PORT=3306
+   DB_USER=root
+   DB_PASSWORD=your_root_password
+   DB_NAME=employee_db
+   ```
+
+2. **Create database**:
+   ```bash
+   mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS employee_db;"
    ```
 
 ### Test Your Connection
@@ -97,4 +89,5 @@ Then start your server:
 ```bash
 npm run dev
 ```
+
 

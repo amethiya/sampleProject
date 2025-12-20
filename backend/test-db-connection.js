@@ -1,51 +1,57 @@
-const { Pool } = require('pg');
+const mysql = require('mysql2/promise');
 require('dotenv').config();
 
-const pool = new Pool({
-  host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432'),
-  database: 'postgres', // Connect to default postgres database first
-  user: process.env.DB_USER || 'postgres',
-  password: process.env.DB_PASSWORD || 'postgres',
-});
-
 async function testConnection() {
-  console.log('Testing PostgreSQL connection...');
+  console.log('Testing MySQL connection...');
   console.log('Host:', process.env.DB_HOST || 'localhost');
-  console.log('Port:', process.env.DB_PORT || '5432');
-  console.log('User:', process.env.DB_USER || 'postgres');
+  console.log('Port:', process.env.DB_PORT || '3306');
+  console.log('User:', process.env.DB_USER || 'mysql_user');
   console.log('Password:', process.env.DB_PASSWORD ? '***' : '(not set)');
   console.log('');
 
+  let connection;
+
   try {
-    const result = await pool.query('SELECT NOW()');
+    // Connect to MySQL server (without specifying database)
+    connection = await mysql.createConnection({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '3306'),
+      user: process.env.DB_USER || 'mysql_user',
+      password: process.env.DB_PASSWORD || 'mysql_password',
+    });
+
     console.log('✅ Connection successful!');
-    console.log('Server time:', result.rows[0].now);
-    
+
+    const [rows] = await connection.query('SELECT NOW() as now');
+    console.log('Server time:', rows[0].now);
+
     // Check if database exists
-    const dbCheck = await pool.query(
-      "SELECT 1 FROM pg_database WHERE datname = $1",
-      [process.env.DB_NAME || 'employee_db']
+    const dbName = process.env.DB_NAME || 'employee_db';
+    const [databases] = await connection.query(
+      'SHOW DATABASES LIKE ?',
+      [dbName]
     );
-    
-    if (dbCheck.rows.length === 0) {
-      console.log(`\n⚠️  Database "${process.env.DB_NAME || 'employee_db'}" does not exist.`);
+
+    if (databases.length === 0) {
+      console.log(`\n⚠️  Database "${dbName}" does not exist.`);
       console.log('Creating database...');
-      await pool.query(`CREATE DATABASE ${process.env.DB_NAME || 'employee_db'}`);
+      await connection.query(`CREATE DATABASE ${dbName}`);
       console.log('✅ Database created successfully!');
     } else {
-      console.log(`✅ Database "${process.env.DB_NAME || 'employee_db'}" exists.`);
+      console.log(`✅ Database "${dbName}" exists.`);
     }
-    
+
+    await connection.end();
     process.exit(0);
   } catch (error) {
     console.error('\n❌ Connection failed!');
     console.error('Error:', error.message);
     console.error('\nTroubleshooting:');
-    console.error('1. Make sure PostgreSQL is running');
-    console.error('2. Check your password in backend/.env file');
-    console.error('3. Try connecting with: psql -U postgres');
-    console.error('4. If no password works, try empty password: DB_PASSWORD=');
+    console.error('1. Make sure MySQL is running (or start Docker: docker-compose up -d)');
+    console.error('2. Check your credentials in backend/.env file');
+    console.error('3. Try connecting with: mysql -u root -p');
+    console.error('4. Verify port is correct (3307 for Docker, 3306 for local)');
+    if (connection) await connection.end();
     process.exit(1);
   }
 }
