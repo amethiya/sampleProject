@@ -10,6 +10,7 @@ export const LIBRARIES = {
   scrollTrigger: "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js",
   lenis: "https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js",
   three: "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js",
+  threeRoomEnvironment: "https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js",
 };
 
 /** The data file handed to Claude: everything it may use, nothing else. */
@@ -88,6 +89,23 @@ websites. Build a complete, production-quality concept redesign of the website d
   content suits it.
 - One tasteful Three.js scene per site on the home page that relates to the category ("threeDObject" hints at
   the subject), rendered only while visible, with a static fallback when WebGL is unavailable.
+
+## Motion playbook (award-level 3D sites)
+Study how sites like the Awwwards 3D collection, landing.love's 3D category, the Cartier Roadster universe and the
+Riotters LiDAR drone demo tell a story with one object and the scroll. Use their techniques, never their assets or
+branding:
+- A scroll-driven 3D chapter: a sticky full-screen stage (about 300vh of scroll) where one polished object,
+  built from Three.js primitives and lit with RoomEnvironment reflections (PMREMGenerator), changes pose between
+  beats: enters small, turns, moves to the side opposite each caption, pulls apart into an exploded view or is
+  orbited by the camera, then settles. Captions are real content from content.json, one beat at a time.
+- Depth layers: giant outlined display type of the business name sliding behind the object at a different speed;
+  a particle field (THREE.Points) that gathers around the object late in the chapter.
+- Text that reads as it moves: words that sharpen from blur to focus while scrolling a key statement; headings that
+  rise word by word from behind a mask; numbers that count up only when they are real numbers from the content.
+- Cinematic pacing: an orchestrated page-load sequence, slow ease-out curves (expo/power3), scrubbed transitions
+  tied to scroll position, a thin progress line for long chapters, and calm stretches between big moments.
+- Image craft: mask/clip-path reveals, slow parallax inside frames, a pinned horizontal gallery for photo sets.
+- Performance: cap devicePixelRatio at 2, pause rendering when off screen, one WebGL context per page if possible.
 - Respect prefers-reduced-motion (no smooth scroll, no animation, all content visible). Content must be readable
   if any script fails to load.
 - Responsive from 360px to 1600px wide with no horizontal scrolling; a mobile menu when the navigation does not

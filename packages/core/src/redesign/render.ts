@@ -181,10 +181,35 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
     .map((p) => `<a href="${pageHref(p.slug)}"${p.slug === page.slug ? ' aria-current="page"' : ""}>${esc(p.label)}</a>`)
     .join("");
 
+  // 3D chapter captions come from the site itself: section headings with their first line, else plain facts.
+  const caps: { k: string; t: string }[] = [];
+  for (const sec of normalize(page.sections)) {
+    const line = [...sec.paragraphs, ...sec.items].find((x) => x.length >= 25);
+    if (sec.heading && sec.heading.toLowerCase() !== lead.name.toLowerCase() && line && sec.heading.length <= 50) caps.push({ k: sec.heading, t: firstSentences(line, 120) });
+    if (caps.length === 3) break;
+  }
+  for (const p of others) {
+    if (caps.length === 3) break;
+    const line = p.sections.flatMap((x) => [...x.paragraphs, ...x.items]).find((x) => x.length >= 25);
+    if (line) caps.push({ k: p.label, t: firstSentences(line, 120) });
+  }
+  const facts = [{ k: "Location", t: where }, ...(hours[0] ? [{ k: "Hours", t: hours[0] }] : []), ...(phone ? [{ k: "Call", t: phone }] : email ? [{ k: "Email", t: email }] : [])];
+  while (caps.length < 3 && facts.length) caps.push(facts.shift()!);
+  const variant = opts.dna && ["cinematic", "luxury", "gallery", "organic"].includes(opts.dna.concept.id) ? "orbit" : "explode";
+  const chapter = isHome
+    ? `<section class="chapter" data-variant="${variant}" aria-label="${name}">
+  <div class="chapter-sticky">
+    <div class="chapter-type" aria-hidden="true"><span>${name}</span><span>${name}</span></div>
+    <canvas id="obj-gl" aria-hidden="true"></canvas>
+    <div class="chapter-caps">${caps.map((c, i) => `<p class="cap cap-${i}"><span class="cap-k">${esc(c.k)}</span><span class="cap-t">${esc(c.t)}</span></p>`).join("")}</div>
+    <div class="chapter-progress" aria-hidden="true"><i></i></div>
+  </div>
+</section>`
+    : "";
+
   const explore = isHome
     ? others.length
       ? `<section class="explore" aria-label="Explore">
-  <div class="explore-visual"><canvas id="obj-gl" aria-hidden="true"></canvas></div>
   <div class="explore-list">
     <h2 class="section-title">Explore</h2>
     ${others.map((p) => `<a class="explore-item rv" href="${pageHref(p.slug)}">
@@ -194,7 +219,7 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
     </a>`).join("")}
   </div>
 </section>`
-      : `<section class="explore solo" aria-hidden="true"><div class="explore-visual"><canvas id="obj-gl"></canvas></div></section>`
+      : ""
     : "";
 
   return `<!doctype html>
@@ -250,7 +275,9 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
 </section>
 
 <div id="content">
-${blocks.map(renderBlock).join("\n")}
+${blocks.slice(0, 1).map(renderBlock).join("\n")}
+${chapter}
+${blocks.slice(1).map(renderBlock).join("\n")}
 </div>
 
 ${explore}
@@ -289,6 +316,7 @@ ${explore}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/environments/RoomEnvironment.js"></script>
 <script>${clientScript(t, stockHero)}</script>
 </body>
 </html>`;
@@ -445,7 +473,25 @@ h1,h2,h3{font-family:var(--display);font-weight:${t.displayWeight};letter-spacin
 .gallery:not(.pinned) .g-track{width:auto;flex-wrap:wrap;max-width:1440px;margin:0 auto}
 .gallery:not(.pinned) .g-item{width:calc((100% - 40px)/3);min-width:240px}
 
-.explore{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:clamp(32px,6vw,96px);padding:clamp(60px,9vw,130px) var(--pad);max-width:1440px;margin:0 auto;align-items:start}
+#content>.chapter{max-width:none;padding:0;margin-top:clamp(60px,8vw,110px)}
+.chapter{position:relative;height:340vh}
+.chapter-sticky{position:sticky;top:0;height:100vh;overflow:hidden;background:radial-gradient(70% 60% at 50% 55%,color-mix(in srgb,var(--accent) 20%,transparent) 0%,transparent 70%)}
+#obj-gl{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:1}
+.chapter-type{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:2vh;z-index:0;pointer-events:none;overflow:hidden}
+.chapter-type span{font:${t.displayWeight} clamp(5rem,17vw,16rem)/.9 var(--display);letter-spacing:${t.displayTracking};white-space:nowrap;color:transparent;-webkit-text-stroke:1px color-mix(in srgb,var(--ink) 22%,transparent);will-change:transform}
+.chapter-type span:last-child{color:color-mix(in srgb,var(--accent) 10%,transparent)}
+.chapter-caps{position:absolute;inset:0;z-index:2;pointer-events:none}
+.cap{position:absolute;max-width:min(380px,40vw);display:grid;gap:10px;opacity:0;will-change:opacity,transform}
+.cap-0{left:var(--pad);top:50%;transform:translateY(-50%)}
+.cap-1{right:var(--pad);top:50%;transform:translateY(-50%);text-align:right}
+.cap-2{left:50%;bottom:9vh;transform:translateX(-50%);text-align:center;max-width:min(560px,80vw)}
+.cap-k{font:600 13px/1.2 var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.cap-t{font:${t.displayWeight} clamp(1.3rem,2.4vw,2.1rem)/1.2 var(--display);letter-spacing:${t.displayTracking}}
+.chapter-progress{position:absolute;left:var(--pad);right:var(--pad);bottom:4vh;height:2px;background:var(--line);z-index:2}
+.chapter-progress i{display:block;height:100%;width:100%;background:var(--accent);transform:scaleX(0);transform-origin:left}
+.no-js .chapter{height:auto}.no-js .chapter-sticky{position:relative;height:auto;padding:60px var(--pad)}.no-js .cap{position:static;opacity:1;transform:none;max-width:none;text-align:left;margin-bottom:24px}.no-js #obj-gl,.no-js .chapter-type,.no-js .chapter-progress{display:none}
+.title-w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.06em}.title-w>span{display:inline-block}
+.explore{display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(32px,6vw,96px);padding:clamp(60px,9vw,130px) var(--pad);max-width:1440px;margin:0 auto;align-items:start}
 .explore.solo{grid-template-columns:1fr}
 .explore-visual{position:sticky;top:12vh;height:72vh;border-radius:var(--r);overflow:hidden;background:radial-gradient(120% 90% at 30% 20%,color-mix(in srgb,var(--accent) 22%,var(--surface)) 0%,var(--surface) 62%)}
 .explore.solo .explore-visual{position:relative;top:0;height:60vh}
@@ -487,7 +533,7 @@ h1,h2,h3{font-family:var(--display);font-weight:${t.displayWeight};letter-spacin
 
 .js .hero-title .w>span{transform:translateY(108%)}
 .js .rv{opacity:0;transform:translateY(26px)}
-.js .sw{opacity:.16}
+.js .sw{opacity:.16;filter:blur(5px)}
 
 body{--r:22px;--rb:999px}
 body.corners-sharp{--r:4px;--rb:6px}
@@ -521,7 +567,8 @@ body.hero-centered .hero-facts{width:100%;text-align:left}
   .split,.listing,.prose,.explore,.visit{grid-template-columns:1fr}
   .split.flip .split-media{order:0}
   .listing-head,.prose-head{position:static}
-  .explore-visual{position:relative;top:0;height:52vh}
+  .cap{max-width:none;left:var(--pad)!important;right:var(--pad)!important;top:auto!important;bottom:12vh!important;transform:none!important;text-align:left!important}
+  .chapter{height:300vh}
   .gallery .g-track{overflow-x:auto;width:auto;flex-wrap:nowrap!important;scroll-snap-type:x mandatory;padding-bottom:12px}
   .g-item{scroll-snap-align:center;width:78vw!important}
   .visit-map,.visit-map iframe,.visit-map img{min-height:300px}
@@ -533,7 +580,7 @@ body.hero-centered .hero-facts{width:100%;text-align:left}
 @media (max-width:560px){.nav-cta{display:none}.nav{gap:12px;top:52px}.nav.solid{top:0}.hero{padding-top:140px}.concept{font-size:12px}.brand-name{max-width:52vw}}
 @media (prefers-reduced-motion:reduce){
   .hero-media,.marquee-inner{animation:none}
-  .js .hero-title .w>span,.js .rv{transform:none;opacity:1}.js .sw{opacity:1}
+  .js .hero-title .w>span,.js .rv{transform:none;opacity:1}.js .sw{opacity:1;filter:none}.chapter{height:auto}.chapter-sticky{position:relative;height:100vh}.cap{opacity:1}
 }
 `;
 }
@@ -625,7 +672,15 @@ function clientScript(t: Theme, stockHero: string): string {
     .to('.hero .rv', { opacity: 1, y: 0, duration: .9, ease: 'power3.out', stagger: .08 }, '-=.8');
 
   $$('.statement').forEach(function(s){
-    gsap.to($$('.sw', s), { opacity: 1, stagger: .5, ease: 'none', scrollTrigger: { trigger: s, start: 'top 75%', end: 'bottom 55%', scrub: true } });
+    gsap.to($$('.sw', s), { opacity: 1, filter: 'blur(0px)', stagger: .5, ease: 'none', scrollTrigger: { trigger: s, start: 'top 75%', end: 'bottom 55%', scrub: true } });
+  });
+  // Section headings rise word by word from behind a mask.
+  $$('main .section-title').forEach(function(h){
+    if (h.closest('.hero') || h.textContent.length > 90) return;
+    h.classList.remove('rv');
+    var words = h.textContent.trim().split(/\s+/); h.textContent = '';
+    words.forEach(function(w){ var o = document.createElement('span'); o.className = 'title-w'; var i = document.createElement('span'); i.textContent = w; o.appendChild(i); h.appendChild(o); h.appendChild(document.createTextNode(' ')); });
+    gsap.from($$('.title-w>span', h), { yPercent: 110, duration: 1, ease: 'expo.out', stagger: .06, scrollTrigger: { trigger: h, start: 'top 88%' } });
   });
   $$('main .rv').forEach(function(el){
     if (el.closest('.hero')) return;
@@ -783,23 +838,80 @@ function clientScript(t: Theme, stockHero: string): string {
         orbit.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0); orbit.userData.s = .004 + Math.random() * .006; floaters.push(orbit); g.add(orbit);
       }
     }
-    function size(){ var w = box.clientWidth, h = box.clientHeight; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); cam.position.z = w < h ? 10.5 : 8.5; }
+    // Studio reflections for metals and gloss.
+    if (T.RoomEnvironment && T.PMREMGenerator) {
+      var pm = new T.PMREMGenerator(r); scene.environment = pm.fromScene(new T.RoomEnvironment(), .04).texture;
+      scene.traverse(function(o){ if (o.material && 'envMapIntensity' in o.material) o.material.envMapIntensity = ${t.dark ? "1" : ".45"}; });
+      scene.children.forEach(function(l){ if (l.isLight && !l.isPointLight) l.intensity *= .55; });
+    }
+    // Remember where every part sits so the chapter can pull the object apart and put it back.
+    g.children.forEach(function(c, i){
+      c.userData.home = c.position.clone();
+      var d = c.position.clone(); if (d.length() < .05) d.set(Math.cos(i * 2.4), Math.sin(i * 1.7), Math.sin(i * 3.1));
+      c.userData.dir = d.normalize();
+    });
+    // A particle field that gathers around the object late in the chapter.
+    var chapter = canvas.closest('.chapter'), variant = chapter ? chapter.getAttribute('data-variant') : 'explode';
+    var N = 1600, pos = new Float32Array(N * 3);
+    for (var pi = 0; pi < N; pi++) {
+      var u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rad = variant === 'orbit' ? 3.2 + Math.random() * .5 : 2.4 + Math.random() * 1.8;
+      var yy = variant === 'orbit' ? (Math.random() - .5) * .35 : u;
+      var rr = variant === 'orbit' ? 1 : Math.sqrt(1 - u * u);
+      pos[pi * 3] = rad * rr * Math.cos(th); pos[pi * 3 + 1] = rad * yy; pos[pi * 3 + 2] = rad * rr * Math.sin(th);
+    }
+    var pg = new T.BufferGeometry(); pg.setAttribute('position', new T.BufferAttribute(pos, 3));
+    var pts = new T.Points(pg, new T.PointsMaterial({ color: accent, size: .035, transparent: true, opacity: 0, depthWrite: false }));
+    scene.add(pts);
+
+    function size(){ var w = box.clientWidth, h = box.clientHeight; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
     size(); addEventListener('resize', size);
-    var prog = 0, mx = 0, my = 0;
-    if (window.ScrollTrigger) ScrollTrigger.create({ trigger: box, start: 'top bottom', end: 'bottom top', onUpdate: function(s){ prog = s.progress; } });
+    var target = 0, prog = 0, mx = 0, my = 0;
+    if (window.ScrollTrigger && chapter) ScrollTrigger.create({ trigger: chapter, start: 'top top', end: 'bottom bottom', onUpdate: function(s){ target = s.progress; } });
     addEventListener('pointermove', function(e){ mx = e.clientX / innerWidth - .5; my = e.clientY / innerHeight - .5; });
+
+    // Captions, outline type and progress bar follow the same scroll position.
+    var caps = chapter ? $$('.cap', chapter) : [], types = chapter ? $$('.chapter-type span', chapter) : [], bar = chapter ? $('.chapter-progress i', chapter) : null;
+    function win(p, a, b, fade){ return Math.max(0, Math.min(1, (p - a) / fade, (b - p) / fade)); }
+    function ease(x){ return x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
+    function lerp(a, b, k){ return a + (b - a) * k; }
+    var narrow = function(){ return innerWidth < 900; };
+    var spread = g.children.length > 12 ? .55 : 1.3;
     var clock = new T.Clock(), baseX = g.rotation.x;
+
     function frame(){
       var t2 = clock.getElapsedTime();
-      g.rotation.y += ((prog * Math.PI * 2 + mx * .6) - g.rotation.y) * .06; g.rotation.x = baseX + my * .3;
-      g.position.y = Math.sin(t2 * .8) * .08;
-      floaters.forEach(function(f){
-        if (f.userData.s) { f.rotation.y += f.userData.s; f.rotation.x += f.userData.s * .5; }
-        if (f.userData.o !== undefined) { f.position.y += Math.sin(t2 + f.userData.o) * .002; f.rotation.z += .004; }
+      prog += (target - prog) * .08;
+      var p = prog;
+      // Pose: right while caption 1 shows, left for caption 2, centred and raised for caption 3.
+      var side = narrow() ? 0 : 1.7;
+      var k1 = ease(Math.min(1, Math.max(0, (p - .28) / .12))), k2 = ease(Math.min(1, Math.max(0, (p - .62) / .12)));
+      g.position.x = lerp(lerp(side, -side, k1), 0, k2);
+      g.position.y = lerp(0, narrow() ? .9 : .45, k2) + (narrow() ? .7 : 0) + Math.sin(t2 * .8) * .06;
+      var s0 = lerp(.62, 1.05, ease(Math.min(1, p / .22)));
+      g.scale.setScalar(s0);
+      g.rotation.y = p * Math.PI * 2.2 + mx * .5 + t2 * .05;
+      g.rotation.x = baseX + Math.sin(p * Math.PI) * .35 + my * .2;
+      var burst = variant === 'explode' ? Math.sin(Math.max(0, Math.min(1, (p - .3) / .4)) * Math.PI) : 0;
+      g.children.forEach(function(c){ if (c.userData.home) c.position.copy(c.userData.home).addScaledVector(c.userData.dir, burst * spread); });
+      floaters.forEach(function(f){ if (f.userData.s) { f.rotation.y += f.userData.s; f.rotation.x += f.userData.s * .5; } if (f.userData.o !== undefined) f.rotation.z += .004; });
+      if (variant === 'orbit') {
+        var a = p * Math.PI * 1.4 - 1.1, rad = lerp(9.5, 7, ease(p));
+        cam.position.set(Math.sin(a) * rad, .6 + Math.sin(p * Math.PI) * 1.2, Math.cos(a) * rad); cam.lookAt(g.position.x * .4, g.position.y * .5, 0);
+        pts.material.opacity = .25 + .45 * Math.sin(p * Math.PI);
+      } else {
+        cam.position.set(0, .4, lerp(9.5, 8, ease(p))); cam.lookAt(0, .2, 0);
+        pts.material.opacity = .7 * win(p, .55, 1.05, .12);
+      }
+      pts.position.copy(g.position); pts.rotation.y = t2 * .05 + p * 2; pts.scale.setScalar(lerp(1.4, 1, ease(p)));
+      caps.forEach(function(c, i){
+        var a0 = [.04, .38, .72][i], o = win(p, a0, a0 + .26, .07);
+        c.style.opacity = o; c.style.translate = '0 ' + ((1 - o) * 24) + 'px';
       });
+      if (types[0]) { types[0].style.transform = 'translateX(' + (10 - p * 60) + '%)'; types[1].style.transform = 'translateX(' + (-50 + p * 60) + '%)'; }
+      if (bar) bar.style.transform = 'scaleX(' + p + ')';
       r.render(scene, cam);
     }
-    if (still) { frame(); return; }
+    if (still) { prog = target = .5; frame(); return; }
     visibleLoop(canvas, frame);
   }
 })();`;
