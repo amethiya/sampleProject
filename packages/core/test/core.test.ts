@@ -104,6 +104,7 @@ describe("buildPitch", () => {
     expect(p.body).toMatch(/phone/);
     expect(p.body).toMatch(/Not secure/);
     expect(p.body).toMatch(/won't contact you again/);
+    expect(p.subject).toContain("redesigned website");
     expect(p.gmailUrl).toContain("to=joe%40joesdiner.com");
   });
 });

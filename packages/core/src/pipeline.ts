@@ -36,7 +36,8 @@ export async function auditCandidate(c: Candidate, minScore = DEFAULT_MIN_SCORE)
     audit,
     contacts,
     content,
-    qualified: audit.score >= minScore && contacts.emails.length + contacts.phones.length > 0,
+    // Outreach is by email only: a site without a public email address is skipped.
+    qualified: audit.score >= minScore && contacts.emails.length > 0,
     auditedAt: new Date().toISOString(),
   };
 }

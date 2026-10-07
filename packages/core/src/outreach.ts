@@ -27,35 +27,31 @@ export function buildPitch(lead: Lead, previewUrl: string, senderName: string): 
   }
   if (!points.length) points.push("its design looks dated next to competitors nearby");
 
-  const subject = `A fresh look for ${lead.name}'s website`;
+  const domain = lead.website.replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/.*$/, "");
+  const subject = `${lead.name}: your redesigned website is ready to view`;
   const body = [
     `Hi ${lead.name} team,`,
     "",
-    `I came across ${lead.website.replace(/^https?:\/\//, "").replace(/\/$/, "")} while looking at ${label(lead.category)} in ${lead.city}. A few things stood out:`,
+    `I was looking at ${domain} and noticed a few things that may be costing you customers:`,
     "",
     ...points.map((p) => `• ${p}`),
     "",
-    "Instead of just describing it, I built a free concept of what a modern version could look like, using your existing content:",
+    "So I rebuilt your website as a demo, using your own text and photos, with a modern design that works well on phones:",
     previewUrl,
     "",
-    "If you like the direction, I can turn it into your real site, with mobile support, fast loading and easy updates. If not, no problem at all.",
+    "Nothing has changed on your current site, and the demo isn't listed on Google.",
+    "",
+    "If you like it, I can turn it into your live website. Just reply to this email and we can go through the details. If it's not for you, no problem at all.",
     "",
     "Best regards,",
     senderName,
     "",
     "—",
-    "You're receiving this one-time note because your business email is listed publicly on your website. Reply \"no thanks\" and I won't contact you again.",
+    `You're receiving this one-time email because this address is listed on ${domain}. Reply "no thanks" and I won't contact you again.`,
   ].join("\n");
 
   const gmailUrl =
     "https://mail.google.com/mail/?view=cm&fs=1" +
     `&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   return { to, subject, body, gmailUrl };
-}
-
-function label(cat: string): string {
-  return (
-    { restaurant: "restaurants", gym: "gyms", import_export: "import/export companies", healthcare: "healthcare practices", accounting: "accounting firms" }[cat] ??
-    "local businesses"
-  );
 }
