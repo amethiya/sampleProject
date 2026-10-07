@@ -8,7 +8,9 @@
  *  4. Copy the /exec URL and set it on the Worker:  npx wrangler secret put SHEETS_WEBHOOK_URL
  *     and the same secret:                          npx wrangler secret put SHEETS_SECRET
  *
- * The Worker POSTs {secret, headers, rows}. Rows already present (same Website) are skipped.
+ * The Worker POSTs {secret, headers, rows}. Each row is matched by its Website value:
+ * a new website is appended; a known one has its Revamp Radar columns updated in place (status, contacts,
+ * preview link…). Columns to the right of the Revamp Radar columns are never touched, so your own notes stay.
  */
 var SHEET_NAME = 'Leads'; // falls back to the first tab
 
@@ -22,25 +24,38 @@ function doPost(e) {
 
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var sheet = ss.getSheetByName(SHEET_NAME) || ss.getSheets()[0];
+    var width = body.headers.length;
     if (sheet.getLastRow() === 0) {
       sheet.appendRow(body.headers);
-      sheet.getRange(1, 1, 1, body.headers.length).setFontWeight('bold');
+      sheet.getRange(1, 1, 1, width).setFontWeight('bold');
       sheet.setFrozenRows(1);
     }
 
-    var websiteCol = body.headers.indexOf('Website') + 1;
-    var existing = {};
-    if (sheet.getLastRow() > 1 && websiteCol > 0) {
-      sheet.getRange(2, websiteCol, sheet.getLastRow() - 1, 1).getValues()
-        .forEach(function (r) { existing[r[0]] = true; });
+    var websiteCol = body.headers.indexOf('Website');
+    var rowOf = {};
+    if (sheet.getLastRow() > 1 && websiteCol >= 0) {
+      sheet.getRange(2, websiteCol + 1, sheet.getLastRow() - 1, 1).getValues()
+        .forEach(function (r, i) { if (r[0]) rowOf[r[0]] = i + 2; });
     }
-    var fresh = body.rows.filter(function (r) { return !existing[r[websiteCol - 1]]; });
-    if (fresh.length) {
-      var range = sheet.getRange(sheet.getLastRow() + 1, 1, fresh.length, fresh[0].length);
+
+    var updated = 0, appended = [];
+    body.rows.forEach(function (r) {
+      var at = rowOf[r[websiteCol]];
+      if (at) {
+        var range = sheet.getRange(at, 1, 1, width);
+        range.setNumberFormat('@');
+        range.setValues([r]);
+        updated++;
+      } else {
+        appended.push(r);
+      }
+    });
+    if (appended.length) {
+      var range = sheet.getRange(sheet.getLastRow() + 1, 1, appended.length, width);
       range.setNumberFormat('@'); // keep phone numbers and dates as plain text
-      range.setValues(fresh);
+      range.setValues(appended);
     }
-    return out({ ok: true, appended: fresh.length, skipped: body.rows.length - fresh.length });
+    return out({ ok: true, appended: appended.length, updated: updated });
   } catch (err) {
     return out({ ok: false, error: String(err) });
   } finally {

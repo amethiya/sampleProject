@@ -46,7 +46,7 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-async function api(req: Request, url: URL, env: Env, _ctx: ExecutionContext): Promise<Response> {
+async function api(req: Request, url: URL, env: Env, ctx: ExecutionContext): Promise<Response> {
   const path = url.pathname.replace(/\/+$/, "");
   const m = req.method;
 
@@ -105,7 +105,9 @@ async function api(req: Request, url: URL, env: Env, _ctx: ExecutionContext): Pr
   if (lm && m === "PATCH") {
     const { status } = (await req.json()) as { status?: string };
     if (!status || !STATUSES.includes(status)) return json({ error: "invalid status" }, 400);
-    await env.DB.prepare("UPDATE sites SET status = ? WHERE id = ?").bind(status, decodeURIComponent(lm[1])).run();
+    // Mark the row for re-sync so the Google Sheet shows the new status, then push it straight away.
+    await env.DB.prepare("UPDATE sites SET status = ?, sheet_synced = 0 WHERE id = ?").bind(status, decodeURIComponent(lm[1])).run();
+    ctx.waitUntil(syncSheet(env, publicBase(env, url)).catch(() => {}));
     return json({ ok: true });
   }
 
