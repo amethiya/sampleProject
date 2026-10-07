@@ -1,0 +1,32 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "revamp-radar",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  // Dashboard (React build) served as static assets; API + previews handled by the Worker.
+  "assets": {
+    "directory": "../dashboard/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/preview/*", "/img"]
+  },
+  "d1_databases": [
+    // Run `npx wrangler d1 create revamp-radar` and paste the returned database_id here.
+    { "binding": "DB", "database_name": "revamp-radar", "database_id": "97f2b40d-3213-4783-8c7e-c9aeaf27ebd1" }
+  ],
+  // Every 10 minutes: discover a slice if the queue is low, audit a small batch, sync to Sheets.
+  // Small batches keep each run under the free plan's 50-subrequest limit.
+  "triggers": { "crons": ["*/10 * * * *"] },
+  "vars": {
+    "DAILY_TARGET": "10",
+    "MIN_SCORE": "35",
+    "BATCH_SIZE": "6",
+    "PUBLIC_URL": "https://revamp-radar.amethiyavivek.workers.dev",
+    "SENDER_NAME": "Vivek Amethiya"
+  }
+  // Secrets (set with `npx wrangler secret put <NAME>`):
+  //   ADMIN_TOKEN         - bearer token the dashboard uses for /api
+  //   SHEETS_WEBHOOK_URL  - Google Apps Script web app URL (integrations/google-apps-script)
+  //   SHEETS_SECRET       - shared secret checked by the Apps Script
+}

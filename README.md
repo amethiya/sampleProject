@@ -1,192 +1,111 @@
-# Employee Management System
+# Revamp Radar
 
-A full-stack CRUD application for managing employees built with Node.js, TypeScript, Express, React, and MySQL.
+Finds small businesses (restaurants, gyms, import/export, healthcare, accounting) in US and EU cities
+whose websites look outdated, collects their **publicly listed** contact details, appends them to a
+Google Sheet, and generates an animated concept redesign of each site from its own content.
 
-## Features
+**Live:** https://revamp-radar.amethiyavivek.workers.dev — public page at `/`, sign in at `/login`,
+dashboard at `/app`, redesigns at `/preview/<domain>`.
 
-- Create, Read, Update, and Delete employee records
-- Modern React UI with TypeScript
-- RESTful API backend with Express and TypeScript
-- MySQL database integration
-- Responsive design
-
-## Prerequisites
-
-- Node.js (v18 or higher)
-- Docker and Docker Compose (recommended for database)
-- npm or yarn
-
-## Quick Start with Docker (Recommended)
-
-### 1. Start MySQL Database
-
-```bash
-# Start MySQL in Docker
-docker-compose up -d
-
-# Verify it's running
-docker-compose ps
+```
+OpenStreetMap (Overpass)  ──►  Cloudflare Worker (cron every 10 min)  ──►  D1 database
+   businesses with websites      audit → score → extract contacts            │
+                                                                             ├─► Google Sheet (Apps Script webhook)
+                                                                             ├─► Dashboard (React, same Worker)
+                                                                             └─► /preview/<domain>  (3D animated redesign)
 ```
 
-The database will be automatically created with these credentials:
-- **Host**: localhost
-- **Port**: 3307 (mapped from container port 3306)
-- **Database**: employee_db
-- **User**: mysql_user
-- **Password**: mysql_password
+## Repo layout
 
-**Note**: Port 3307 is used to avoid conflicts with other MySQL instances. The `.env` file is already configured correctly.
+| Path | What |
+|---|---|
+| `packages/core` | Shared logic: discovery, outdated-site scoring, contact/content extraction, redesign renderer. Runs in Node and Workers. |
+| `apps/worker` | Cloudflare Worker: cron job, REST API, preview pages, serves the dashboard. D1 schema in `schema.sql`. |
+| `apps/dashboard` | React + Vite: public landing page (before/after slider, live showcase), sign-in, and the leads dashboard with a per-lead drawer (audit, live redesign, pitch email). |
+| `apps/cli` | Local runner: `npm run discover` writes CSV/JSON + preview HTML to `out/`. |
+| `integrations/google-apps-script` | `Code.gs` webhook that appends rows to the Google Sheet. |
+| `docs/PLAN.md` | Phase 1 / 2 / 3 product plan. |
 
-### 2. Backend Setup
+## Quick start
 
 ```bash
-# Navigate to backend directory
-cd backend
-
-# Install dependencies
 npm install
+npm test                                   # core unit tests
+npm run discover -- --target 10            # local run → out/leads-<date>.csv + out/previews/*.html
+npm run discover -- --category gym --city berlin --target 5
 
-# The .env file is already configured for Docker MySQL
-# No need to change anything if using Docker!
-
-# Run the backend server (development mode)
-npm run dev
+# feed the deployed Worker (RR_TOKEN = ADMIN_TOKEN)
+RR_URL=https://revamp-radar.amethiyavivek.workers.dev RR_TOKEN=… npm run discover -- --target 10 --upload
+RR_URL=… RR_TOKEN=… npm run discover -- --push --slices 6   # discovery only, Worker audits
 ```
 
-The backend server will start on `http://localhost:5001` and automatically create the employees table.
+### Full-site redesigns
 
-**Note**: Port 5001 is used instead of 5000 to avoid conflicts with macOS AirPlay Receiver.
+Opening a redesign crawls the business's site (home page plus up to 7 linked pages), keeps every heading,
+paragraph, list and image in order, and renders each page in our theme with motion and 3D:
+`/preview/<domain>/` and `/preview/<domain>/<page>`. Add `?engine=template` or `?engine=claude` to pick a version.
 
-### 3. Frontend Setup
-
-Open a new terminal window:
+**Redesign with Claude** (dashboard → lead → Redesign → *Redesign with Claude*) queues a job. A runner on your
+Mac picks it up and has Claude Code, signed in with your Claude subscription, build a bespoke multi-page site from
+the crawled content following `packages/core/src/redesign/brief.ts`:
 
 ```bash
-# Navigate to frontend directory
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run the frontend development server
-npm run dev
+claude            # once: sign in to Claude Code with your Claude account
+RR_URL=https://revamp-radar.amethiyavivek.workers.dev RR_TOKEN=<ADMIN_TOKEN> npm run redesign-runner
 ```
 
-The frontend will start on `http://localhost:3000`
+The runner only allows Claude to read and write files in a temporary folder (no shell, no web access).
+Claude-built pages are served with a sandboxed CSP, so they can't touch the dashboard's session.
+A Claude subscription can't be called from Cloudflare directly; to run jobs without your Mac on, the same
+brief can be sent through the Claude API with an API key (billed per use).
 
-## Docker Commands
+### Outreach (Phase 3)
+
+Click a lead in the dashboard to see why it scored as outdated plus a ready-made pitch email.
+"Open draft in Gmail" opens a pre-filled compose window. Nothing is sent automatically.
+Set the signature with `SENDER_NAME` in `apps/worker/wrangler.jsonc`.
+
+### How a site is scored (0–100, higher = more outdated)
+
+No HTTPS, no mobile viewport, legacy doctype, table layouts, `<font>/<center>/<marquee>/frames`, Flash,
+old jQuery/Bootstrap/WordPress, legacy Google Analytics, IE hacks, old copyright year, old generators
+(FrontPage, Dreamweaver…), dated builders, fixed-width layouts, slider plugins, no semantic HTML.
+Modern stacks (Next.js, Webflow, Squarespace, Wix…) subtract points. A lead **qualifies** at
+`MIN_SCORE` (default 35) and needs at least one email or phone number.
+
+## Deploying (Cloudflare free plan)
 
 ```bash
-# Start MySQL database
-docker-compose up -d
-
-# Stop MySQL database
-docker-compose down
-
-# View database logs
-docker-compose logs mysql
-
-# Stop and remove all data (fresh start)
-docker-compose down -v
+npx wrangler login
+npx wrangler d1 create revamp-radar        # put database_id into apps/worker/wrangler.jsonc
+npm run db:init -w @rr/worker              # apply schema
+npm run db:migrate -w @rr/worker           # full-site crawl + Claude redesign tables
+npx wrangler secret put ADMIN_EMAIL        # (in apps/worker) dashboard sign-in email
+npm run hash-password -w @rr/worker -- '<password>' | npx wrangler secret put ADMIN_PASSWORD_HASH
+openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET
+npx wrangler secret put ADMIN_TOKEN        # bearer token for the CLI / GitHub Action
+npm run deploy
 ```
 
-## Manual Database Setup (Alternative)
+The cron (`*/10 * * * *`) refills the queue from one (category, city) slice when it runs low,
+audits 6 sites per run (≤ ~15 subrequests, under the free 50 limit), and stops auditing for the day
+once it reaches 3× `DAILY_TARGET` qualified leads.
 
-If you prefer not to use Docker, you can set up MySQL manually:
+### Google Sheet sync
 
-1. Install and start MySQL on your system
-2. Create database: `CREATE DATABASE employee_db;`
-3. Update `backend/.env` with your MySQL credentials
-4. See [Troubleshooting](#troubleshooting) section for help
+1. Open the Google Sheet → Extensions → Apps Script → paste `integrations/google-apps-script/Code.gs`.
+2. Project Settings → Script properties → `SHEETS_SECRET` = a long random string.
+3. Deploy → New deployment → Web app → Execute as **Me**, access **Anyone** → copy the `/exec` URL.
+4. In `apps/worker`: `npx wrangler secret put SHEETS_WEBHOOK_URL` and `npx wrangler secret put SHEETS_SECRET`.
 
-## Project Structure
+New qualified leads are appended every cron run (deduplicated by website). "Sync to Sheet" in the
+dashboard forces it.
 
-```
-sample-project/
-├── backend/
-│   ├── src/
-│   │   ├── config/
-│   │   │   └── database.ts      # Database configuration
-│   │   ├── controllers/
-│   │   │   └── employeeController.ts  # CRUD controllers
-│   │   ├── models/
-│   │   │   └── Employee.ts      # Employee interface
-│   │   ├── routes/
-│   │   │   └── employeeRoutes.ts # API routes
-│   │   └── index.ts              # Server entry point
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── EmployeeForm.tsx  # Form component
-│   │   │   └── EmployeeList.tsx   # List component
-│   │   ├── services/
-│   │   │   └── api.ts            # API service
-│   │   ├── types/
-│   │   │   └── Employee.ts       # TypeScript types
-│   │   ├── App.tsx               # Main app component
-│   │   └── main.tsx              # Entry point
-│   ├── package.json
-│   └── vite.config.ts
-└── README.md
-```
+## Responsible use
 
-## API Endpoints
-
-- `GET /api/employees` - Get all employees
-- `GET /api/employees/:id` - Get employee by ID
-- `POST /api/employees` - Create new employee
-- `PUT /api/employees/:id` - Update employee
-- `DELETE /api/employees/:id` - Delete employee
-
-## Usage
-
-1. Start the backend server (port 5001)
-2. Start the frontend server (port 3000)
-3. Open `http://localhost:3000` in your browser
-4. Click "Add New Employee" to create an employee
-5. Use Edit/Delete buttons to manage employees
-
-## Troubleshooting
-
-### Docker Issues
-
-**If Docker container won't start:**
-```bash
-# Check if port 3306 is already in use
-lsof -i :3306
-
-# If port is in use, stop local MySQL or change port in docker-compose.yml
-```
-
-**If you get connection errors:**
-- Make sure Docker container is running: `docker-compose ps`
-- Check container logs: `docker-compose logs mysql`
-- Verify .env file has correct credentials (should match docker-compose.yml)
-
-### MySQL Authentication Error (Manual Setup)
-
-If you see `Access denied for user` error:
-
-1. **Use Docker instead** (recommended): `docker-compose up -d`
-
-2. **Or test your connection**:
-   ```bash
-   cd backend
-   node test-db-connection.js
-   ```
-
-3. **Update `.env` file** with correct credentials:
-   - Open `backend/.env`
-   - Update `DB_PASSWORD` with your MySQL password
-
-4. **See detailed guide**: Check `backend/SETUP.md` for more troubleshooting steps.
-
-## Technologies Used
-
-- **Backend**: Node.js, Express, TypeScript, MySQL (mysql2)
-- **Frontend**: React, TypeScript, Vite, Axios
-- **Database**: MySQL (via Docker)
-- **Containerization**: Docker & Docker Compose
-
+- Only contact details the business publishes on its own site or in OpenStreetMap are collected.
+- Previews are labelled "Concept redesign, not the official website", served `noindex`, and link to
+  the real site. Use them in one-to-one pitches, not as public replacements.
+- Outreach to EU contacts falls under GDPR (legitimate-interest B2B, clear opt-out); US under CAN-SPAM.
+  Honour opt-outs by setting a lead's status to `ignored`.
+- OpenStreetMap data © OpenStreetMap contributors (ODbL). Be gentle with the public Overpass API.

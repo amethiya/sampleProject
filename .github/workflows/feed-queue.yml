@@ -1,0 +1,18 @@
+# Daily backup feed: discovers businesses from GitHub's runners and pushes them to the Worker's queue.
+# Needs repo secrets RR_URL (e.g. https://revamp-radar.<you>.workers.dev) and RR_TOKEN (the ADMIN_TOKEN).
+name: Feed lead queue
+on:
+  schedule: [{ cron: "15 5 * * *" }]
+  workflow_dispatch:
+jobs:
+  feed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run discover -- --push --slices 8
+        env:
+          RR_URL: ${{ secrets.RR_URL }}
+          RR_TOKEN: ${{ secrets.RR_TOKEN }}

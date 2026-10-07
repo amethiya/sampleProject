@@ -1,16 +1,15 @@
 {
-  "name": "employee-management-system",
-  "version": "1.0.0",
-  "description": "Full-stack Employee CRUD application",
+  "name": "revamp-radar",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
   "scripts": {
-    "install:all": "cd backend && npm install && cd ../frontend && npm install",
-    "dev:backend": "cd backend && npm run dev",
-    "dev:frontend": "cd frontend && npm run dev",
-    "build:backend": "cd backend && npm run build",
-    "build:frontend": "cd frontend && npm run build"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+    "discover": "npm run discover -w @rr/cli --",
+    "redesign-runner": "npm run redesign-runner -w @rr/cli --",
+    "test": "npm test -w @rr/core",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:dashboard": "npm run dev -w @rr/dashboard",
+    "dev:worker": "npm run build -w @rr/dashboard && npm run dev -w @rr/worker",
+    "deploy": "npm run build -w @rr/dashboard && npm run deploy -w @rr/worker"
+  }
 }
-
