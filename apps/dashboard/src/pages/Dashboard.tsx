@@ -52,6 +52,7 @@ export default function Dashboard() {
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const guard = useCallback((e: unknown) => {
     if (e instanceof Unauthorized) navigate("/login");
@@ -164,6 +165,7 @@ export default function Dashboard() {
             <p className="muted">Businesses with outdated websites and a redesign ready to pitch.</p>
           </div>
           <div className="head-actions">
+            <button className="button button-quiet" onClick={() => setAdding(true)}>Redesign any website</button>
             <button className="button button-quiet" onClick={exportCsv}>Export CSV</button>
             <button className="button button-quiet" onClick={() => runAction("sync")} disabled={!!busy}>{busy === "sync" ? "Syncing…" : "Sync to Sheet"}</button>
             <button className="button" onClick={() => runAction("run")} disabled={!!busy}>{busy === "run" ? "Running discovery…" : "Run discovery"}</button>
@@ -244,6 +246,13 @@ export default function Dashboard() {
       </main>
 
       {lead && <LeadDrawer lead={lead} onClose={() => setSelected(null)} onStatus={(s) => updateStatus(lead.id, s)} onError={guard} />}
+      {adding && (
+        <AddWebsite
+          onClose={() => setAdding(false)}
+          onAdded={async (id, name) => { setAdding(false); setToast(`${name} added. Opening its redesign…`); await load(); setSelected(id); }}
+          onError={guard}
+        />
+      )}
       {toast && <div className="toast" role="status">{toast}</div>}
     </div>
   );
@@ -355,7 +364,54 @@ function LeadDrawer({ lead, onClose, onStatus, onError }: { lead: LeadRow; onClo
   );
 }
 
+function AddWebsite({ onClose, onAdded, onError }: { onClose(): void; onAdded(id: string, name: string): void; onError(e: unknown): void }) {
+  const [url, setUrl] = useState("");
+  const [category, setCategory] = useState("restaurant");
+  const [city, setCity] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const r = await api<{ id: string; name: string }>("/api/leads/add", { method: "POST", body: JSON.stringify({ url, category, city }) });
+      onAdded(r.id, r.name);
+    } catch (err) {
+      if (err instanceof Unauthorized) onError(err);
+      else setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <div className="scrim" onClick={onClose} />
+      <form className="modal" onSubmit={submit} role="dialog" aria-label="Redesign any website">
+        <h2>Redesign any website</h2>
+        <p className="muted">Paste a website address. Revamp Radar reads its pages, adds it to your leads and builds a redesign you can open right away.</p>
+        <label>Website<input type="text" inputMode="url" placeholder="example.com" value={url} onChange={(e) => setUrl(e.target.value)} required autoFocus /></label>
+        <div className="modal-row">
+          <label>Category
+            <select value={category} onChange={(e) => setCategory(e.target.value)}>
+              {Object.entries(CATEGORY_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+            </select>
+          </label>
+          <label>City (optional)<input type="text" value={city} onChange={(e) => setCity(e.target.value)} /></label>
+        </div>
+        {error && <p className="form-error" role="alert">{error}</p>}
+        <div className="modal-actions">
+          <button type="button" className="button button-quiet" onClick={onClose}>Cancel</button>
+          <button type="submit" className="button" disabled={busy}>{busy ? "Reading website…" : "Add and redesign"}</button>
+        </div>
+      </form>
+    </>
+  );
+}
+
 interface RedesignStatus {
+  templateStyle: string | null;
+  claudeStyle: string | null;
   crawledAt: string | null;
   pages: { slug: string; label: string; url: string }[];
   job: { id: number; status: "queued" | "running" | "done" | "failed"; error: string | null; createdAt: string; startedAt: string | null; finishedAt: string | null } | null;
@@ -455,7 +511,11 @@ function RedesignPanel({ lead, onError }: { lead: LeadRow; onError(e: unknown): 
           <button className="button button-quiet" onClick={() => act("crawl")} disabled={!!busy || active}>{busy === "crawl" ? "Reading site…" : "Re-read website"}</button>
         </div>
       </div>
-      <p className="muted small">Read {st.pages.length} pages from the current site{st.crawledAt ? ` on ${new Date(st.crawledAt).toLocaleDateString()}` : ""}.</p>
+      <p className="muted small">
+        Read {st.pages.length} pages from the current site{st.crawledAt ? ` on ${new Date(st.crawledAt).toLocaleDateString()}` : ""}.
+        {st.templateStyle && ` Template look: ${st.templateStyle}.`}
+        {st.claudeStyle && ` Claude look: ${st.claudeStyle}.`}
+      </p>
     </div>
   );
 }

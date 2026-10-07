@@ -10,3 +10,5 @@ export { THEMES } from "./redesign/themes";
 export * from "./outreach";
 export * from "./crawl";
 export { BRIEF, RUNNER_PROMPT, LIBRARIES, briefContent } from "./redesign/brief";
+export { pickDna, dnaFromKey, PALETTES, FONT_PAIRS, CONCEPTS, type DesignDna } from "./redesign/styles";
+export { applyDna } from "./redesign/render";

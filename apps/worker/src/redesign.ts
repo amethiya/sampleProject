@@ -1,4 +1,7 @@
-import { crawlSite, renderSitePage, snapshotFromLead, type Lead, type SiteSnapshot } from "@rr/core";
+import {
+  auditCandidate, categoryById, crawlSite, dnaFromKey, hostId, normalizeWebsite, pickDna, renderSitePage, snapshotFromLead,
+  type DesignDna, type Lead, type SiteSnapshot,
+} from "@rr/core";
 
 interface Db {
   DB: D1Database;
@@ -17,12 +20,38 @@ const STALE_MINUTES = 45;
 interface SiteRow {
   lead: string;
   site: string | null;
+  style: string | null;
 }
 
-async function loadLead(env: Db, id: string): Promise<{ lead: Lead; site: SiteSnapshot | null } | null> {
-  const row = await env.DB.prepare("SELECT lead, site FROM sites WHERE id = ? AND state = 'audited'").bind(id).first<SiteRow>();
+async function loadLead(env: Db, id: string): Promise<{ lead: Lead; site: SiteSnapshot | null; style: string | null } | null> {
+  const row = await env.DB.prepare("SELECT lead, site, style FROM sites WHERE id = ? AND state = 'audited'").bind(id).first<SiteRow>();
   if (!row) return null;
-  return { lead: JSON.parse(row.lead) as Lead, site: row.site ? (JSON.parse(row.site) as SiteSnapshot) : null };
+  return { lead: JSON.parse(row.lead) as Lead, site: row.site ? (JSON.parse(row.site) as SiteSnapshot) : null, style: row.style };
+}
+
+/** Design DNA keys of the most recent redesigns, newest first (template sites and Claude jobs). */
+async function recentStyles(env: Db, limit = 12): Promise<string[]> {
+  const { results } = await env.DB.prepare(
+    `SELECT style FROM (
+       SELECT style, styled_at AS at FROM sites WHERE style IS NOT NULL
+       UNION ALL SELECT style, created_at AS at FROM redesign_jobs WHERE style IS NOT NULL
+     ) ORDER BY at DESC LIMIT ?`,
+  ).bind(limit).all<{ style: string }>();
+  return results.map((r) => r.style);
+}
+
+/** The site's DNA, assigning one that differs from recent redesigns the first time it is rendered. */
+async function ensureDna(env: Db, id: string, lead: Lead, style: string | null): Promise<DesignDna> {
+  const existing = style ? dnaFromKey(style) : null;
+  if (existing) return existing;
+  const dna = pickDna(id, lead.category, await recentStyles(env));
+  await env.DB.prepare("UPDATE sites SET style = ?, styled_at = datetime('now') WHERE id = ?").bind(dna.key, id).run();
+  return dna;
+}
+
+export function describeDna(key: string): string {
+  const d = dnaFromKey(key);
+  return d ? `${d.concept.name} concept, ${d.hero} hero, ${d.palette.id} palette, ${d.fonts.id} type` : key;
 }
 
 /** Crawl the whole site once and keep it; later previews and Claude jobs reuse the snapshot. */
@@ -55,7 +84,8 @@ export async function preview(req: Request, url: URL, env: Db): Promise<Response
   if (!data) return new Response("Preview not found", { status: 404 });
   const site = await ensureSite(env, id, data.lead, data.site);
   if (!site.pages.some((p) => p.slug === slug)) return new Response("Page not found", { status: 404 });
-  return html(renderSitePage(data.lead, site, slug, { image: (u) => proxied(url.origin, u) }), TEMPLATE_CSP);
+  const dna = await ensureDna(env, id, data.lead, data.style);
+  return html(renderSitePage(data.lead, site, slug, { image: (u) => proxied(url.origin, u), dna }), TEMPLATE_CSP);
 }
 
 export function proxied(origin: string, u: string): string {
@@ -128,9 +158,37 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
     if (lm[2] === "redesign" && m === "POST") {
       const site = await ensureSite(env, id, data.lead, data.site);
       const active = await env.DB.prepare("SELECT id FROM redesign_jobs WHERE lead_id = ? AND status IN ('queued', 'running')").bind(id).first();
-      if (!active) await env.DB.prepare("INSERT INTO redesign_jobs (lead_id) VALUES (?)").bind(id).run();
+      if (!active) {
+        // A new look every time: avoid recent redesigns, including this site's current one.
+        const recent = await recentStyles(env);
+        if (data.style) recent.unshift(data.style);
+        const dna = pickDna(`${id}:${Date.now()}`, data.lead.category, recent);
+        await env.DB.prepare("INSERT INTO redesign_jobs (lead_id, style) VALUES (?, ?)").bind(id, dna.key).run();
+      }
       return json(await status(env, id, site));
     }
+  }
+
+  // Add any website by URL (not only discovered leads) so it can be redesigned.
+  if (path === "/api/leads/add" && m === "POST") {
+    const body = (await req.json().catch(() => ({}))) as { url?: string; category?: string; city?: string; name?: string };
+    const website = normalizeWebsite(body.url ?? "");
+    const category = categoryById(body.category ?? "");
+    if (!website || !category) return json({ error: "Enter a website address and choose a category." }, 400);
+    const id = hostId(website);
+    const lead = await auditCandidate({
+      id, name: body.name?.trim() || id, category: category.id, city: body.city?.trim() || "", country: "", region: "us", website,
+    }, 0);
+    if (!lead) return json({ error: "That website couldn't be reached. Check the address and try again." }, 422);
+    if (!body.name?.trim()) lead.name = (lead.content.title.split(/[|\-–—:]/)[0] || id).trim().slice(0, 80) || id;
+    lead.qualified = true;
+    await env.DB.prepare(
+      `INSERT INTO sites (id, name, category, city, country, region, website, candidate, state, score, qualified, lead, audited_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'audited', ?, 1, ?, datetime('now'))
+       ON CONFLICT(id) DO UPDATE SET state = 'audited', name = excluded.name, category = excluded.category, score = excluded.score,
+         qualified = 1, lead = excluded.lead, site = NULL, audited_at = excluded.audited_at`,
+    ).bind(id, lead.name, lead.category, lead.city, lead.country, lead.region, website, JSON.stringify(lead), lead.audit.score, JSON.stringify(lead)).run();
+    return json({ id, name: lead.name, score: lead.audit.score });
   }
 
   // Runner protocol (used by `npm run redesign-runner` on a machine signed in to Claude Code).
@@ -138,7 +196,7 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
     await env.DB.prepare(
       `UPDATE redesign_jobs SET status = 'queued', started_at = NULL WHERE status = 'running' AND started_at < datetime('now', '-${STALE_MINUTES} minutes')`,
     ).run();
-    const job = await env.DB.prepare("SELECT id, lead_id FROM redesign_jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1").first<{ id: number; lead_id: string }>();
+    const job = await env.DB.prepare("SELECT id, lead_id, style FROM redesign_jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1").first<{ id: number; lead_id: string; style: string | null }>();
     if (!job) return json({ job: null });
     const claimed = await env.DB.prepare("UPDATE redesign_jobs SET status = 'running', started_at = datetime('now') WHERE id = ? AND status = 'queued'").bind(job.id).run();
     if (!claimed.meta.changes) return json({ job: null });
@@ -148,7 +206,8 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
       return json({ job: null });
     }
     const site = await ensureSite(env, job.lead_id, data.lead, data.site);
-    return json({ job: { id: job.id, leadId: job.lead_id }, lead: data.lead, site: withProxiedImages(url.origin, site) });
+    const avoid = (await recentStyles(env, 8)).filter((k) => k !== job.style).slice(0, 5).map(describeDna);
+    return json({ job: { id: job.id, leadId: job.lead_id, style: job.style }, lead: data.lead, site: withProxiedImages(url.origin, site), avoid });
   }
 
   const jm = path.match(/^\/api\/redesign-jobs\/(\d+)\/(complete|fail)$/);
@@ -190,10 +249,13 @@ async function finish(env: Db, id: number, status: string, error: string | null)
 
 async function status(env: Db, id: string, site: SiteSnapshot | null) {
   const job = await env.DB.prepare(
-    "SELECT id, status, error, created_at AS createdAt, started_at AS startedAt, finished_at AS finishedAt FROM redesign_jobs WHERE lead_id = ? ORDER BY id DESC LIMIT 1",
+    "SELECT id, status, error, style, created_at AS createdAt, started_at AS startedAt, finished_at AS finishedAt FROM redesign_jobs WHERE lead_id = ? ORDER BY id DESC LIMIT 1",
   ).bind(id).first();
   const { results: ai } = await env.DB.prepare("SELECT slug, created_at AS createdAt FROM ai_pages WHERE lead_id = ?").bind(id).all<{ slug: string; createdAt: string }>();
+  const style = await env.DB.prepare("SELECT style FROM sites WHERE id = ?").bind(id).first<{ style: string | null }>();
   return {
+    templateStyle: style?.style ? describeDna(style.style) : null,
+    claudeStyle: (job as { style?: string } | null)?.style ? describeDna((job as { style: string }).style) : null,
     crawledAt: site?.crawledAt ?? null,
     pages: site?.pages.map((p) => ({ slug: p.slug, label: p.label, url: p.url })) ?? [],
     job: job ?? null,

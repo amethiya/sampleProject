@@ -15,7 +15,7 @@ import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseArgs } from "node:util";
-import { BRIEF, RUNNER_PROMPT, briefContent, type Lead, type SiteSnapshot } from "@rr/core";
+import { BRIEF, RUNNER_PROMPT, briefContent, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
 
 const { values: args } = parseArgs({
   options: {
@@ -45,9 +45,10 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 }
 
 interface NextJob {
-  job: { id: number; leadId: string } | null;
+  job: { id: number; leadId: string; style: string | null } | null;
   lead?: Lead;
   site?: SiteSnapshot;
+  avoid?: string[];
 }
 
 function runClaude(cwd: string, timeoutMin: number): Promise<string> {
@@ -85,14 +86,15 @@ async function collectPages(dir: string, allowed: Set<string>) {
   return pages;
 }
 
-async function processJob({ job, lead, site }: NextJob) {
+async function processJob({ job, lead, site, avoid = [] }: NextJob) {
   if (!job || !lead || !site) return;
   const started = Date.now();
-  console.log(`\n▶ Job ${job.id}: ${lead.name} (${site.pages.length} pages)`);
+  const dna = job.style ? dnaFromKey(job.style) ?? undefined : undefined;
+  console.log(`\n▶ Job ${job.id}: ${lead.name} (${site.pages.length} pages)${dna ? `, ${dna.concept.name} / ${dna.palette.id} / ${dna.fonts.id}` : ""}`);
   const dir = await mkdtemp(join(tmpdir(), `rr-${job.id}-`));
   try {
     await writeFile(join(dir, "BRIEF.md"), BRIEF);
-    await writeFile(join(dir, "content.json"), JSON.stringify(briefContent(lead, site), null, 2));
+    await writeFile(join(dir, "content.json"), JSON.stringify(briefContent(lead, site, dna, avoid), null, 2));
     const result = await runClaude(dir, Number(args.timeout));
     let summary = result.slice(-300);
     try {

@@ -272,6 +272,14 @@ select.s-lost, select.s-ignored { color: var(--muted); }
 .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--night); color: #fff; padding: 12px 18px; border-radius: 12px; box-shadow: 0 12px 30px rgba(11, 16, 40, .3); z-index: 50; animation: rise .25s ease-out; max-width: calc(100vw - 32px); }
 @keyframes rise { from { transform: translate(-50%, 10px); opacity: 0; } }
 
+/* Modal */
+.modal { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(520px, calc(100vw - 32px)); background: var(--white); border-radius: 16px; padding: 28px; z-index: 41; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 30px 80px -20px rgba(11, 16, 40, .45); animation: fade .2s ease-out; }
+.modal h2 { font-size: 22px; font-weight: 750; }
+.modal label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px; flex: 1; }
+.modal input, .modal select { height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--white); }
+.modal-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
 /* Responsive */
 @media (max-width: 1080px) {
   .kpis { grid-template-columns: repeat(3, 1fr); }
