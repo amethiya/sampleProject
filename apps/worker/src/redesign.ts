@@ -196,7 +196,12 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
     await env.DB.prepare(
       `UPDATE redesign_jobs SET status = 'queued', started_at = NULL WHERE status = 'running' AND started_at < datetime('now', '-${STALE_MINUTES} minutes')`,
     ).run();
-    const job = await env.DB.prepare("SELECT id, lead_id, style FROM redesign_jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1").first<{ id: number; lead_id: string; style: string | null }>();
+    // Optionally claim the job for one specific website (cloud sessions asked to redesign X).
+    const { leadId } = (await req.json().catch(() => ({}))) as { leadId?: string };
+    const job = await (leadId
+      ? env.DB.prepare("SELECT id, lead_id, style FROM redesign_jobs WHERE status = 'queued' AND lead_id = ? ORDER BY created_at LIMIT 1").bind(leadId)
+      : env.DB.prepare("SELECT id, lead_id, style FROM redesign_jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1")
+    ).first<{ id: number; lead_id: string; style: string | null }>();
     if (!job) return json({ job: null });
     const claimed = await env.DB.prepare("UPDATE redesign_jobs SET status = 'running', started_at = datetime('now') WHERE id = ? AND status = 'queued'").bind(job.id).run();
     if (!claimed.meta.changes) return json({ job: null });

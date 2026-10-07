@@ -6,6 +6,8 @@
  *   ADMIN_PASSWORD_HASH  - "pbkdf2$<iterations>$<saltHex>$<hashHex>" (generate with `npm run hash-password -w @rr/worker`)
  *   SESSION_SECRET       - random string used to sign session cookies
  * ADMIN_TOKEN (bearer) keeps working for the CLI and automation.
+ * RUNNER_TOKEN (bearer) is a limited key for redesign runners and Claude cloud sessions: it can only add
+ * websites and work on redesign jobs (see RUNNER_PATHS).
  */
 
 export interface AuthEnv {
@@ -13,6 +15,7 @@ export interface AuthEnv {
   ADMIN_PASSWORD_HASH?: string;
   SESSION_SECRET?: string;
   ADMIN_TOKEN?: string;
+  RUNNER_TOKEN?: string;
 }
 
 const COOKIE = "rr_session";
@@ -55,9 +58,15 @@ function readCookie(req: Request, name: string): string | undefined {
     .find(([k]) => k === name)?.[1];
 }
 
-/** Returns the signed-in email, "token" for a valid bearer token, or null. */
+const RUNNER_PATHS = [/^\/api\/redesign-jobs\//, /^\/api\/leads\/add$/, /^\/api\/leads\/[^/]+\/(redesign|crawl)$/];
+
+/** Returns the signed-in email, "token" for the admin token, "runner" for the runner token, or null. */
 export async function currentUser(req: Request, env: AuthEnv): Promise<string | null> {
-  if (env.ADMIN_TOKEN && req.headers.get("authorization") === `Bearer ${env.ADMIN_TOKEN}`) return "token";
+  const auth = req.headers.get("authorization") ?? "";
+  if (env.ADMIN_TOKEN && safeEqual(auth, `Bearer ${env.ADMIN_TOKEN}`)) return "token";
+  if (env.RUNNER_TOKEN && safeEqual(auth, `Bearer ${env.RUNNER_TOKEN}`)) {
+    return RUNNER_PATHS.some((re) => re.test(new URL(req.url).pathname.replace(/\/+$/, ""))) ? "runner" : null;
+  }
   const raw = readCookie(req, COOKIE);
   if (!raw || !env.SESSION_SECRET) return null;
   const [payload, sig] = raw.split(".");
