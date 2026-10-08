@@ -20,10 +20,23 @@ export interface PublicStats {
 
 export const CATEGORY_LABELS: Record<string, string> = {
   restaurant: "Restaurant",
+  cafe: "Café",
   gym: "Gym",
+  salon: "Salon",
+  clothing: "Clothing",
+  retail: "Retail",
   import_export: "Import & export",
   healthcare: "Healthcare",
   accounting: "Accounting",
+  services: "Local services",
+};
+
+export const REGION_LABELS: Record<string, string> = {
+  us: "United States",
+  eu: "European Union",
+  ca: "Canada",
+  au: "Australia",
+  nz: "New Zealand",
 };
 
 const regionNames = (() => {

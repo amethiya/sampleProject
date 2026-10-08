@@ -188,6 +188,7 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
        ON CONFLICT(id) DO UPDATE SET state = 'audited', name = excluded.name, category = excluded.category, score = excluded.score,
          qualified = 1, lead = excluded.lead, site = NULL, audited_at = excluded.audited_at`,
     ).bind(id, lead.name, lead.category, lead.city, lead.country, lead.region, website, JSON.stringify(lead), lead.audit.score, JSON.stringify(lead)).run();
+    await ensureSite(env, id, lead, null, true).catch(() => null);
     return json({ id, name: lead.name, score: lead.audit.score });
   }
 

@@ -3,7 +3,7 @@ import {
   type Candidate, type Lead,
 } from "@rr/core";
 import { currentUser, login, logout, type AuthEnv } from "./auth";
-import { imageProxy, preview, redesignApi } from "./redesign";
+import { ensureSite, imageProxy, preview, redesignApi } from "./redesign";
 
 export interface Env extends AuthEnv {
   DB: D1Database;
@@ -56,7 +56,22 @@ async function api(req: Request, url: URL, env: Env, ctx: ExecutionContext): Pro
   if (m === "GET" && path === "/api/stats") return json(await stats(env));
   if (m === "GET" && path === "/api/meta") return json({ categories: CATEGORIES.map(({ id, label }) => ({ id, label })), cities: CITIES });
   if (m === "POST" && path === "/api/run") return json(await runCycle(env));
-  if (m === "POST" && path === "/api/sync") return json(await syncSheet(env, publicBase(env, url)));
+  if (m === "POST" && path === "/api/sync") return json(await syncSheet(env, publicBase(env, url), true));
+
+  // Google Sheet connection, managed from the portal (stored in the meta table; Worker secrets still win).
+  if (path === "/api/sheet" && m === "GET") return json(await sheetStatus(env));
+  if (path === "/api/sheet" && m === "POST") {
+    const { webhookUrl, viewUrl } = (await req.json().catch(() => ({}))) as { webhookUrl?: string; viewUrl?: string };
+    if (webhookUrl !== undefined) {
+      if (webhookUrl && !/^https:\/\/script\.google(usercontent)?\.com\//.test(webhookUrl)) return json({ error: "Paste the Web app URL that Apps Script shows after Deploy (it starts with https://script.google.com/)." }, 400);
+      await setMeta(env, "sheet_webhook", webhookUrl);
+    }
+    if (viewUrl !== undefined) {
+      if (viewUrl && !/^https:\/\/docs\.google\.com\/spreadsheets\//.test(viewUrl)) return json({ error: "Paste the Google Sheet's address (it starts with https://docs.google.com/spreadsheets/)." }, 400);
+      await setMeta(env, "sheet_view", viewUrl);
+    }
+    return json(await sheetStatus(env));
+  }
 
   // Lets the CLI / GitHub Actions feed candidates when Overpass is unreachable from Workers.
   if (m === "POST" && path === "/api/candidates") {
@@ -84,12 +99,17 @@ async function api(req: Request, url: URL, env: Env, ctx: ExecutionContext): Pro
     if (cat) (where.push("category = ?"), binds.push(cat));
     const status = url.searchParams.get("status");
     if (status) (where.push("status = ?"), binds.push(status));
+    const segment = url.searchParams.get("segment");
+    if (segment === "ready") where.push("status = 'new'");
+    else if (segment && segment !== "all" && STATUSES.includes(segment)) (where.push("status = ?"), binds.push(segment));
+    const region = url.searchParams.get("region");
+    if (region) (where.push("region = ?"), binds.push(region));
     const q = url.searchParams.get("q");
     if (q) (where.push("(name LIKE ? OR website LIKE ? OR city LIKE ?)"), binds.push(`%${q}%`, `%${q}%`, `%${q}%`));
     const { results } = await env.DB.prepare(
-      `SELECT id, status, sheet_synced, lead FROM sites WHERE ${where.join(" AND ")} ORDER BY audited_at DESC LIMIT 500`,
-    ).bind(...binds).all<{ id: string; status: string; sheet_synced: number; lead: string }>();
-    return json(results.map((r) => summarize(JSON.parse(r.lead) as Lead, r.status, r.sheet_synced)));
+      `SELECT id, status, sheet_synced, region, site IS NOT NULL AS crawled, json_remove(lead, '$.content') AS lead FROM sites WHERE ${where.join(" AND ")} ORDER BY audited_at DESC LIMIT 500`,
+    ).bind(...binds).all<{ id: string; status: string; sheet_synced: number; region: string; crawled: number; lead: string }>();
+    return json(results.map((r) => ({ ...summarize(JSON.parse(r.lead) as Lead, r.status, r.sheet_synced), region: r.region, crawled: !!r.crawled })));
   }
 
   const pm = path.match(/^\/api\/leads\/([^/]+)\/pitch$/);
@@ -171,6 +191,8 @@ export async function runCycle(env: Env) {
     }));
     report.audited = results.length;
     report.newQualified = leads.filter((l) => l?.qualified).map((l) => l!.id);
+    // Read new leads' whole sites now, so their redesigns open instantly.
+    for (const lead of leads) if (lead?.qualified) await ensureSite(env, lead.id, lead, null).catch(() => null);
   }
 
   report.sheet = await syncSheet(env, env.PUBLIC_URL ?? "");
@@ -183,22 +205,67 @@ function insertCandidate(env: Env, c: Candidate) {
   ).bind(c.id, c.name, c.category, c.city, c.country, c.region, c.website, JSON.stringify(c));
 }
 
-async function syncSheet(env: Env, base: string) {
-  if (!env.SHEETS_WEBHOOK_URL || !env.SHEETS_SECRET) return { skipped: "SHEETS_WEBHOOK_URL / SHEETS_SECRET not set" };
-  const { results } = await env.DB.prepare(
-    "SELECT id, lead, status FROM sites WHERE qualified = 1 AND sheet_synced = 0 ORDER BY audited_at LIMIT 50",
-  ).all<{ id: string; lead: string; status: string }>();
-  if (!results.length) return { synced: 0 };
-  const rows = results.map((r) => leadToRow(JSON.parse(r.lead) as Lead, `${base}/preview/${r.id}/`, r.status));
-  const res = await fetch(env.SHEETS_WEBHOOK_URL, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ secret: env.SHEETS_SECRET, headers: SHEET_HEADERS, rows }),
-  });
-  const body = await res.text();
-  if (!res.ok || !body.includes('"ok":true')) return { error: `sheet ${res.status}: ${body.slice(0, 200)}` };
-  await env.DB.batch(results.map((r) => env.DB.prepare("UPDATE sites SET sheet_synced = 1 WHERE id = ?").bind(r.id)));
-  return { synced: results.length };
+async function getMeta(env: Env, key: string): Promise<string | null> {
+  return (await env.DB.prepare("SELECT value FROM meta WHERE key = ?").bind(key).first<{ value: string }>())?.value ?? null;
+}
+
+async function setMeta(env: Env, key: string, value: string) {
+  await env.DB.prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(key, value).run();
+}
+
+/** Webhook address and shared secret: Worker secrets if set, otherwise what was saved from the portal. */
+async function sheetConfig(env: Env) {
+  let secret = env.SHEETS_SECRET || (await getMeta(env, "sheet_secret"));
+  if (!secret) {
+    secret = [...crypto.getRandomValues(new Uint8Array(18))].map((b) => b.toString(16).padStart(2, "0")).join("");
+    await setMeta(env, "sheet_secret", secret);
+  }
+  return { webhook: env.SHEETS_WEBHOOK_URL || (await getMeta(env, "sheet_webhook")) || "", secret };
+}
+
+async function sheetStatus(env: Env) {
+  const { webhook, secret } = await sheetConfig(env);
+  const last = await getMeta(env, "sheet_last");
+  const pending = (await env.DB.prepare("SELECT COUNT(*) AS n FROM sites WHERE qualified = 1 AND sheet_synced = 0").first<{ n: number }>())!.n;
+  return {
+    connected: !!webhook,
+    webhookUrl: webhook,
+    viewUrl: (await getMeta(env, "sheet_view")) || "",
+    secret,
+    pending,
+    last: last ? JSON.parse(last) : null,
+  };
+}
+
+async function syncSheet(env: Env, base: string, all = false) {
+  const { webhook, secret } = await sheetConfig(env);
+  if (!webhook) return { skipped: "Google Sheet isn't connected yet" };
+  const result = await (async () => {
+    let total = 0;
+    // A manual sync sends everything pending (in batches); the 10-minute job sends one batch.
+    for (let round = 0; round < (all ? 10 : 1); round++) {
+      const { results } = await env.DB.prepare(
+        "SELECT id, lead, status FROM sites WHERE qualified = 1 AND sheet_synced = 0 ORDER BY audited_at LIMIT 50",
+      ).all<{ id: string; lead: string; status: string }>();
+      if (!results.length) break;
+      const rows = results.map((r) => leadToRow(JSON.parse(r.lead) as Lead, `${base}/preview/${r.id}/`, r.status));
+      const res = await fetch(webhook, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ secret, headers: SHEET_HEADERS, rows }),
+      }).catch((e: Error) => new Response(e.message, { status: 599 }));
+      const body = await res.text();
+      if (!res.ok || !body.includes('"ok":true')) {
+        const hint = body.includes("bad secret") ? "The secret in Apps Script doesn't match. Copy it again from the portal." : `${res.status} ${body.replace(/<[^>]+>/g, " ").slice(0, 160)}`;
+        return { error: hint, synced: total };
+      }
+      await env.DB.batch(results.map((r) => env.DB.prepare("UPDATE sites SET sheet_synced = 1 WHERE id = ?").bind(r.id)));
+      total += results.length;
+    }
+    return { synced: total };
+  })();
+  await setMeta(env, "sheet_last", JSON.stringify({ at: new Date().toISOString(), ...result }));
+  return result;
 }
 
 /** Counts and a few showcase previews for the public landing page. No contact details. */
@@ -227,7 +294,10 @@ async function stats(env: Env) {
   const { results: daily } = await env.DB.prepare(
     "SELECT date(audited_at) AS day, COUNT(*) AS n FROM sites WHERE qualified = 1 GROUP BY day ORDER BY day DESC LIMIT 14",
   ).all();
-  return { ...totals, byCategory, daily };
+  const { results: byStatus } = await env.DB.prepare(
+    "SELECT status, COUNT(*) AS n FROM sites WHERE qualified = 1 GROUP BY status",
+  ).all<{ status: string; n: number }>();
+  return { ...totals, byCategory, daily, byStatus: Object.fromEntries(byStatus.map((r) => [r.status, r.n])) };
 }
 
 function summarize(l: Lead, status: string, synced: number) {

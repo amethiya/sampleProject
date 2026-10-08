@@ -863,6 +863,23 @@ function clientScript(t: Theme, stockHero: string): string {
     var pts = new T.Points(pg, new T.PointsMaterial({ color: accent, size: .035, transparent: true, opacity: 0, depthWrite: false }));
     scene.add(pts);
 
+    if (kind === 'cup') {
+      var ceramic = M(0xf7f3ee, .05, .25), glaze = M(accent, .2, .3);
+      var body = new T.Mesh(new T.CylinderGeometry(1.05, .78, 1.5, 72, 1, true), ceramic); g.add(body);
+      var base = new T.Mesh(new T.CylinderGeometry(.78, .78, .06, 72), ceramic); base.position.y = -.75; g.add(base);
+      var coffee = new T.Mesh(new T.CircleGeometry(.98, 72), M(0x4a2c1a, .1, .4)); coffee.rotation.x = -Math.PI / 2; coffee.position.y = .55; g.add(coffee);
+      var handle = new T.Mesh(new T.TorusGeometry(.42, .1, 24, 64, Math.PI * 1.3), ceramic); handle.position.set(1.08, .05, 0); handle.rotation.z = -Math.PI * .65; g.add(handle);
+      var saucer = new T.Mesh(new T.CylinderGeometry(1.7, 1.25, .14, 96), glaze); saucer.position.y = -.86; g.add(saucer);
+      for (var b = 0; b < 6; b++) { var bean = new T.Mesh(new T.SphereGeometry(.16, 24, 16), M(0x5a3420, .1, .35)); bean.scale.set(1, .6, .75); var ba = b / 6 * Math.PI * 2; bean.position.set(Math.cos(ba) * 2.4, Math.sin(ba * 2) * .6, Math.sin(ba) * 2.4); bean.userData.o = ba; floaters.push(bean); g.add(bean); }
+      g.rotation.x = .3;
+    }
+    if (kind === 'gem') {
+      var facet = new T.MeshPhysicalMaterial({ color: accent, metalness: .1, roughness: .05, clearcoat: 1, transmission: .35, flatShading: true });
+      var gem = new T.Mesh(new T.OctahedronGeometry(1.35, 0), facet); gem.scale.y = 1.35; g.add(gem);
+      var ringM = M(0xd8d2c8, .9, .2);
+      var band = new T.Mesh(new T.TorusGeometry(2.1, .035, 16, 160), ringM); band.rotation.x = Math.PI / 2.4; band.userData.s = .003; floaters.push(band); g.add(band);
+      for (var q2 = 0; q2 < 7; q2++) { var sm = new T.Mesh(new T.OctahedronGeometry(.22, 0), q2 % 2 ? facet : ringM); var qa = q2 / 7 * Math.PI * 2; sm.position.set(Math.cos(qa) * 2.6, Math.sin(qa * 1.5) * .9, Math.sin(qa) * 2.6); sm.userData.s = .01; floaters.push(sm); g.add(sm); }
+    }
     function size(){ var w = box.clientWidth, h = box.clientHeight; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
     size(); addEventListener('resize', size);
     var target = 0, prog = 0, mx = 0, my = 0;

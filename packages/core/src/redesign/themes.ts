@@ -1,7 +1,7 @@
 import type { CategoryId } from "../types";
 
 /** Which category-specific 3D object the feature scene renders. */
-export type ObjectKind = "rings" | "dumbbell" | "capsules" | "coins" | "globe";
+export type ObjectKind = "rings" | "dumbbell" | "capsules" | "coins" | "globe" | "cup" | "gem";
 
 export interface Service {
   title: string;
@@ -52,9 +52,109 @@ const I = {
   box: "M3 7l9-4l9 4v10l-9 4l-9-4zM3 7l9 4l9-4M12 11v10",
   truck: "M2 6h12v10H2zM14 10h4l4 4v2h-8M6 19a2 2 0 1 0 0-4a2 2 0 0 0 0 4zM18 19a2 2 0 1 0 0-4a2 2 0 0 0 0 4",
   check: "M4 12l5 5L20 6",
+  cup: "M5 8h11v6a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5zM16 10h2a2 2 0 0 1 0 4h-2M8 3v2M11 3v2",
+  scissors: "M6 9a3 3 0 1 0 0-6a3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6a3 3 0 0 0 0 6zM8.1 7.9L20 20M8.1 16.1L20 4",
+  tag: "M3 12V4h8l10 10l-8 8zM7.5 7.5h.01",
+  bag: "M5 8h14l-1 12H6zM9 8a3 3 0 0 1 6 0",
+  star: "M12 3l2.7 5.6l6.1.9l-4.4 4.3l1 6.1L12 17l-5.4 2.9l1-6.1L3.2 9.5l6.1-.9z",
 };
 
 export const THEMES: Record<CategoryId, Theme> = {
+  cafe: {
+    label: "Café",
+    fonts: "family=DM+Serif+Display&family=DM+Sans:wght@400;500;700",
+    display: "'DM Serif Display', Georgia, serif",
+    body: "'DM Sans', system-ui, sans-serif",
+    displayWeight: 400, displayTracking: "-0.01em", dark: false,
+    bg: "#f6efe8", surface: "#fffaf5", ink: "#2b1d16", muted: "#7c6556", line: "rgba(43,29,22,.12)", accent: "#b4532a", accentInk: "#fff6ef",
+    object: "cup",
+    photos: ["1501339847302-ac426a4a7cbb", "1495474472287-4d71bcdd2085", "1554118811-1e0d58224f24", "1509042239860-f550ce710b93", "1442512595331-e89e73853f31", "1447933601403-0c6688de566e"],
+    tagline: "Good coffee, fresh bakes and a seat that's yours for as long as you like.",
+    statement: "Every cup is made to order by people who care how it tastes.",
+    cta: "Visit us today",
+    services: [
+      { title: "Specialty coffee", text: "Carefully sourced beans, brewed the way you like.", icon: I.cup },
+      { title: "Fresh food", text: "Pastries and light meals prepared every day.", icon: I.leaf },
+      { title: "Take away", text: "Order ahead or grab something on the go.", icon: I.bag },
+      { title: "Open daily", text: "A comfortable place to meet, work or relax.", icon: I.clock },
+    ],
+  },
+  salon: {
+    label: "Salon",
+    fonts: "family=Playfair+Display:wght@500;700&family=Source+Sans+3:wght@400;600",
+    display: "'Playfair Display', Georgia, serif",
+    body: "'Source Sans 3', system-ui, sans-serif",
+    displayWeight: 500, displayTracking: "-0.015em", dark: false,
+    bg: "#fbf3f2", surface: "#ffffff", ink: "#2a1418", muted: "#7f5f64", line: "rgba(42,20,24,.1)", accent: "#c2405a", accentInk: "#ffffff",
+    object: "gem",
+    photos: ["1560066984-138dadb4c035", "1522337360788-8b13dee7a37e", "1562322140-8baeececf3df", "1600948836101-f9ffda59d250", "1521590832167-7bcbfaa6381f"],
+    tagline: "Expert hands, a calm space and a look you'll love leaving with.",
+    statement: "Great work starts with listening, so every appointment begins with what you want.",
+    cta: "Book an appointment",
+    services: [
+      { title: "Cuts & styling", text: "Precision cuts and styling for every occasion.", icon: I.scissors },
+      { title: "Colour", text: "From subtle tones to bold changes.", icon: I.star },
+      { title: "Treatments", text: "Care that keeps hair and skin healthy.", icon: I.heart },
+      { title: "Easy booking", text: "Choose a time that suits you.", icon: I.calendar },
+    ],
+  },
+  clothing: {
+    label: "Fashion",
+    fonts: "family=Bebas+Neue&family=Karla:wght@400;500;700",
+    display: "'Bebas Neue', Impact, sans-serif",
+    body: "'Karla', system-ui, sans-serif",
+    displayWeight: 400, displayTracking: "0.01em", dark: true,
+    bg: "#121212", surface: "#1c1c1c", ink: "#efefef", muted: "#a3a3a3", line: "rgba(239,239,239,.1)", accent: "#e8ff5a", accentInk: "#141600",
+    object: "gem",
+    photos: ["1441986300917-64674bd600d8", "1489987707025-afc232f7ea0f", "1445205170230-053b83016050", "1567401893414-76b7b1e5a7a5", "1490481651871-ab68de25d43d", "1555529669-e69e7aa0ba9a"],
+    tagline: "Pieces chosen with care, for the way you actually live.",
+    statement: "Fewer, better things: clothing picked for quality, fit and how long it will last.",
+    cta: "Visit the store",
+    services: [
+      { title: "New arrivals", text: "Fresh pieces in store every season.", icon: I.tag },
+      { title: "Styling help", text: "Advice on fit, size and what works together.", icon: I.star },
+      { title: "Quality first", text: "Brands and fabrics we're proud to stock.", icon: I.check },
+      { title: "Easy shopping", text: "Friendly service in store and over the phone.", icon: I.bag },
+    ],
+  },
+  retail: {
+    label: "Shop",
+    fonts: "family=Syne:wght@600;700;800&family=Work+Sans:wght@400;500",
+    display: "'Syne', system-ui, sans-serif",
+    body: "'Work Sans', system-ui, sans-serif",
+    displayWeight: 700, displayTracking: "-0.02em", dark: false,
+    bg: "#fdfbf2", surface: "#ffffff", ink: "#1c1a0e", muted: "#6b6750", line: "rgba(28,26,14,.11)", accent: "#e05a00", accentInk: "#ffffff",
+    object: "gem",
+    photos: ["1528698827591-e19ccd7bc23d", "1472851294608-062f824d29cc", "1534452203293-494d7ddbf7e0", "1604719312566-8912e9227c6a", "1555529669-e69e7aa0ba9a"],
+    tagline: "A local shop with things worth coming back for.",
+    statement: "We choose every product ourselves, so you can trust what's on the shelf.",
+    cta: "Visit the shop",
+    services: [
+      { title: "Carefully chosen range", text: "Products we know and recommend.", icon: I.tag },
+      { title: "Local service", text: "Friendly advice from people who know the products.", icon: I.users },
+      { title: "Gifts", text: "Ideas and wrapping for every occasion.", icon: I.box },
+      { title: "Open daily", text: "Drop in whenever it suits you.", icon: I.clock },
+    ],
+  },
+  services: {
+    label: "Local services",
+    fonts: "family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter+Tight:wght@400;500;600",
+    display: "'Fraunces', Georgia, serif",
+    body: "'Inter Tight', system-ui, sans-serif",
+    displayWeight: 400, displayTracking: "-0.02em", dark: false,
+    bg: "#f3f5fb", surface: "#ffffff", ink: "#0e1838", muted: "#56607f", line: "rgba(14,24,56,.1)", accent: "#2448d8", accentInk: "#ffffff",
+    object: "gem",
+    photos: ["1497366216548-37526070297c", "1497215728101-856f4ea42174", "1521737604893-d14cc237f11d", "1504384308090-c894fdcc538d", "1556761175-5973dc0f32e7"],
+    tagline: "Reliable, professional service from people who answer the phone.",
+    statement: "Clear advice, fair prices and work done properly the first time.",
+    cta: "Get in touch",
+    services: [
+      { title: "Consultation", text: "We start by understanding exactly what you need.", icon: I.users },
+      { title: "Clear quotes", text: "Transparent pricing before any work begins.", icon: I.doc },
+      { title: "Quality work", text: "Done carefully and on schedule.", icon: I.check },
+      { title: "Local and responsive", text: "Easy to reach when you need us.", icon: I.clock },
+    ],
+  },
   restaurant: {
     label: "Restaurant",
     fonts: "family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600",

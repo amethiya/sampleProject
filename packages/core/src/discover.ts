@@ -2,7 +2,9 @@ import type { CategoryDef } from "./categories";
 import { hostId, isBlockedHost, normalizeWebsite } from "./http";
 import type { Candidate, City } from "./types";
 
+// Tried in order on each attempt; the public servers are often overloaded, so keep several.
 export const OVERPASS_URLS = [
+  "https://lz4.overpass-api.de/api/interpreter",
   "https://overpass-api.de/api/interpreter",
   "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ];

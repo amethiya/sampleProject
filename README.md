@@ -1,6 +1,6 @@
 # Revamp Radar
 
-Finds small businesses (restaurants, gyms, import/export, healthcare, accounting) in US and EU cities
+Finds small businesses (restaurants, cafés, gyms, salons, clothing and retail shops, import/export, healthcare, accounting, local services) in the US, EU, Canada, Australia and New Zealand
 whose websites look outdated, collects their **publicly listed** contact details, appends them to a
 Google Sheet, and generates an animated concept redesign of each site from its own content.
 

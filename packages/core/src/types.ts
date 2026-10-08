@@ -1,5 +1,7 @@
-export type CategoryId = "restaurant" | "gym" | "import_export" | "healthcare" | "accounting";
-export type RegionId = "us" | "eu";
+export type CategoryId =
+  | "restaurant" | "cafe" | "gym" | "salon" | "clothing" | "retail" | "import_export" | "healthcare" | "accounting" | "services";
+/** Target markets: United States, European Union, Canada, Australia, New Zealand. */
+export type RegionId = "us" | "eu" | "ca" | "au" | "nz";
 
 export interface City {
   id: string;

@@ -97,6 +97,11 @@ const CATEGORY_PALETTES: Record<string, string[]> = {
   healthcare: ["clinic", "sage", "cobalt", "blush", "sand", "harbor", "forest"],
   accounting: ["ledger", "cobalt", "sand", "sage", "graphite", "harbor", "clinic"],
   import_export: ["harbor", "cobalt", "graphite", "ledger", "citrus", "forest", "sand"],
+  cafe: ["terracotta", "sand", "ember", "sage", "forest", "citrus", "blush"],
+  salon: ["blush", "plum", "sand", "sage", "graphite", "terracotta", "clinic"],
+  clothing: ["graphite", "sand", "blush", "volt", "plum", "cobalt", "citrus"],
+  retail: ["citrus", "sand", "terracotta", "cobalt", "forest", "sage", "graphite"],
+  services: ["cobalt", "ledger", "sage", "sand", "harbor", "graphite", "clinic"],
 };
 
 function hash(s: string): number {

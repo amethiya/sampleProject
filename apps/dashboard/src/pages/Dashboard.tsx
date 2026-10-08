@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Logo from "../Logo";
-import { api, CATEGORY_LABELS, countryName, Unauthorized } from "../api";
+import { api, CATEGORY_LABELS, countryName, REGION_LABELS, Unauthorized } from "../api";
 import { navigate } from "../router";
+import appsScript from "../../../../integrations/google-apps-script/Code.gs?raw";
 
 interface LeadRow {
   id: string;
@@ -9,6 +10,7 @@ interface LeadRow {
   category: string;
   city: string;
   country: string;
+  region: string;
   website: string;
   score: number;
   reasons: string[];
@@ -18,15 +20,16 @@ interface LeadRow {
   auditedAt: string;
   status: string;
   sheetSynced: boolean;
+  crawled: boolean;
 }
 
 interface Stats {
-  total: number;
   pending: number;
   audited: number;
   qualified: number;
   today: number;
   unsynced: number;
+  byStatus: Record<string, number>;
 }
 
 interface Pitch {
@@ -36,23 +39,76 @@ interface Pitch {
   gmailUrl: string;
 }
 
+interface SheetState {
+  connected: boolean;
+  webhookUrl: string;
+  viewUrl: string;
+  secret: string;
+  pending: number;
+  last: { at: string; synced?: number; error?: string; skipped?: string } | null;
+}
+
+type Tab = "audit" | "redesign" | "pitch";
+
 const STATUSES = ["new", "contacted", "replied", "won", "lost", "ignored"];
-const STATUS_LABELS: Record<string, string> = { new: "New", contacted: "Contacted", replied: "Replied", won: "Won", lost: "Lost", ignored: "Ignored" };
+const STATUS_LABELS: Record<string, string> = { new: "Ready to pitch", contacted: "Email sent", replied: "Replied", won: "Won", lost: "Lost", ignored: "Ignored" };
+const SEGMENTS: { id: string; label: string }[] = [
+  { id: "ready", label: "Ready to pitch" },
+  { id: "contacted", label: "Email sent" },
+  { id: "replied", label: "Replied" },
+  { id: "won", label: "Won" },
+  { id: "lost", label: "Lost" },
+  { id: "ignored", label: "Ignored" },
+  { id: "all", label: "All leads" },
+];
 const DAILY_GOAL = 10;
+
+const domainOf = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "").replace(/\/.*$/, "");
+const ago = (iso: string) => {
+  const s = (Date.now() - new Date(iso).getTime()) / 1000;
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  return new Date(iso).toLocaleDateString();
+};
+
+function Icon({ d, size = 18 }: { d: string; size?: number }) {
+  return (
+    <svg className="icon" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
+      <path d={d} />
+    </svg>
+  );
+}
+const I = {
+  search: "M11 18a7 7 0 1 0 0-14a7 7 0 0 0 0 14zM20 20l-4-4",
+  radar: "M12 21a9 9 0 1 0 0-18a9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM12 12l6-4",
+  plus: "M12 5v14M5 12h14",
+  sheet: "M4 4h16v16H4zM4 9h16M4 14h16M10 4v16",
+  download: "M12 4v11M7 10l5 5l5-5M5 20h14",
+  external: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
+  close: "M6 6l12 12M18 6L6 18",
+  menu: "M4 7h16M4 12h16M4 17h16",
+  leads: "M4 6h16M4 12h16M4 18h10",
+  logout: "M15 4h4v16h-4M10 8l-4 4l4 4M6 12h10",
+  copy: "M8 8h11v11H8zM5 16V5h11",
+  check: "M5 12l5 5L20 7",
+};
 
 export default function Dashboard() {
   const [me, setMe] = useState<string | null>(null);
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [segment, setSegment] = useState("ready");
   const [category, setCategory] = useState("");
-  const [status, setStatus] = useState("");
+  const [region, setRegion] = useState("");
   const [q, setQ] = useState("");
-  const [showAll, setShowAll] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [open, setOpen] = useState<{ id: string; tab: Tab } | null>(null);
+  const [panel, setPanel] = useState<"" | "sheet" | "add">("");
+  const [menu, setMenu] = useState(false);
 
   const guard = useCallback((e: unknown) => {
     if (e instanceof Unauthorized) navigate("/login");
@@ -64,44 +120,40 @@ export default function Dashboard() {
   }, [guard]);
 
   const load = useCallback(async () => {
-    const params = new URLSearchParams();
-    if (category) params.set("category", category);
-    if (status) params.set("status", status);
-    if (q) params.set("q", q);
-    if (showAll) params.set("all", "1");
+    const p = new URLSearchParams({ segment });
+    if (category) p.set("category", category);
+    if (region) p.set("region", region);
+    if (q) p.set("q", q);
+    api<Stats>("/api/stats").then(setStats).catch(() => {});
     try {
-      const [l, s] = await Promise.all([api<LeadRow[]>(`/api/leads?${params}`), api<Stats>("/api/stats")]);
-      setLeads(l);
-      setStats(s);
+      setLeads(await api<LeadRow[]>(`/api/leads?${p}`));
       setError("");
     } catch (e) {
       guard(e);
+    } finally {
+      setLoading(false);
     }
-  }, [category, status, q, showAll, guard]);
+  }, [segment, category, region, q, guard]);
 
   useEffect(() => {
     if (!me) return;
-    const t = setTimeout(load, 200);
-    return () => clearTimeout(t);
+    const t = setTimeout(load, 180);
+    const every = setInterval(load, 60_000); // new leads arrive every 10 minutes
+    return () => { clearTimeout(t); clearInterval(every); };
   }, [me, load]);
 
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(""), 3200);
+    const t = setTimeout(() => setToast(""), 3600);
     return () => clearTimeout(t);
   }, [toast]);
 
-  const runAction = async (kind: "run" | "sync") => {
-    setBusy(kind);
+  const findLeads = async () => {
+    setBusy("find");
     try {
-      const r = await api<Record<string, unknown>>(kind === "run" ? "/api/run" : "/api/sync", { method: "POST" });
-      if (kind === "run") {
-        const n = (r.newQualified as string[] | undefined)?.length ?? 0;
-        setToast(`Discovery run finished: ${r.audited ?? 0} sites audited, ${n} new ${n === 1 ? "lead" : "leads"}.`);
-      } else {
-        const sheet = r as { synced?: number; skipped?: string; error?: string };
-        setToast(sheet.skipped ? "Google Sheet sync isn't connected yet." : sheet.error ? `Sheet sync failed: ${sheet.error}` : `Synced ${sheet.synced ?? 0} leads to Google Sheets.`);
-      }
+      const r = await api<{ audited?: number; newQualified?: string[] }>("/api/run", { method: "POST" });
+      const n = r.newQualified?.length ?? 0;
+      setToast(n ? `Found ${n} new ${n === 1 ? "lead" : "leads"} from ${r.audited} websites checked.` : `Checked ${r.audited ?? 0} websites. No new leads this round; try again or wait for the next run.`);
       await load();
     } catch (e) {
       guard(e);
@@ -111,20 +163,22 @@ export default function Dashboard() {
   };
 
   const updateStatus = async (id: string, next: string) => {
-    setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status: next } : l)));
+    setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status: next, sheetSynced: false } : l)));
     try {
       await api(`/api/leads/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ status: next }) });
+      setToast(`Marked as ${STATUS_LABELS[next]}.`);
+      setTimeout(load, 2500);
     } catch (e) {
       guard(e);
     }
   };
 
   const exportCsv = async () => {
+    setMenu(false);
     const res = await fetch("/api/export.csv", { credentials: "same-origin" });
-    if (!res.ok) return setError("Export failed. Try signing in again.");
+    if (!res.ok) return setError("Export failed. Sign in again and retry.");
     const url = URL.createObjectURL(await res.blob());
-    const a = Object.assign(document.createElement("a"), { href: url, download: `revamp-radar-leads-${new Date().toISOString().slice(0, 10)}.csv` });
-    a.click();
+    Object.assign(document.createElement("a"), { href: url, download: `revamp-radar-leads-${new Date().toISOString().slice(0, 10)}.csv` }).click();
     URL.revokeObjectURL(url);
   };
 
@@ -133,123 +187,160 @@ export default function Dashboard() {
     navigate("/login");
   };
 
-  const lead = useMemo(() => leads.find((l) => l.id === selected) ?? null, [leads, selected]);
-  const goal = Math.min(100, ((stats?.today ?? 0) / DAILY_GOAL) * 100);
+  const lead = useMemo(() => leads.find((l) => l.id === open?.id) ?? null, [leads, open]);
+  const count = (s: string) => (s === "ready" ? stats?.byStatus?.new : s === "all" ? stats?.qualified : stats?.byStatus?.[s]) ?? 0;
 
   if (!me) return <div className="boot"><Logo /></div>;
 
   return (
     <div className="app">
-      <aside className="side">
-        <Logo inverse />
+      <aside className={`side${menu ? " open" : ""}`}>
+        <div className="side-top">
+          <Logo />
+          <button className="icon-btn side-close" onClick={() => setMenu(false)} aria-label="Close menu"><Icon d={I.close} /></button>
+        </div>
         <nav aria-label="Main">
-          <a className="active" aria-current="page">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" /></svg>
-            Leads
-          </a>
-          <a href="/" target="_blank" rel="noreferrer">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6" /></svg>
-            Public page
-          </a>
+          <a className="nav-item active" aria-current="page" onClick={() => setMenu(false)}><Icon d={I.leads} />Leads</a>
+          <button className="nav-item" onClick={() => { setPanel("sheet"); setMenu(false); }}><Icon d={I.sheet} />Google Sheet</button>
+          <button className="nav-item" onClick={exportCsv}><Icon d={I.download} />Export CSV</button>
+          <a className="nav-item" href="/" target="_blank" rel="noreferrer"><Icon d={I.external} />Public page</a>
         </nav>
         <div className="side-foot">
           <span className="side-user" title={me}>{me}</span>
-          <button className="side-signout" onClick={signOut}>Sign out</button>
+          <button className="nav-item" onClick={signOut}><Icon d={I.logout} />Sign out</button>
         </div>
       </aside>
+      {menu && <div className="scrim side-scrim" onClick={() => setMenu(false)} />}
 
-      <main className="main">
-        <header className="main-head">
-          <div>
-            <h1>Leads</h1>
-            <p className="muted">Businesses with outdated websites and a redesign ready to pitch.</p>
-          </div>
-          <div className="head-actions">
-            <button className="button button-quiet" onClick={() => setAdding(true)}>Redesign any website</button>
-            <button className="button button-quiet" onClick={exportCsv}>Export CSV</button>
-            <button className="button button-quiet" onClick={() => runAction("sync")} disabled={!!busy}>{busy === "sync" ? "Syncing…" : "Sync to Sheet"}</button>
-            <button className="button" onClick={() => runAction("run")} disabled={!!busy}>{busy === "run" ? "Running discovery…" : "Run discovery"}</button>
-          </div>
+      <div className="main">
+        <header className="topbar">
+          <button className="icon-btn" onClick={() => setMenu(true)} aria-label="Open menu"><Icon d={I.menu} /></button>
+          <Logo />
+          <button className="icon-btn" onClick={() => setPanel("add")} aria-label="Redesign any website"><Icon d={I.plus} /></button>
         </header>
 
-        {error && <div className="banner" role="alert">{error}</div>}
-
-        <section className="kpis" aria-label="Summary">
-          <div className="kpi kpi-goal">
-            <span className="kpi-label">Found today</span>
-            <span className="kpi-value">{stats?.today ?? "–"}<small>of {DAILY_GOAL}</small></span>
-            <span className="meter" role="progressbar" aria-valuenow={stats?.today ?? 0} aria-valuemax={DAILY_GOAL}><i style={{ width: `${goal}%` }} /></span>
+        <div className="content">
+          <div className="page-head">
+            <div>
+              <h1>Leads</h1>
+              <p className="muted">Businesses with outdated websites and a public email address, in the US, EU, Canada, Australia and New Zealand.</p>
+            </div>
+            <div className="head-actions">
+              <button className="btn" onClick={() => setPanel("add")}><Icon d={I.plus} />Redesign any website</button>
+              <button className="btn" onClick={() => setPanel("sheet")}><Icon d={I.sheet} />Google Sheet</button>
+              <button className="btn btn-primary" onClick={findLeads} disabled={!!busy}><Icon d={I.radar} />{busy === "find" ? "Finding leads…" : "Find new leads"}</button>
+            </div>
           </div>
-          <div className="kpi"><span className="kpi-label">Ready to pitch</span><span className="kpi-value">{stats?.qualified ?? "–"}</span></div>
-          <div className="kpi"><span className="kpi-label">Websites audited</span><span className="kpi-value">{stats?.audited ?? "–"}</span></div>
-          <div className="kpi"><span className="kpi-label">Waiting in queue</span><span className="kpi-value">{stats?.pending ?? "–"}</span></div>
-          <div className="kpi"><span className="kpi-label">Not in Sheet yet</span><span className="kpi-value">{stats?.unsynced ?? "–"}</span></div>
-        </section>
 
-        <section className="filters" aria-label="Filters">
-          <div className="search">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 0 0-14a7 7 0 0 0 0 14zM20 20l-4-4" /></svg>
-            <input type="search" placeholder="Search by name, website or city" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search leads" />
+          {error && <div className="banner" role="alert">{error}</div>}
+
+          <section className="kpis" aria-label="Summary">
+            <div className="kpi">
+              <span className="kpi-label">Found today</span>
+              <span className="kpi-value">{stats?.today ?? "–"}<small> / {DAILY_GOAL}</small></span>
+              <span className="meter"><i style={{ width: `${Math.min(100, ((stats?.today ?? 0) / DAILY_GOAL) * 100)}%` }} /></span>
+            </div>
+            <div className="kpi"><span className="kpi-label">Ready to pitch</span><span className="kpi-value">{stats?.byStatus?.new ?? "–"}</span></div>
+            <div className="kpi"><span className="kpi-label">Emails sent</span><span className="kpi-value">{stats?.byStatus?.contacted ?? 0}</span></div>
+            <div className="kpi"><span className="kpi-label">Won</span><span className="kpi-value">{stats?.byStatus?.won ?? 0}</span></div>
+          </section>
+
+          <div className="segments" role="tablist" aria-label="Lead status">
+            {SEGMENTS.map((s) => (
+              <button key={s.id} role="tab" aria-selected={segment === s.id} className={segment === s.id ? "on" : ""} onClick={() => { setSegment(s.id); setLoading(true); }}>
+                {s.label}<span className="count">{count(s.id)}</span>
+              </button>
+            ))}
           </div>
-          <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
-            <option value="">All categories</option>
-            {Object.entries(CATEGORY_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-          </select>
-          <select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status">
-            <option value="">Any status</option>
-            {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-          </select>
-          <label className="toggle">
-            <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} />
-            <span>Show sites that didn't qualify</span>
-          </label>
-        </section>
 
-        <div className="table-card">
-          <table className="leads">
-            <thead>
-              <tr><th>Business</th><th>Location</th><th>Outdated score</th><th>Contact</th><th>Status</th><th><span className="sr">Open</span></th></tr>
-            </thead>
-            <tbody>
-              {leads.map((l) => (
-                <tr key={l.id} className={selected === l.id ? "is-selected" : ""} onClick={() => setSelected(l.id)}>
-                  <td>
-                    <button className="row-title" onClick={(e) => { e.stopPropagation(); setSelected(l.id); }}>{l.name}</button>
-                    <span className="row-sub">{CATEGORY_LABELS[l.category] ?? l.category} · {l.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}</span>
-                  </td>
-                  <td><span className="row-main">{l.city}</span><span className="row-sub">{countryName(l.country)}</span></td>
-                  <td><Score value={l.score} /></td>
-                  <td>
-                    {l.emails[0] ? <span className="row-main ellipsis">{l.emails[0]}</span> : <span className="row-sub">No email found</span>}
-                    {l.phones[0] && <span className="row-sub">{l.phones[0]}</span>}
-                  </td>
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <select className={`status s-${l.status}`} value={l.status} onChange={(e) => updateStatus(l.id, e.target.value)} aria-label={`Status for ${l.name}`}>
-                      {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-                    </select>
-                  </td>
-                  <td className="row-go" aria-hidden="true">
-                    <svg viewBox="0 0 24 24"><path d="M9 6l6 6l-6 6" /></svg>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!leads.length && (
+          <div className="toolbar">
+            <label className="search">
+              <Icon d={I.search} />
+              <input type="search" placeholder="Search name, website or city" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search leads" />
+            </label>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Category">
+              <option value="">All categories</option>
+              {Object.entries(CATEGORY_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+            </select>
+            <select value={region} onChange={(e) => setRegion(e.target.value)} aria-label="Region">
+              <option value="">All regions</option>
+              {Object.entries(REGION_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+            </select>
+          </div>
+
+          {/* Desktop table */}
+          <div className="table-card">
+            <table className="leads">
+              <thead>
+                <tr><th>Business</th><th>Location</th><th>Score</th><th>Email</th><th>Status</th><th className="ta-r">Actions</th></tr>
+              </thead>
+              <tbody>
+                {leads.map((l) => (
+                  <tr key={l.id} className={open?.id === l.id ? "sel" : ""}>
+                    <td>
+                      <button className="link-strong" onClick={() => setOpen({ id: l.id, tab: "audit" })}>{l.name}</button>
+                      <span className="sub">{CATEGORY_LABELS[l.category] ?? l.category} · {domainOf(l.website)}</span>
+                    </td>
+                    <td><span className="nowrap">{l.city || "—"}</span><span className="sub">{l.country ? countryName(l.country) : ""}</span></td>
+                    <td><Score value={l.score} /></td>
+                    <td><span className="ellipsis">{l.emails[0]}</span></td>
+                    <td><StatusSelect value={l.status} onChange={(s) => updateStatus(l.id, s)} label={l.name} /></td>
+                    <td className="ta-r">
+                      <div className="row-actions end">
+                        <button className="btn btn-sm" onClick={() => setOpen({ id: l.id, tab: "redesign" })}>Redesign</button>
+                        <button className="btn btn-sm btn-primary" onClick={() => setOpen({ id: l.id, tab: "pitch" })}>Pitch</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <ul className="cards">
+            {leads.map((l) => (
+              <li key={l.id} className="card">
+                <button className="card-main" onClick={() => setOpen({ id: l.id, tab: "audit" })}>
+                  <span className="card-top"><b>{l.name}</b><Score value={l.score} compact /></span>
+                  <span className="sub">{CATEGORY_LABELS[l.category] ?? l.category} · {[l.city, l.country && countryName(l.country)].filter(Boolean).join(", ")}</span>
+                  <span className="sub ellipsis">{l.emails[0]}</span>
+                </button>
+                <div className="card-actions">
+                  <StatusSelect value={l.status} onChange={(s) => updateStatus(l.id, s)} label={l.name} />
+                  <button className="btn btn-sm" onClick={() => setOpen({ id: l.id, tab: "redesign" })}>Redesign</button>
+                  <button className="btn btn-sm btn-primary" onClick={() => setOpen({ id: l.id, tab: "pitch" })}>Pitch</button>
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          {!loading && !leads.length && (
             <div className="empty">
-              <h2>No leads match these filters</h2>
-              <p>Clear the filters, or run discovery to audit the next batch of websites. New leads also arrive automatically every 10 minutes.</p>
-              <button className="button" onClick={() => runAction("run")} disabled={!!busy}>Run discovery</button>
+              <h2>{segment === "ready" ? "No leads waiting to be pitched" : "Nothing here yet"}</h2>
+              <p className="muted">New leads arrive automatically every 10 minutes. Find more now, or redesign a website you already have in mind.</p>
+              <div className="row-actions center">
+                <button className="btn btn-primary" onClick={findLeads} disabled={!!busy}>{busy === "find" ? "Finding leads…" : "Find new leads"}</button>
+                <button className="btn" onClick={() => setPanel("add")}>Redesign any website</button>
+              </div>
             </div>
           )}
+          {loading && !leads.length && <div className="empty"><p className="muted">Loading leads…</p></div>}
         </div>
-      </main>
 
-      {lead && <LeadDrawer lead={lead} onClose={() => setSelected(null)} onStatus={(s) => updateStatus(lead.id, s)} onError={guard} />}
-      {adding && (
+        <div className="mobile-bar">
+          <button className="btn btn-primary btn-block" onClick={findLeads} disabled={!!busy}><Icon d={I.radar} />{busy === "find" ? "Finding leads…" : "Find new leads"}</button>
+        </div>
+      </div>
+
+      {lead && open && (
+        <LeadPanel key={lead.id} lead={lead} initialTab={open.tab} onClose={() => setOpen(null)} onStatus={(s) => updateStatus(lead.id, s)} onError={guard} />
+      )}
+      {panel === "sheet" && <SheetPanel onClose={() => setPanel("")} onError={guard} onToast={setToast} onSynced={load} />}
+      {panel === "add" && (
         <AddWebsite
-          onClose={() => setAdding(false)}
-          onAdded={async (id, name) => { setAdding(false); setToast(`${name} added. Opening its redesign…`); await load(); setSelected(id); }}
+          onClose={() => setPanel("")}
+          onAdded={async (id, name) => { setPanel(""); setToast(`${name} added.`); setSegment("all"); await load(); setOpen({ id, tab: "redesign" }); }}
           onError={guard}
         />
       )}
@@ -258,154 +349,89 @@ export default function Dashboard() {
   );
 }
 
-function Score({ value }: { value: number }) {
-  const tone = value >= 60 ? "hot" : value >= 35 ? "warm" : "cool";
+function Score({ value, compact = false }: { value: number; compact?: boolean }) {
+  const level = value >= 60 ? "high" : value >= 35 ? "mid" : "low";
   return (
-    <span className={`score ${tone}`} title="Higher means more outdated">
+    <span className={`score score-${level}${compact ? " compact" : ""}`} title="How outdated the current site is, out of 100">
       <b>{value}</b>
-      <span className="score-track"><i style={{ width: `${value}%` }} /></span>
+      {!compact && <span className="score-track"><i style={{ width: `${value}%` }} /></span>}
     </span>
   );
 }
 
-function LeadDrawer({ lead, onClose, onStatus, onError }: { lead: LeadRow; onClose(): void; onStatus(s: string): void; onError(e: unknown): void }) {
-  const [tab, setTab] = useState<"audit" | "redesign" | "pitch">("audit");
-  const [pitch, setPitch] = useState<Pitch | null>(null);
-  const [pitchError, setPitchError] = useState("");
-  const [copied, setCopied] = useState(false);
-  const preview = `/preview/${encodeURIComponent(lead.id)}/`;
+function StatusSelect({ value, onChange, label }: { value: string; onChange(s: string): void; label: string }) {
+  return (
+    <select className={`status st-${value}`} value={value} onChange={(e) => onChange(e.target.value)} aria-label={`Status for ${label}`}>
+      {STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
+    </select>
+  );
+}
 
-  useEffect(() => {
-    setPitch(null);
-    setPitchError("");
-    api<Pitch>(`/api/leads/${encodeURIComponent(lead.id)}/pitch`).then(setPitch).catch((e) => {
-      if (e instanceof Unauthorized) onError(e);
-      else setPitchError((e as Error).message);
-    });
-  }, [lead.id, onError]);
-
+function Sheet({ title, onClose, children, wide = false }: { title: string; onClose(): void; children: React.ReactNode; wide?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => { removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
   }, [onClose]);
-
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <aside className="drawer" role="dialog" aria-label={lead.name}>
-        <header className="drawer-head">
-          <div>
-            <h2>{lead.name}</h2>
-            <p className="muted">{CATEGORY_LABELS[lead.category] ?? lead.category} in {lead.city}, {countryName(lead.country)}</p>
-          </div>
-          <button className="icon-button" onClick={onClose} aria-label="Close">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
-        </header>
-
-        <div className="drawer-links">
-          <a className="button button-quiet" href={lead.website} target="_blank" rel="noreferrer">Current website</a>
-          <a className="button" href={preview} target="_blank" rel="noreferrer">Open redesign</a>
-        </div>
-
-        <div className="tabs" role="tablist">
-          {(["audit", "redesign", "pitch"] as const).map((t) => (
-            <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-              {t === "audit" ? "Audit" : t === "redesign" ? "Redesign" : "Pitch email"}
-            </button>
-          ))}
-        </div>
-
-        <div className="drawer-body">
-          {tab === "audit" && (
-            <div className="audit">
-              <div className="gauge">
-                <Score value={lead.score} />
-                <p className="muted">Outdated score out of 100, based on {lead.reasons.length} issues found on the homepage.</p>
-              </div>
-              <h3>What's wrong with the current site</h3>
-              <ul className="issues">{lead.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
-              <h3>Contacts</h3>
-              <ul className="contacts">
-                {lead.emails.map((e) => <li key={e}><a href={`mailto:${e}`}>{e}</a></li>)}
-                {lead.phones.map((p) => <li key={p}><a href={`tel:${p}`}>{p}</a></li>)}
-                {!lead.emails.length && !lead.phones.length && <li className="muted">No public contact details found.</li>}
-              </ul>
-              {lead.contactPage && <a className="text-link" href={lead.contactPage} target="_blank" rel="noreferrer">Open their contact page</a>}
-              <p className="muted small">Audited {new Date(lead.auditedAt).toLocaleString()}. {lead.sheetSynced ? "Saved in Google Sheets." : "Not in Google Sheets yet."}</p>
-            </div>
-          )}
-
-          {tab === "redesign" && <RedesignPanel lead={lead} onError={onError} />}
-
-          {tab === "pitch" && (
-            <div className="pitch">
-              {pitch ? (
-                <>
-                  <dl className="pitch-meta"><dt>To</dt><dd>{pitch.to}</dd><dt>Subject</dt><dd>{pitch.subject}</dd></dl>
-                  <pre>{pitch.body}</pre>
-                  <div className="pitch-actions">
-                    <a className="button" href={pitch.gmailUrl} target="_blank" rel="noreferrer" onClick={() => lead.status === "new" && onStatus("contacted")}>Open draft in Gmail</a>
-                    <button className="button button-quiet" onClick={() => { navigator.clipboard?.writeText(pitch.body); setCopied(true); setTimeout(() => setCopied(false), 1800); }}>
-                      {copied ? "Copied" : "Copy text"}
-                    </button>
-                  </div>
-                  <p className="muted small">Nothing is sent automatically. Gmail opens with the draft filled in, and you press send.</p>
-                </>
-              ) : (
-                <p className="muted">{pitchError ? (pitchError.includes("no email") ? "This lead has no public email address, so there's no email to draft. Use the phone number instead." : pitchError) : "Writing the pitch…"}</p>
-              )}
-            </div>
-          )}
-        </div>
-      </aside>
+      <aside className={`drawer${wide ? " wide" : ""}`} role="dialog" aria-label={title}>{children}</aside>
     </>
   );
 }
 
-function AddWebsite({ onClose, onAdded, onError }: { onClose(): void; onAdded(id: string, name: string): void; onError(e: unknown): void }) {
-  const [url, setUrl] = useState("");
-  const [category, setCategory] = useState("restaurant");
-  const [city, setCity] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
-    try {
-      const r = await api<{ id: string; name: string }>("/api/leads/add", { method: "POST", body: JSON.stringify({ url, category, city }) });
-      onAdded(r.id, r.name);
-    } catch (err) {
-      if (err instanceof Unauthorized) onError(err);
-      else setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
+function LeadPanel({ lead, initialTab, onClose, onStatus, onError }: { lead: LeadRow; initialTab: Tab; onClose(): void; onStatus(s: string): void; onError(e: unknown): void }) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   return (
-    <>
-      <div className="scrim" onClick={onClose} />
-      <form className="modal" onSubmit={submit} role="dialog" aria-label="Redesign any website">
-        <h2>Redesign any website</h2>
-        <p className="muted">Paste a website address. Revamp Radar reads its pages, adds it to your leads and builds a redesign you can open right away.</p>
-        <label>Website<input type="text" inputMode="url" placeholder="example.com" value={url} onChange={(e) => setUrl(e.target.value)} required autoFocus /></label>
-        <div className="modal-row">
-          <label>Category
-            <select value={category} onChange={(e) => setCategory(e.target.value)}>
-              {Object.entries(CATEGORY_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
-            </select>
-          </label>
-          <label>City (optional)<input type="text" value={city} onChange={(e) => setCity(e.target.value)} /></label>
+    <Sheet title={lead.name} onClose={onClose} wide>
+      <header className="drawer-head">
+        <div className="drawer-title">
+          <h2>{lead.name}</h2>
+          <p className="muted">{CATEGORY_LABELS[lead.category] ?? lead.category}{lead.city ? ` · ${lead.city}` : ""}{lead.country ? `, ${countryName(lead.country)}` : ""}</p>
         </div>
-        {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="modal-actions">
-          <button type="button" className="button button-quiet" onClick={onClose}>Cancel</button>
-          <button type="submit" className="button" disabled={busy}>{busy ? "Reading website…" : "Add and redesign"}</button>
-        </div>
-      </form>
-    </>
+        <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon d={I.close} /></button>
+      </header>
+      <div className="drawer-meta">
+        <StatusSelect value={lead.status} onChange={onStatus} label={lead.name} />
+        <a className="btn btn-sm" href={lead.website} target="_blank" rel="noreferrer">Current site<Icon d={I.external} size={14} /></a>
+        <a className="btn btn-sm" href={`/preview/${encodeURIComponent(lead.id)}/`} target="_blank" rel="noreferrer">Open redesign<Icon d={I.external} size={14} /></a>
+      </div>
+      <div className="tabs" role="tablist">
+        {(["audit", "redesign", "pitch"] as Tab[]).map((t) => (
+          <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>
+            {t === "audit" ? "Audit" : t === "redesign" ? "Redesign" : "Pitch email"}
+          </button>
+        ))}
+      </div>
+      <div className="drawer-body">
+        {tab === "audit" && <AuditTab lead={lead} />}
+        {tab === "redesign" && <RedesignTab lead={lead} onError={onError} />}
+        {tab === "pitch" && <PitchTab lead={lead} onStatus={onStatus} onError={onError} />}
+      </div>
+    </Sheet>
+  );
+}
+
+function AuditTab({ lead }: { lead: LeadRow }) {
+  return (
+    <div className="stack">
+      <div className="score-big"><Score value={lead.score} /><p className="muted">Outdated score out of 100, from {lead.reasons.length} issues on the current homepage.</p></div>
+      <div>
+        <h3>Issues found</h3>
+        <ul className="list">{lead.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
+      </div>
+      <div>
+        <h3>Contacts</h3>
+        <ul className="list plain">
+          {lead.emails.map((e) => <li key={e}><a href={`mailto:${e}`}>{e}</a></li>)}
+          {lead.phones.map((p) => <li key={p}><a href={`tel:${p}`}>{p}</a></li>)}
+        </ul>
+        {lead.contactPage && <a className="text-link" href={lead.contactPage} target="_blank" rel="noreferrer">Their contact page</a>}
+      </div>
+      <p className="muted small">Found {ago(lead.auditedAt)} · {lead.sheetSynced ? "In Google Sheet" : "Not in Google Sheet yet"}</p>
+    </div>
   );
 }
 
@@ -416,35 +442,20 @@ interface RedesignStatus {
   pages: { slug: string; label: string; url: string }[];
   job: { id: number; status: "queued" | "running" | "done" | "failed"; error: string | null; createdAt: string; startedAt: string | null; finishedAt: string | null } | null;
   claudePages: string[];
-  claudeCreatedAt: string | null;
 }
 
-function RedesignPanel({ lead, onError }: { lead: LeadRow; onError(e: unknown): void }) {
+function RedesignTab({ lead, onError }: { lead: LeadRow; onError(e: unknown): void }) {
   const [st, setSt] = useState<RedesignStatus | null>(null);
   const [slug, setSlug] = useState("home");
   const [engine, setEngine] = useState<"template" | "claude">("template");
   const [busy, setBusy] = useState("");
   const base = `/api/leads/${encodeURIComponent(lead.id)}`;
 
-  const refresh = useCallback(async (method: "GET" | "POST" = "GET", path = "/redesign") => {
-    try {
-      const next = await api<RedesignStatus>(base + path, { method });
-      setSt(next);
-    } catch (e) {
-      onError(e);
-    }
-  }, [base, onError]);
-
   useEffect(() => {
-    setSt(null);
-    setSlug("home");
-    setEngine("template");
-    // First open crawls the whole site if it hasn't been crawled yet.
-    api<RedesignStatus>(`${base}/redesign`).then(async (s) => {
-      if (!s.crawledAt) s = await api<RedesignStatus>(`${base}/crawl`, { method: "POST" });
-      setSt(s);
-      if (s.claudePages.length) setEngine("claude");
-    }).catch(onError);
+    api<RedesignStatus>(`${base}/redesign`)
+      .then(async (s) => (s.crawledAt ? s : api<RedesignStatus>(`${base}/crawl`, { method: "POST" })))
+      .then((s) => { setSt(s); if (s.claudePages.length) setEngine("claude"); })
+      .catch(onError);
   }, [base, onError]);
 
   const active = st?.job?.status === "queued" || st?.job?.status === "running";
@@ -452,70 +463,240 @@ function RedesignPanel({ lead, onError }: { lead: LeadRow; onError(e: unknown): 
     if (!active) return;
     const t = setInterval(async () => {
       const next = await api<RedesignStatus>(`${base}/redesign`).catch(() => null);
-      if (next) {
-        setSt(next);
-        if (next.job?.status === "done") setEngine("claude");
-      }
+      if (next) { setSt(next); if (next.job?.status === "done") setEngine("claude"); }
     }, 10_000);
     return () => clearInterval(t);
   }, [active, base]);
 
-  const act = async (kind: "claude" | "crawl") => {
-    setBusy(kind);
-    await refresh("POST", kind === "claude" ? "/redesign" : "/crawl");
+  const act = async (path: "/redesign" | "/crawl") => {
+    setBusy(path);
+    try { setSt(await api<RedesignStatus>(base + path, { method: "POST" })); } catch (e) { onError(e); }
     setBusy("");
   };
 
-  if (!st) return <p className="muted">Reading every page of {lead.website.replace(/^https?:\/\/(www\.)?/, "")}…</p>;
-
+  if (!st) {
+    return (
+      <div className="stack">
+        <div className="pv-frame"><iframe src={`/preview/${encodeURIComponent(lead.id)}/`} title={`Redesign of ${lead.name}`} /></div>
+        <p className="muted small">Loading pages and Claude options…</p>
+      </div>
+    );
+  }
   const hasClaude = st.claudePages.includes(slug);
-  const shownEngine = engine === "claude" && hasClaude ? "claude" : "template";
-  const src = `/preview/${encodeURIComponent(lead.id)}/${slug === "home" ? "" : encodeURIComponent(slug)}?engine=${shownEngine}`;
+  const shown = engine === "claude" && hasClaude ? "claude" : "template";
+  const src = `/preview/${encodeURIComponent(lead.id)}/${slug === "home" ? "" : encodeURIComponent(slug)}?engine=${shown}`;
   const job = st.job;
 
   return (
-    <div className="redesign">
-      <div className="rd-toolbar">
-        <div className="segmented" role="group" aria-label="Redesign version">
-          <button className={shownEngine === "template" ? "on" : ""} onClick={() => setEngine("template")}>Template</button>
-          <button className={shownEngine === "claude" ? "on" : ""} onClick={() => setEngine("claude")} disabled={!hasClaude} title={hasClaude ? "" : "No Claude redesign for this page yet"}>Claude</button>
+    <div className="stack">
+      <div className="rd-bar">
+        <div className="seg" role="group" aria-label="Version">
+          <button className={shown === "template" ? "on" : ""} onClick={() => setEngine("template")}>Template</button>
+          <button className={shown === "claude" ? "on" : ""} onClick={() => setEngine("claude")} disabled={!hasClaude} title={hasClaude ? "" : "No Claude version for this page yet"}>Claude</button>
         </div>
         <select value={slug} onChange={(e) => setSlug(e.target.value)} aria-label="Page">
           {st.pages.map((p) => <option key={p.slug} value={p.slug}>{p.label}</option>)}
         </select>
-        <a className="text-link" href={src} target="_blank" rel="noreferrer">Open full screen</a>
+        <a className="btn btn-sm" href={src} target="_blank" rel="noreferrer">Full screen<Icon d={I.external} size={14} /></a>
       </div>
-
-      <div className="device"><iframe key={src} src={src} title={`Redesign of ${lead.name}`} /></div>
-
-      <div className="rd-claude">
+      <div className="pv-frame"><iframe key={src} src={src} title={`Redesign of ${lead.name}`} /></div>
+      <div className="callout">
         <div>
           <h3>Bespoke redesign with Claude</h3>
-          <p className="muted small">
-            Claude rebuilds all {st.pages.length} pages using every piece of the site's own text and images, with custom layout, motion and 3D.
-            Jobs run on your Mac through Claude Code with your subscription: keep <code>npm run redesign-runner</code> running.
-          </p>
+          <p className="muted small">Claude rebuilds all {st.pages.length} pages with the site's own text and photos, a new design and 3D motion. It runs on your Mac runner or a Claude cloud session and takes about 10–15 minutes.</p>
           {job && (
             <p className={`job job-${job.status}`} role="status">
-              {job.status === "queued" && "Queued. Waiting for the redesign runner to pick it up."}
-              {job.status === "running" && `Claude is building the site (started ${new Date(job.startedAt + "Z").toLocaleTimeString()}). This usually takes 5 to 15 minutes.`}
-              {job.status === "done" && `Claude redesign ready, ${st.claudePages.length} pages (${new Date(job.finishedAt + "Z").toLocaleString()}).`}
-              {job.status === "failed" && `The last attempt failed: ${job.error ?? "unknown error"}`}
+              {job.status === "queued" && "Queued. Waiting for a runner or cloud session to pick it up."}
+              {job.status === "running" && `Claude is building the site (started ${new Date(job.startedAt + "Z").toLocaleTimeString()}).`}
+              {job.status === "done" && `Claude version ready: ${st.claudePages.length} pages.`}
+              {job.status === "failed" && `Last attempt didn't finish: ${job.error ?? "unknown error"}`}
             </p>
           )}
         </div>
-        <div className="rd-actions">
-          <button className="button" onClick={() => act("claude")} disabled={!!busy || active}>
-            {active ? "In progress…" : st.claudePages.length ? "Redesign again with Claude" : "Redesign with Claude"}
-          </button>
-          <button className="button button-quiet" onClick={() => act("crawl")} disabled={!!busy || active}>{busy === "crawl" ? "Reading site…" : "Re-read website"}</button>
+        <div className="row-actions">
+          <button className="btn btn-primary" onClick={() => act("/redesign")} disabled={!!busy || active}>{active ? "In progress…" : st.claudePages.length ? "Redesign again with Claude" : "Redesign with Claude"}</button>
+          <button className="btn" onClick={() => act("/crawl")} disabled={!!busy || active}>{busy === "/crawl" ? "Reading site…" : "Re-read website"}</button>
         </div>
       </div>
       <p className="muted small">
-        Read {st.pages.length} pages from the current site{st.crawledAt ? ` on ${new Date(st.crawledAt).toLocaleDateString()}` : ""}.
+        {st.pages.length} pages read{st.crawledAt ? ` on ${new Date(st.crawledAt).toLocaleDateString()}` : ""}.
         {st.templateStyle && ` Template look: ${st.templateStyle}.`}
         {st.claudeStyle && ` Claude look: ${st.claudeStyle}.`}
       </p>
     </div>
+  );
+}
+
+function PitchTab({ lead, onStatus, onError }: { lead: LeadRow; onStatus(s: string): void; onError(e: unknown): void }) {
+  const [pitch, setPitch] = useState<Pitch | null>(null);
+  const [err, setErr] = useState("");
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    api<Pitch>(`/api/leads/${encodeURIComponent(lead.id)}/pitch`).then(setPitch).catch((e) => (e instanceof Unauthorized ? onError(e) : setErr((e as Error).message)));
+  }, [lead.id, onError]);
+  if (err) return <p className="muted">{err.includes("no email") ? "This lead has no public email address, so there's nothing to send." : err}</p>;
+  if (!pitch) return <p className="muted">Writing the email…</p>;
+  return (
+    <div className="stack">
+      <dl className="pitch-meta"><dt>To</dt><dd>{pitch.to}</dd><dt>Subject</dt><dd>{pitch.subject}</dd></dl>
+      <pre className="pitch-body">{pitch.body}</pre>
+      <div className="row-actions">
+        <a className="btn btn-primary" href={pitch.gmailUrl} target="_blank" rel="noreferrer" onClick={() => lead.status === "new" && onStatus("contacted")}>Open draft in Gmail</a>
+        <button className="btn" onClick={() => { navigator.clipboard?.writeText(`${pitch.subject}\n\n${pitch.body}`).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1600); }).catch(() => {}); }}>{copied ? "Copied" : "Copy email"}</button>
+      </div>
+      <p className="muted small">Nothing is sent automatically. Opening the draft marks the lead as Email sent; change it any time from the status menu.</p>
+    </div>
+  );
+}
+
+function CopyField({ label, value }: { label: string; value: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <div className="copy-field">
+      <span className="copy-label">{label}</span>
+      <div className="copy-row">
+        <code>{value}</code>
+        <button className="btn btn-sm" onClick={() => navigator.clipboard?.writeText(value).then(() => { setDone(true); setTimeout(() => setDone(false), 1500); }).catch(() => {})}>
+          <Icon d={done ? I.check : I.copy} size={14} />{done ? "Copied" : "Copy"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SheetPanel({ onClose, onError, onToast, onSynced }: { onClose(): void; onError(e: unknown): void; onToast(s: string): void; onSynced(): void }) {
+  const [st, setSt] = useState<SheetState | null>(null);
+  const [webhook, setWebhook] = useState("");
+  const [view, setView] = useState("");
+  const [busy, setBusy] = useState("");
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    api<SheetState>("/api/sheet").then((s) => { setSt(s); setWebhook(s.webhookUrl); setView(s.viewUrl); }).catch(onError);
+  }, [onError]);
+
+  const save = async () => {
+    setBusy("save"); setErr("");
+    try {
+      setSt(await api<SheetState>("/api/sheet", { method: "POST", body: JSON.stringify({ webhookUrl: webhook.trim(), viewUrl: view.trim() }) }));
+      onToast("Google Sheet settings saved.");
+    } catch (e) {
+      if (e instanceof Unauthorized) onError(e); else setErr((e as Error).message);
+    }
+    setBusy("");
+  };
+
+  const sync = async () => {
+    setBusy("sync"); setErr("");
+    try {
+      const r = await api<{ synced?: number; error?: string; skipped?: string }>("/api/sync", { method: "POST" });
+      if (r.error) setErr(r.error);
+      else onToast(r.skipped ? "Connect the Sheet first." : `Synced ${r.synced ?? 0} ${r.synced === 1 ? "lead" : "leads"} to Google Sheets.`);
+      setSt(await api<SheetState>("/api/sheet"));
+      onSynced();
+    } catch (e) {
+      if (e instanceof Unauthorized) onError(e); else setErr((e as Error).message);
+    }
+    setBusy("");
+  };
+
+  const copyScript = () => navigator.clipboard?.writeText(appsScript).then(() => onToast("Script copied.")).catch(() => {});
+
+  return (
+    <Sheet title="Google Sheet" onClose={onClose}>
+      <header className="drawer-head">
+        <div className="drawer-title">
+          <h2>Google Sheet</h2>
+          <p className="muted">New leads are added as rows. When you change a status here, the same row updates in the Sheet.</p>
+        </div>
+        <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon d={I.close} /></button>
+      </header>
+      <div className="drawer-body stack">
+        {!st ? <p className="muted">Loading…</p> : (
+          <>
+            <div className="status-card">
+              <span className={`dot${st.connected ? " on" : ""}`} />
+              <div>
+                <b>{st.connected ? "Connected" : "Not connected yet"}</b>
+                <p className="muted small">
+                  {st.pending} {st.pending === 1 ? "lead" : "leads"} waiting to sync.
+                  {st.last && ` Last sync ${ago(st.last.at)}: ${st.last.error ? `failed (${st.last.error})` : st.last.skipped ? "not connected" : `${st.last.synced ?? 0} rows`}.`}
+                </p>
+              </div>
+            </div>
+            <div className="row-actions">
+              <button className="btn btn-primary" onClick={sync} disabled={!!busy || !st.connected}>{busy === "sync" ? "Syncing…" : "Sync now"}</button>
+              {st.viewUrl && <a className="btn" href={st.viewUrl} target="_blank" rel="noreferrer">Open Sheet<Icon d={I.external} size={14} /></a>}
+            </div>
+            {err && <p className="form-error" role="alert">{err}</p>}
+
+            <div className="divider" />
+            <h3>{st.connected ? "Connection settings" : "Connect in 4 steps (about 3 minutes)"}</h3>
+            <ol className="setup">
+              <li>
+                <span>Open your Google Sheet, then <b>Extensions → Apps Script</b>. Delete what's there and paste the script.</span>
+                <button className="btn btn-sm" onClick={copyScript}><Icon d={I.copy} size={14} />Copy script</button>
+              </li>
+              <li>
+                <span>In Apps Script, open <b>Project Settings → Script properties</b> and add a property named <code>SHEETS_SECRET</code> with this value:</span>
+                <CopyField label="Secret" value={st.secret} />
+              </li>
+              <li><span>Click <b>Deploy → New deployment</b>, type <b>Web app</b>, Execute as <b>Me</b>, Who has access <b>Anyone</b>. Authorize, then copy the Web app URL.</span></li>
+              <li>
+                <span>Paste it here and save.</span>
+                <label className="field">Web app URL<input type="url" placeholder="https://script.google.com/macros/s/…/exec" value={webhook} onChange={(e) => setWebhook(e.target.value)} /></label>
+                <label className="field">Sheet address (optional, for the Open Sheet button)<input type="url" placeholder="https://docs.google.com/spreadsheets/d/…" value={view} onChange={(e) => setView(e.target.value)} /></label>
+                <div><button className="btn btn-primary" onClick={save} disabled={!!busy}>{busy === "save" ? "Saving…" : "Save"}</button></div>
+              </li>
+            </ol>
+          </>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
+function AddWebsite({ onClose, onAdded, onError }: { onClose(): void; onAdded(id: string, name: string): void; onError(e: unknown): void }) {
+  const [url, setUrl] = useState("");
+  const [category, setCategory] = useState("restaurant");
+  const [city, setCity] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setErr("");
+    try {
+      const r = await api<{ id: string; name: string }>("/api/leads/add", { method: "POST", body: JSON.stringify({ url, category, city }) });
+      onAdded(r.id, r.name);
+    } catch (e2) {
+      if (e2 instanceof Unauthorized) onError(e2); else setErr((e2 as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet title="Redesign any website" onClose={onClose}>
+      <header className="drawer-head">
+        <div className="drawer-title">
+          <h2>Redesign any website</h2>
+          <p className="muted">Paste an address. Revamp Radar reads all its pages and builds a redesign you can open right away.</p>
+        </div>
+        <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon d={I.close} /></button>
+      </header>
+      <form className="drawer-body stack" onSubmit={submit}>
+        <label className="field">Website<input type="text" inputMode="url" placeholder="example.com" value={url} onChange={(e) => setUrl(e.target.value)} required autoFocus /></label>
+        <label className="field">Category
+          <select value={category} onChange={(e) => setCategory(e.target.value)}>
+            {Object.entries(CATEGORY_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+          </select>
+        </label>
+        <label className="field">City (optional)<input type="text" value={city} onChange={(e) => setCity(e.target.value)} /></label>
+        {err && <p className="form-error" role="alert">{err}</p>}
+        <div className="row-actions">
+          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Reading website…" : "Add and redesign"}</button>
+          <button type="button" className="btn" onClick={onClose}>Cancel</button>
+        </div>
+      </form>
+    </Sheet>
   );
 }
