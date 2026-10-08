@@ -8,12 +8,13 @@
  *   ... -- --keep          keep the working folder for inspection
  *
  * Claude Code runs headless in a fresh temp folder with only Read/Write/Edit allowed, builds the site into
- * ./site/, and the runner uploads the pages to the Worker.
+ * ./site/, and the runner uploads the pages to the Worker. Progress (pages written) prints as it goes;
+ * Ctrl+C stops Claude and hands the job back so it can be started again from the portal.
  */
 import { spawn } from "node:child_process";
 import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { RUNNER_PROMPT, SKILL_DIR, briefContent, jobBrief, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
@@ -55,10 +56,17 @@ interface NextJob {
   previous?: { slug: string; html: string }[];
 }
 
-function runClaude(cwd: string, timeoutMin: number): Promise<string> {
+/** The Claude Code process for the job in progress, so Ctrl+C can stop it and hand the job back. */
+let current: { jobId: number; child: ReturnType<typeof spawn> | null } | null = null;
+
+/**
+ * Runs Claude Code headless and prints what it is doing as it goes (files it reads and writes), plus a heartbeat
+ * every minute. Resolves with Claude's final message.
+ */
+function runClaude(cwd: string, timeoutMin: number, pageFiles: string[]): Promise<string> {
   const cliArgs = [
     "-p", RUNNER_PROMPT,
-    "--output-format", "json",
+    "--output-format", "stream-json", "--verbose",
     "--permission-mode", "acceptEdits",
     "--disallowedTools", "Bash,WebFetch,WebSearch",
     ...(args.model ? ["--model", args.model] : []),
@@ -66,16 +74,53 @@ function runClaude(cwd: string, timeoutMin: number): Promise<string> {
   ];
   return new Promise((resolve, reject) => {
     const child = spawn("claude", cliArgs, { cwd, stdio: ["ignore", "pipe", "pipe"] });
-    let out = "";
+    if (current) current.child = child;
+    const started = Date.now();
+    const written = new Set<string>();
+    const seen = new Set<string>();
+    let buf = "";
+    let result = "";
     let err = "";
-    child.stdout.on("data", (d) => (out += d));
+    const mins = () => Math.round((Date.now() - started) / 60_000);
+    const say = (msg: string) => console.log(`  ${String(mins()).padStart(2)}m  ${msg}`);
+    // Paths relative to the job folder (macOS may report /private/var/... for /var/...).
+    const tag = `/${basename(cwd)}/`;
+    const rel = (f: string) => (f.includes(tag) ? f.slice(f.indexOf(tag) + tag.length) : f);
+    const onEvent = (ev: { type?: string; result?: string; message?: { content?: { type: string; name?: string; input?: { file_path?: string; skill?: string } }[] } }) => {
+      if (ev.type === "result") result = ev.result ?? "";
+      if (ev.type !== "assistant") return;
+      for (const c of ev.message?.content ?? []) {
+        if (c.type !== "tool_use") continue;
+        const file = c.input?.file_path ? rel(c.input.file_path) : "";
+        if (c.name === "Skill") say(`using the ${c.input?.skill ?? "website-redesign"} skill`);
+        else if ((c.name === "Write" || c.name === "Edit") && file.startsWith("site/")) {
+          const first = !written.has(file);
+          written.add(file);
+          say(`${first ? "wrote" : "edited"} ${file}  (${written.size}/${pageFiles.length} pages)`);
+        } else if (c.name === "Read" && file && !seen.has(file)) {
+          seen.add(file);
+          if (/^(BRIEF\.md|content\.json|skill\/SKILL\.md|previous\/)/.test(file)) say(`reading ${file}`);
+        }
+      }
+    };
+    child.stdout.on("data", (d) => {
+      buf += d;
+      let i;
+      while ((i = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, i).trim();
+        buf = buf.slice(i + 1);
+        if (line) try { onEvent(JSON.parse(line)); } catch { /* not JSON */ }
+      }
+    });
     child.stderr.on("data", (d) => (err += d));
+    const beat = setInterval(() => say(`still working… ${written.size}/${pageFiles.length} pages written`), 60_000);
     const timer = setTimeout(() => child.kill("SIGTERM"), timeoutMin * 60_000);
     child.on("error", (e) => reject(new Error(`Could not start Claude Code (is it installed and signed in?): ${e.message}`)));
     child.on("close", (code) => {
       clearTimeout(timer);
-      if (code === 0) resolve(out);
-      else reject(new Error(`Claude Code exited with ${code}: ${(err || out).slice(-800)}`));
+      clearInterval(beat);
+      if (code === 0) resolve(result);
+      else reject(new Error(`Claude Code exited with ${code}: ${(err || result).slice(-800)}`));
     });
   });
 }
@@ -109,13 +154,10 @@ async function processJob({ job, lead, site, avoid = [], previous = [] }: NextJo
     await writeFile(join(dir, "BRIEF.md"), jobBrief(job, prevFiles));
     if (job.notes || previous.length) console.log(`  ${previous.length ? "Revising the previous version" : "New design"}${job.notes ? `; notes: ${job.notes.slice(0, 200)}` : ""}`);
     await writeFile(join(dir, "content.json"), JSON.stringify(briefContent(lead, site, dna, avoid), null, 2));
-    const result = await runClaude(dir, Number(args.timeout));
-    let summary = result.slice(-300);
-    try {
-      summary = JSON.parse(result).result;
-    } catch {
-      /* plain output */
-    }
+    current = { jobId: job.id, child: null };
+    const pageFiles = site.pages.map((p) => (p.slug === "home" ? "index.html" : `${p.slug}.html`));
+    console.log(`  Claude is designing ${pageFiles.length} pages; progress appears below (usually 10–15 minutes).`);
+    const summary = (await runClaude(dir, Number(args.timeout), pageFiles)).slice(-300);
     const pages = await collectPages(dir, new Set(site.pages.map((p) => p.slug)));
     if (!pages.some((p) => p.slug === "home")) throw new Error(`No site/index.html was written. Claude said: ${summary}`);
     const r = await call<{ pages: number }>(`/api/redesign-jobs/${job.id}/complete`, { pages });
@@ -125,12 +167,28 @@ async function processJob({ job, lead, site, avoid = [], previous = [] }: NextJo
     console.error(`  ✗ ${msg}`);
     await call(`/api/redesign-jobs/${job.id}/fail`, { error: msg }).catch(() => {});
   } finally {
+    current = null;
     if (args.keep) console.log(`  files kept in ${dir}`);
     else await rm(dir, { recursive: true, force: true });
   }
 }
 
-console.log(`Redesign runner connected to ${base}. Waiting for jobs…`);
+// Ctrl+C: stop Claude and hand the job back as failed (so it isn't stuck as "running"), then exit.
+let stopping = false;
+const stop = async () => {
+  if (stopping) process.exit(1);
+  stopping = true;
+  if (current) {
+    console.log(`\nStopping: giving job ${current.jobId} back so you can start it again from the portal…`);
+    current.child?.kill("SIGTERM");
+    await call(`/api/redesign-jobs/${current.jobId}/fail`, { error: "The runner was stopped before it finished. Click Redesign again." }).catch(() => {});
+  }
+  process.exit(0);
+};
+process.on("SIGINT", stop);
+process.on("SIGTERM", stop);
+
+console.log(`Redesign runner connected to ${base}. Waiting for jobs… (checks every ${args.interval}s; Ctrl+C to stop)`);
 for (;;) {
   try {
     const next = await call<NextJob>("/api/redesign-jobs/next");
