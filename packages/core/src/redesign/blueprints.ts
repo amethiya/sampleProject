@@ -203,8 +203,10 @@ export function pickBlueprint(siteId: string, category: CategoryId, text: string
   const pool = BLUEPRINTS.filter((b) => b.categories.includes(category));
   const candidates = pool.length ? pool : BLUEPRINTS;
   const lower = text.toLowerCase();
-  const has = (k: string) => new RegExp(`(^|[^a-z])${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`).test(lower);
-  const score = (b: Blueprint) => b.keywords.reduce((n, k) => n + (has(k) ? (k.length > 5 ? 2 : 1) : 0), 0);
+  const head = lower.slice(0, 60); // the business name and domain come first and count most
+  const re = (k: string) => new RegExp(`(^|[^a-z])${k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`);
+  const score = (b: Blueprint) =>
+    b.keywords.reduce((n, k) => n + (re(k).test(head) ? 10 : re(k).test(lower) ? (k.length > 5 ? 2 : 1) : 0), 0);
   const recent = new Set(recentIds.slice(0, 3));
   const seed = hash(siteId);
   const ranked = candidates

@@ -115,6 +115,7 @@ describe("scene blueprints", () => {
     expect(pickBlueprint("a.com", "restaurant", "Luigi's Pizzeria — wood fired pizza since 1980").id).toBe("pizza-pull");
     expect(pickBlueprint("b.com", "restaurant", "Smash burgers and fries").id).toBe("burger-stack");
     expect(pickBlueprint("c.com", "salon", "Barber shop and hair stylist").id).toBe("silk-ribbon");
+    expect(pickBlueprint("dentalelements.com", "healthcare", "Dental Elements https://dentalelements.com Welcome to our practice in the city. Our clinic offers medical care and health checks").id).toBe("clean-turntable");
   });
 
   it("rotates when nothing matches, avoiding recent blueprints", async () => {
