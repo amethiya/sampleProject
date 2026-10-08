@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Logo from "../Logo";
 import { api, CATEGORY_LABELS, countryName, REGION_LABELS, Unauthorized } from "../api";
 import { navigate } from "../router";
+import { applyTheme, getTheme, type ThemeChoice } from "../theme";
 import appsScript from "../../../../integrations/google-apps-script/Code.gs?raw";
 
 interface LeadRow {
@@ -21,6 +22,7 @@ interface LeadRow {
   status: string;
   sheetSynced: boolean;
   crawled: boolean;
+  redesign: "pending" | "template" | "queued" | "running" | "done" | "failed";
 }
 
 interface Stats {
@@ -62,6 +64,18 @@ const SEGMENTS: { id: string; label: string }[] = [
   { id: "all", label: "All leads" },
 ];
 const DAILY_GOAL = 10;
+const REDESIGN_LABELS: Record<string, string> = {
+  pending: "Not started",
+  template: "Template ready",
+  queued: "Claude queued",
+  running: "Redesigning…",
+  done: "Redesigned",
+  failed: "Failed",
+};
+
+function RedesignChip({ state }: { state: string }) {
+  return <span className={`chip rd-${state}`} title={state === "template" ? "Instant template redesign is ready; Claude redesign not done yet" : undefined}>{REDESIGN_LABELS[state] ?? state}</span>;
+}
 
 const domainOf = (u: string) => u.replace(/^https?:\/\/(www\.)?/, "").replace(/\/.*$/, "");
 const ago = (iso: string) => {
@@ -92,7 +106,29 @@ const I = {
   logout: "M15 4h4v16h-4M10 8l-4 4l4 4M6 12h10",
   copy: "M8 8h11v11H8zM5 16V5h11",
   check: "M5 12l5 5L20 7",
+  sun: "M12 17a5 5 0 1 0 0-10a5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4",
+  moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
+  monitor: "M3 4h18v12H3zM8 20h8M12 16v4",
 };
+
+function ThemeSwitch() {
+  const [choice, setChoice] = useState<ThemeChoice>(getTheme);
+  const opts: { id: ThemeChoice; label: string; icon: string }[] = [
+    { id: "light", label: "Light", icon: I.sun },
+    { id: "dark", label: "Dark", icon: I.moon },
+    { id: "system", label: "System", icon: I.monitor },
+  ];
+  return (
+    <div className="theme-switch" role="radiogroup" aria-label="Theme">
+      {opts.map((o) => (
+        <button key={o.id} role="radio" aria-checked={choice === o.id} className={choice === o.id ? "on" : ""} title={o.label}
+          onClick={() => { applyTheme(o.id); setChoice(o.id); }}>
+          <Icon d={o.icon} size={15} /><span>{o.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const [me, setMe] = useState<string | null>(null);
@@ -101,6 +137,7 @@ export default function Dashboard() {
   const [segment, setSegment] = useState("ready");
   const [category, setCategory] = useState("");
   const [region, setRegion] = useState("");
+  const [redesignFilter, setRedesignFilter] = useState("");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -123,6 +160,7 @@ export default function Dashboard() {
     const p = new URLSearchParams({ segment });
     if (category) p.set("category", category);
     if (region) p.set("region", region);
+    if (redesignFilter) p.set("redesign", redesignFilter);
     if (q) p.set("q", q);
     api<Stats>("/api/stats").then(setStats).catch(() => {});
     try {
@@ -133,14 +171,13 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [segment, category, region, q, guard]);
+  }, [segment, category, region, redesignFilter, q, guard]);
 
   useEffect(() => {
-    if (!me) return;
-    const t = setTimeout(load, 180);
+    const t = setTimeout(load, 120);
     const every = setInterval(load, 60_000); // new leads arrive every 10 minutes
     return () => { clearTimeout(t); clearInterval(every); };
-  }, [me, load]);
+  }, [load]);
 
   useEffect(() => {
     if (!toast) return;
@@ -190,8 +227,6 @@ export default function Dashboard() {
   const lead = useMemo(() => leads.find((l) => l.id === open?.id) ?? null, [leads, open]);
   const count = (s: string) => (s === "ready" ? stats?.byStatus?.new : s === "all" ? stats?.qualified : stats?.byStatus?.[s]) ?? 0;
 
-  if (!me) return <div className="boot"><Logo /></div>;
-
   return (
     <div className="app">
       <aside className={`side${menu ? " open" : ""}`}>
@@ -206,7 +241,8 @@ export default function Dashboard() {
           <a className="nav-item" href="/" target="_blank" rel="noreferrer"><Icon d={I.external} />Public page</a>
         </nav>
         <div className="side-foot">
-          <span className="side-user" title={me}>{me}</span>
+          <ThemeSwitch />
+          <span className="side-user" title={me ?? ""}>{me ?? "Signing in…"}</span>
           <button className="nav-item" onClick={signOut}><Icon d={I.logout} />Sign out</button>
         </div>
       </aside>
@@ -266,13 +302,18 @@ export default function Dashboard() {
               <option value="">All regions</option>
               {Object.entries(REGION_LABELS).map(([id, label]) => <option key={id} value={id}>{label}</option>)}
             </select>
+            <select value={redesignFilter} onChange={(e) => setRedesignFilter(e.target.value)} aria-label="Redesign">
+              <option value="">Any redesign</option>
+              <option value="done">Redesigned by Claude</option>
+              <option value="pending">Redesign pending</option>
+            </select>
           </div>
 
           {/* Desktop table */}
           <div className="table-card">
             <table className="leads">
               <thead>
-                <tr><th>Business</th><th>Location</th><th>Score</th><th>Email</th><th>Status</th><th className="ta-r">Actions</th></tr>
+                <tr><th>Business</th><th>Location</th><th>Score</th><th>Lead status</th><th>Redesign</th><th className="ta-r">Actions</th></tr>
               </thead>
               <tbody>
                 {leads.map((l) => (
@@ -280,11 +321,12 @@ export default function Dashboard() {
                     <td>
                       <button className="link-strong" onClick={() => setOpen({ id: l.id, tab: "audit" })}>{l.name}</button>
                       <span className="sub">{CATEGORY_LABELS[l.category] ?? l.category} · {domainOf(l.website)}</span>
+                      <span className="sub ellipsis">{l.emails[0]}</span>
                     </td>
                     <td><span className="nowrap">{l.city || "—"}</span><span className="sub">{l.country ? countryName(l.country) : ""}</span></td>
                     <td><Score value={l.score} /></td>
-                    <td><span className="ellipsis">{l.emails[0]}</span></td>
                     <td><StatusSelect value={l.status} onChange={(s) => updateStatus(l.id, s)} label={l.name} /></td>
+                    <td><RedesignChip state={l.redesign} /></td>
                     <td className="ta-r">
                       <div className="row-actions end">
                         <button className="btn btn-sm" onClick={() => setOpen({ id: l.id, tab: "redesign" })}>Redesign</button>
@@ -305,6 +347,7 @@ export default function Dashboard() {
                   <span className="card-top"><b>{l.name}</b><Score value={l.score} compact /></span>
                   <span className="sub">{CATEGORY_LABELS[l.category] ?? l.category} · {[l.city, l.country && countryName(l.country)].filter(Boolean).join(", ")}</span>
                   <span className="sub ellipsis">{l.emails[0]}</span>
+                  <span className="card-chip"><RedesignChip state={l.redesign} /></span>
                 </button>
                 <div className="card-actions">
                   <StatusSelect value={l.status} onChange={(s) => updateStatus(l.id, s)} label={l.name} />
@@ -334,7 +377,7 @@ export default function Dashboard() {
       </div>
 
       {lead && open && (
-        <LeadPanel key={lead.id} lead={lead} initialTab={open.tab} onClose={() => setOpen(null)} onStatus={(s) => updateStatus(lead.id, s)} onError={guard} />
+        <LeadPanel key={lead.id} lead={lead} initialTab={open.tab} onClose={() => setOpen(null)} onStatus={(s) => updateStatus(lead.id, s)} onError={guard} onChanged={load} />
       )}
       {panel === "sheet" && <SheetPanel onClose={() => setPanel("")} onError={guard} onToast={setToast} onSynced={load} />}
       {panel === "add" && (
@@ -382,7 +425,7 @@ function Sheet({ title, onClose, children, wide = false }: { title: string; onCl
   );
 }
 
-function LeadPanel({ lead, initialTab, onClose, onStatus, onError }: { lead: LeadRow; initialTab: Tab; onClose(): void; onStatus(s: string): void; onError(e: unknown): void }) {
+function LeadPanel({ lead, initialTab, onClose, onStatus, onError, onChanged }: { lead: LeadRow; initialTab: Tab; onClose(): void; onStatus(s: string): void; onError(e: unknown): void; onChanged(): void }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   return (
     <Sheet title={lead.name} onClose={onClose} wide>
@@ -395,6 +438,7 @@ function LeadPanel({ lead, initialTab, onClose, onStatus, onError }: { lead: Lea
       </header>
       <div className="drawer-meta">
         <StatusSelect value={lead.status} onChange={onStatus} label={lead.name} />
+        <RedesignChip state={lead.redesign} />
         <a className="btn btn-sm" href={lead.website} target="_blank" rel="noreferrer">Current site<Icon d={I.external} size={14} /></a>
         <a className="btn btn-sm" href={`/preview/${encodeURIComponent(lead.id)}/`} target="_blank" rel="noreferrer">Open redesign<Icon d={I.external} size={14} /></a>
       </div>
@@ -407,7 +451,7 @@ function LeadPanel({ lead, initialTab, onClose, onStatus, onError }: { lead: Lea
       </div>
       <div className="drawer-body">
         {tab === "audit" && <AuditTab lead={lead} />}
-        {tab === "redesign" && <RedesignTab lead={lead} onError={onError} />}
+        {tab === "redesign" && <RedesignTab lead={lead} onError={onError} onChanged={onChanged} />}
         {tab === "pitch" && <PitchTab lead={lead} onStatus={onStatus} onError={onError} />}
       </div>
     </Sheet>
@@ -444,7 +488,7 @@ interface RedesignStatus {
   claudePages: string[];
 }
 
-function RedesignTab({ lead, onError }: { lead: LeadRow; onError(e: unknown): void }) {
+function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: unknown): void; onChanged(): void }) {
   const [st, setSt] = useState<RedesignStatus | null>(null);
   const [slug, setSlug] = useState("home");
   const [engine, setEngine] = useState<"template" | "claude">("template");
@@ -463,14 +507,18 @@ function RedesignTab({ lead, onError }: { lead: LeadRow; onError(e: unknown): vo
     if (!active) return;
     const t = setInterval(async () => {
       const next = await api<RedesignStatus>(`${base}/redesign`).catch(() => null);
-      if (next) { setSt(next); if (next.job?.status === "done") setEngine("claude"); }
+      if (next) {
+        setSt(next);
+        if (next.job?.status !== "queued" && next.job?.status !== "running") onChanged();
+        if (next.job?.status === "done") setEngine("claude");
+      }
     }, 10_000);
     return () => clearInterval(t);
-  }, [active, base]);
+  }, [active, base, onChanged]);
 
   const act = async (path: "/redesign" | "/crawl") => {
     setBusy(path);
-    try { setSt(await api<RedesignStatus>(base + path, { method: "POST" })); } catch (e) { onError(e); }
+    try { setSt(await api<RedesignStatus>(base + path, { method: "POST" })); onChanged(); } catch (e) { onError(e); }
     setBusy("");
   };
 

@@ -25,7 +25,7 @@ export default function Landing() {
           <a href="#how">How it works</a>
           <a href="#showcase">Redesigns</a>
         </nav>
-        <a className="button" {...linkProps("/login")}>Sign in</a>
+        <a className="button" href="#showcase">See redesigns</a>
       </header>
 
       <section className="l-hero">
@@ -36,12 +36,12 @@ export default function Landing() {
             and builds a modern redesign from their own content, ready for you to pitch.
           </p>
           <div className="l-hero-actions">
-            <a className="button button-lg" {...linkProps("/login")}>Open the dashboard</a>
             {feature && (
-              <a className="button button-lg button-quiet" href={`/preview/${encodeURIComponent(feature.id)}/`} target="_blank" rel="noreferrer">
+              <a className="button button-lg" href={`/preview/${encodeURIComponent(feature.id)}/`} target="_blank" rel="noreferrer">
                 View a live redesign
               </a>
             )}
+            <a className="button button-lg button-quiet" href="#how">How it works</a>
           </div>
           {stats && (
             <p className="l-live">
@@ -89,7 +89,9 @@ export default function Landing() {
 
       <section className="l-cta">
         <h2>Ten new leads every day, each with a redesign attached.</h2>
-        <a className="button button-lg button-inverse" {...linkProps("/login")}>Sign in to Revamp Radar</a>
+        {stats?.showcase[0] && (
+          <a className="button button-lg button-inverse" href={`/preview/${encodeURIComponent(stats.showcase[0].id)}/`} target="_blank" rel="noreferrer">View a live redesign</a>
+        )}
       </section>
 
       <footer className="l-foot">

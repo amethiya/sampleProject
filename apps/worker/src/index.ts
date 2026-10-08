@@ -104,12 +104,23 @@ async function api(req: Request, url: URL, env: Env, ctx: ExecutionContext): Pro
     else if (segment && segment !== "all" && STATUSES.includes(segment)) (where.push("status = ?"), binds.push(segment));
     const region = url.searchParams.get("region");
     if (region) (where.push("region = ?"), binds.push(region));
+    const redesign = url.searchParams.get("redesign");
+    if (redesign === "done") where.push("EXISTS (SELECT 1 FROM ai_pages a WHERE a.lead_id = sites.id)");
+    if (redesign === "pending") where.push("NOT EXISTS (SELECT 1 FROM ai_pages a WHERE a.lead_id = sites.id)");
     const q = url.searchParams.get("q");
     if (q) (where.push("(name LIKE ? OR website LIKE ? OR city LIKE ?)"), binds.push(`%${q}%`, `%${q}%`, `%${q}%`));
     const { results } = await env.DB.prepare(
-      `SELECT id, status, sheet_synced, region, site IS NOT NULL AS crawled, json_remove(lead, '$.content') AS lead FROM sites WHERE ${where.join(" AND ")} ORDER BY audited_at DESC LIMIT 500`,
-    ).bind(...binds).all<{ id: string; status: string; sheet_synced: number; region: string; crawled: number; lead: string }>();
-    return json(results.map((r) => ({ ...summarize(JSON.parse(r.lead) as Lead, r.status, r.sheet_synced), region: r.region, crawled: !!r.crawled })));
+      `SELECT id, status, sheet_synced, region, site IS NOT NULL AS crawled, json_remove(lead, '$.content') AS lead,
+         (SELECT j.status FROM redesign_jobs j WHERE j.lead_id = sites.id ORDER BY j.id DESC LIMIT 1) AS job_status,
+         EXISTS (SELECT 1 FROM ai_pages a WHERE a.lead_id = sites.id) AS has_claude
+       FROM sites WHERE ${where.join(" AND ")} ORDER BY audited_at DESC LIMIT 500`,
+    ).bind(...binds).all<{ id: string; status: string; sheet_synced: number; region: string; crawled: number; lead: string; job_status: string | null; has_claude: number }>();
+    return json(results.map((r) => ({
+      ...summarize(JSON.parse(r.lead) as Lead, r.status, r.sheet_synced),
+      region: r.region,
+      crawled: !!r.crawled,
+      redesign: redesignState(r.job_status, !!r.has_claude, !!r.crawled),
+    })));
   }
 
   const pm = path.match(/^\/api\/leads\/([^/]+)\/pitch$/);
@@ -298,6 +309,18 @@ async function stats(env: Env) {
     "SELECT status, COUNT(*) AS n FROM sites WHERE qualified = 1 GROUP BY status",
   ).all<{ status: string; n: number }>();
   return { ...totals, byCategory, daily, byStatus: Object.fromEntries(byStatus.map((r) => [r.status, r.n])) };
+}
+
+/**
+ * Where a lead's redesign stands: a Claude job in progress wins, then a finished Claude redesign, then the
+ * instant template (once the site has been read), then failed / not started.
+ */
+function redesignState(job: string | null, hasClaude: boolean, crawled: boolean): string {
+  if (job === "running") return "running";
+  if (job === "queued") return "queued";
+  if (hasClaude) return "done";
+  if (job === "failed") return "failed";
+  return crawled ? "template" : "pending";
 }
 
 function summarize(l: Lead, status: string, synced: number) {
