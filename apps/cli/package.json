@@ -1,0 +1,21 @@
+{
+  "name": "@rr/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "discover": "tsx src/index.ts",
+    "redesign-runner": "tsx src/redesign-runner.ts",
+    "typecheck": "tsc -p .",
+    "job": "tsx src/job.ts",
+    "skill:catalog": "tsx src/skill-catalog.ts"
+  },
+  "dependencies": {
+    "@rr/core": "*"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0"
+  }
+}
