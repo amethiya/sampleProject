@@ -21,8 +21,8 @@
 - [ ] Text contrast is comfortable in all sections; body lines stay under ~75 characters.
 
 ## Motion
-- [ ] One signature moment on the home page (3D chapter, kinetic headline or pinned gallery) chosen from the
-      category profile.
+- [ ] The home page's signature moment is the assigned blueprint's (`designDirection.blueprint`), built as described,
+      and the home page follows its storyboard beats.
 - [ ] Scroll-scrubbed storytelling + eased one-shot reveals; no element animates without a reason.
 - [ ] `prefers-reduced-motion` turns off smooth scroll and animation and shows everything.
 - [ ] With JavaScript or WebGL unavailable, all content is still visible and readable.

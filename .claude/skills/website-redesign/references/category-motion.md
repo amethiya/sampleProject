@@ -51,3 +51,21 @@ launch/promo films, concept explainers and animated data pieces**, built mainly 
 - **Loops** — seamless short loops for ambient elements (marquees, idle object rotation).
 
 Translate these into scroll-driven web motion with the recipes in `motion-recipes.md`.
+
+## Patterns from 3D-website showcase reels
+
+Studied from short design-showcase videos of 3D scroll websites (fashion, watches, tailoring, sarees, food). What
+makes them land, and the recipe that builds each:
+- **Exploded product**: a burger, a garment or a device comes apart into its layers as you scroll, each layer
+  captioned, then reassembles (recipe 16, blueprints `burger-stack`, `deconstructed`, `plate-slide`).
+- **Type sandwich**: the brand name in giant type split around the product, which turns in the gap; tiny spec labels
+  in the corners like "Model / 146GR" (recipe 17, every `*-turntable` blueprint).
+- **Dark spotlight stage**: a single cone of light, fog, serif headline set beside the object (recipe 18).
+- **Particle figure**: a figure or logo made of glowing points on a reflective floor, title in a large serif over it
+  (recipe 22 with the business's own logo or photo).
+- **Layered cut-outs**: several photos of people or products at different depths in front of a framed colour block
+  (recipe 19, blueprint `lookbook-scenes`).
+- **Scene cards**: a numbered scene counter, a floating product card with fabric ribbons flowing past, one large real
+  number beside it (recipe 20 and 21).
+
+The common thread: **one hero object, one idea per scroll beat, big confident type, everything else quiet.**

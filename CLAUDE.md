@@ -8,6 +8,9 @@ TypeScript npm-workspaces monorepo. See README.md for the architecture.
   there is a test for this. Previews are served with a strict CSP.
 - Overpass rejects browser-like user agents (406) and is often overloaded (504): keep queries small.
 
+- Scene blueprints (`packages/core/src/redesign/blueprints.ts`) pick each redesign's signature 3D moment and
+  storyboard. After changing them run `npm run skill:catalog` to regenerate the skill's references/blueprints.md
+  (a test fails if it is out of date).
 - Claude redesigns: `packages/core/src/redesign/brief.ts` is the brief Claude follows; the runner is
   `apps/cli/src/redesign-runner.ts`. Pages it uploads are untrusted and served with a `sandbox` CSP.
 

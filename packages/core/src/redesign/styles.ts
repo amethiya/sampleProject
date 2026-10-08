@@ -1,3 +1,6 @@
+import { BLUEPRINTS, pickBlueprint, type Blueprint } from "./blueprints";
+import type { CategoryId } from "../types";
+
 /**
  * Design DNA: every redesign gets its own palette, type pairing, hero layout, shape language and concept,
  * chosen so it differs from the most recent redesigns. Category still decides photography, 3D subject and copy.
@@ -41,6 +44,8 @@ export interface DesignDna {
   hero: HeroLayout;
   corners: Corners;
   concept: Concept;
+  /** The scene blueprint (signature 3D moment and storyboard). Absent on keys stored before blueprints existed. */
+  blueprint?: Blueprint;
 }
 
 const L = (ink: string, a: number) => `rgba(${ink},${a})`;
@@ -115,21 +120,23 @@ function rotate<T>(xs: T[], seed: number): T[] {
   return xs.map((_, i) => xs[(i + seed) % n]);
 }
 
-/** Rebuild a DNA from its stored key ("palette|fonts|hero|corners|concept"). */
+/** Rebuild a DNA from its stored key ("palette|fonts|hero|corners|concept|blueprint"). */
 export function dnaFromKey(key: string): DesignDna | null {
-  const [p, f, h, c, k] = key.split("|");
+  const [p, f, h, c, k, b] = key.split("|");
   const palette = PALETTES.find((x) => x.id === p);
   const fonts = FONT_PAIRS.find((x) => x.id === f);
   const concept = CONCEPTS.find((x) => x.id === k);
   if (!palette || !fonts || !concept || !HERO_LAYOUTS.includes(h as HeroLayout) || !CORNERS.includes(c as Corners)) return null;
-  return { key, palette, fonts, hero: h as HeroLayout, corners: c as Corners, concept };
+  const blueprint = b ? BLUEPRINTS.find((x) => x.id === b) : undefined;
+  return { key, palette, fonts, hero: h as HeroLayout, corners: c as Corners, concept, blueprint };
 }
 
 /**
  * Choose a DNA for a site that avoids what recent redesigns used: no palette from the last 6, no type pairing
- * from the last 6, no concept from the last 4, and a different hero layout from the previous one.
+ * from the last 6, no concept from the last 4, a different hero layout from the previous one, and a scene
+ * blueprint that suits the business (`text` is its name and content, for keywords like pizza or burger).
  */
-export function pickDna(siteId: string, category: string, recentKeys: string[]): DesignDna {
+export function pickDna(siteId: string, category: string, recentKeys: string[], text = ""): DesignDna {
   const recent = recentKeys.map(dnaFromKey).filter((d): d is DesignDna => !!d);
   const used = <T>(get: (d: DesignDna) => T, n: number) => new Set(recent.slice(0, n).map(get));
   const seed = hash(siteId);
@@ -141,6 +148,7 @@ export function pickDna(siteId: string, category: string, recentKeys: string[]):
   const hero = pickFrom(HERO_LAYOUTS, used((d) => d.hero, 1), seed >>> 5);
   const corners = pickFrom(CORNERS, used((d) => d.corners, 1), seed >>> 7);
   const concept = CONCEPTS.find((c) => c.id === pickFrom(CONCEPTS.map((x) => x.id), used((d) => d.concept.id, 4), seed >>> 9))!;
-  const key = [palette.id, fonts.id, hero, corners, concept.id].join("|");
-  return { key, palette, fonts, hero, corners, concept };
+  const blueprint = pickBlueprint(siteId, category as CategoryId, text, recent.map((d) => d.blueprint?.id ?? ""));
+  const key = [palette.id, fonts.id, hero, corners, concept.id, blueprint.id].join("|");
+  return { key, palette, fonts, hero, corners, concept, blueprint };
 }

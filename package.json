@@ -7,6 +7,7 @@
     "discover": "npm run discover -w @rr/cli --",
     "redesign-runner": "npm run redesign-runner -w @rr/cli --",
     "job": "npm run job -w @rr/cli --",
+    "skill:catalog": "npm run skill:catalog -w @rr/cli",
     "test": "npm test -w @rr/core",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "dev:dashboard": "npm run dev -w @rr/dashboard",

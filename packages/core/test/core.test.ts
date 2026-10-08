@@ -108,3 +108,51 @@ describe("buildPitch", () => {
     expect(p.gmailUrl).toContain("to=joe%40joesdiner.com");
   });
 });
+
+describe("scene blueprints", () => {
+  it("matches the business: pizzeria → slice pull, burger bar → exploded burger", async () => {
+    const { pickBlueprint } = await import("../src");
+    expect(pickBlueprint("a.com", "restaurant", "Luigi's Pizzeria — wood fired pizza since 1980").id).toBe("pizza-pull");
+    expect(pickBlueprint("b.com", "restaurant", "Smash burgers and fries").id).toBe("burger-stack");
+    expect(pickBlueprint("c.com", "salon", "Barber shop and hair stylist").id).toBe("silk-ribbon");
+  });
+
+  it("rotates when nothing matches, avoiding recent blueprints", async () => {
+    const { pickBlueprint } = await import("../src");
+    const first = pickBlueprint("d.com", "accounting", "");
+    const next = pickBlueprint("d.com", "accounting", "", [first.id]);
+    expect(next.id).not.toBe(first.id);
+  });
+
+  it("covers every category, uses known recipes, and is in the skill catalogue", async () => {
+    const { BLUEPRINTS, CATEGORIES } = await import("../src");
+    const { readFileSync } = await import("node:fs");
+    const md = readFileSync(new URL("../../../.claude/skills/website-redesign/references/blueprints.md", import.meta.url), "utf8");
+    for (const c of CATEGORIES) expect(BLUEPRINTS.filter((b) => b.categories.includes(c.id)).length).toBeGreaterThanOrEqual(3);
+    for (const b of BLUEPRINTS) {
+      expect(md, `run npm run skill:catalog (${b.id} missing)`).toContain(`\`${b.id}\``);
+      for (const r of b.recipes) expect(r).toBeLessThanOrEqual(22);
+    }
+    expect(new Set(BLUEPRINTS.map((b) => b.id)).size).toBe(BLUEPRINTS.length);
+  });
+
+  it("stores the blueprint in the DNA key and still reads older keys", async () => {
+    const { pickDna, dnaFromKey } = await import("../src");
+    const dna = pickDna("e.com", "restaurant", [], "pizza");
+    expect(dna.key.split("|")).toHaveLength(6);
+    expect(dnaFromKey(dna.key)?.blueprint?.id).toBe("pizza-pull");
+    const old = dnaFromKey(dna.key.split("|").slice(0, 5).join("|"));
+    expect(old).not.toBeNull();
+    expect(old?.blueprint).toBeUndefined();
+  });
+
+  it("renders the blueprint's object and motion in the 3D chapter", async () => {
+    const { dnaFromKey, renderSitePage, snapshotFromLead } = await import("../src");
+    const lead = { id: "x", name: "Tony Burger", website: "https://t.com", category: "restaurant", city: "Austin", country: "US", contacts: { emails: ["a@t.com"], phones: [] }, audit: { score: 50, issues: [] }, content: { title: "T", description: "", headings: [], paragraphs: [], images: [] } } as never;
+    const site = snapshotFromLead(lead);
+    const html = renderSitePage(lead, site, site.pages[0].slug, { dna: dnaFromKey("ember|jakarta|split|soft|bold|kettlebell-turntable")! });
+    expect(html).toContain('data-variant="turntable"');
+    expect(html).toContain('data-kind="kettlebell"');
+    expect(html).toContain("<span>Tony</span><span>Burger</span>");
+  });
+});

@@ -48,7 +48,17 @@ export function briefContent(lead: Lead, site: SiteSnapshot, dna?: DesignDna, av
       googleFontsQuery: t.fonts,
       displayFont: t.display,
       bodyFont: t.body,
-      threeDObject: t.object,
+      threeDObject: dna?.blueprint?.object ?? t.object,
+      blueprint: dna?.blueprint
+        ? {
+            id: dna.blueprint.id,
+            name: dna.blueprint.name,
+            signatureMoment: dna.blueprint.signature,
+            chapterMotion: dna.blueprint.motion,
+            storyboard: dna.blueprint.beats,
+            motionRecipes: dna.blueprint.recipes,
+          }
+        : null,
       primaryCallToAction: t.cta,
       fallbackPhotos: t.photos.map((id) => photoUrl(id, 1920)),
     },
@@ -62,6 +72,10 @@ export const BRIEF = `# Redesign brief
 skill/SKILL.md and every file in skill/references/ before you start, follow its workflow, pick the motion profile
 for this category, use its motion recipes, and run its QA checklist before you finish. This brief is the output
 contract; the skill is how you design and build.
+
+**Build the scene blueprint in designDirection.blueprint.** It is this site's assigned template from the skill's
+references/blueprints.md: its signature moment, its storyboard beats and its motion recipes. Build that moment as the
+home page's centrepiece and follow the storyboard, filling every beat with this site's own content.
 
 You are the lead designer and front-end developer at Revamp Radar, a studio that rebuilds dated small-business
 websites. Build a complete, production-quality concept redesign of the website described in content.json.

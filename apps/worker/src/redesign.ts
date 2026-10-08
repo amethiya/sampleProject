@@ -40,18 +40,28 @@ async function recentStyles(env: Db, limit = 12): Promise<string[]> {
   return results.map((r) => r.style);
 }
 
+/** Name and page text, so a pizzeria gets the pizza blueprint and a burger bar the burger one. */
+function siteText(lead: Lead, site: SiteSnapshot | null): string {
+  const pages = site?.pages ?? [];
+  return [lead.name, lead.website, ...pages.flatMap((p) => [p.title, p.description ?? "", ...p.sections.flatMap((s) => [s.heading ?? "", ...s.paragraphs, ...s.items])])]
+    .join(" ")
+    .slice(0, 20000);
+}
+
 /** The site's DNA, assigning one that differs from recent redesigns the first time it is rendered. */
-async function ensureDna(env: Db, id: string, lead: Lead, style: string | null): Promise<DesignDna> {
+async function ensureDna(env: Db, id: string, lead: Lead, style: string | null, site: SiteSnapshot | null): Promise<DesignDna> {
   const existing = style ? dnaFromKey(style) : null;
-  if (existing) return existing;
-  const dna = pickDna(id, lead.category, await recentStyles(env));
+  if (existing?.blueprint) return existing;
+  const fresh = pickDna(id, lead.category, await recentStyles(env), siteText(lead, site));
+  // Older sites keep their palette and type and only gain a scene blueprint.
+  const dna = existing ? { ...existing, blueprint: fresh.blueprint, key: `${existing.key.split("|").slice(0, 5).join("|")}|${fresh.blueprint!.id}` } : fresh;
   await env.DB.prepare("UPDATE sites SET style = ?, styled_at = datetime('now') WHERE id = ?").bind(dna.key, id).run();
   return dna;
 }
 
 export function describeDna(key: string): string {
   const d = dnaFromKey(key);
-  return d ? `${d.concept.name} concept, ${d.hero} hero, ${d.palette.id} palette, ${d.fonts.id} type` : key;
+  return d ? `${d.concept.name} concept, ${d.hero} hero, ${d.palette.id} palette, ${d.fonts.id} type${d.blueprint ? `, "${d.blueprint.name}" scene` : ""}` : key;
 }
 
 /** Crawl the whole site once and keep it; later previews and Claude jobs reuse the snapshot. */
@@ -84,7 +94,7 @@ export async function preview(req: Request, url: URL, env: Db): Promise<Response
   if (!data) return new Response("Preview not found", { status: 404 });
   const site = await ensureSite(env, id, data.lead, data.site);
   if (!site.pages.some((p) => p.slug === slug)) return new Response("Page not found", { status: 404 });
-  const dna = await ensureDna(env, id, data.lead, data.style);
+  const dna = await ensureDna(env, id, data.lead, data.style, site);
   return html(renderSitePage(data.lead, site, slug, { image: (u) => proxied(url.origin, u), dna }), TEMPLATE_CSP);
 }
 
@@ -125,7 +135,7 @@ export async function imageProxy(req: Request, url: URL, env: Db, ctx: Execution
   const size = Number(upstream?.headers.get("content-length") ?? 0);
   if (!upstream?.ok || !type.startsWith("image/") || size > 8_000_000) return new Response("Image unavailable", { status: 404 });
   const res = new Response(upstream.body, {
-    headers: { "content-type": type, "cache-control": "public, max-age=604800", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox" },
+    headers: { "content-type": type, "cache-control": "public, max-age=604800", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox", "access-control-allow-origin": "*" },
   });
   ctx.waitUntil(cache.put(req, res.clone()));
   return res;
@@ -162,7 +172,7 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
         // A new look every time: avoid recent redesigns, including this site's current one.
         const recent = await recentStyles(env);
         if (data.style) recent.unshift(data.style);
-        const dna = pickDna(`${id}:${Date.now()}`, data.lead.category, recent);
+        const dna = pickDna(`${id}:${Date.now()}`, data.lead.category, recent, siteText(data.lead, site));
         await env.DB.prepare("INSERT INTO redesign_jobs (lead_id, style) VALUES (?, ?)").bind(id, dna.key).run();
       }
       return json(await status(env, id, site));

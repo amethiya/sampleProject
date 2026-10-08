@@ -1,7 +1,9 @@
 import type { CategoryId } from "../types";
 
 /** Which category-specific 3D object the feature scene renders. */
-export type ObjectKind = "rings" | "dumbbell" | "capsules" | "coins" | "globe" | "cup" | "gem";
+export type ObjectKind =
+  | "rings" | "dumbbell" | "capsules" | "coins" | "globe" | "cup" | "gem"
+  | "burger" | "pizza" | "glass" | "kettlebell" | "perfume" | "parcel" | "ribbon";
 
 export interface Service {
   title: string;

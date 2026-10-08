@@ -181,3 +181,104 @@ if (matchMedia('(pointer: fine)').matches) btns.forEach(b => {
 gsap.from(el, { textContent: 0, duration: 1.4, ease: 'power2.out', snap: { textContent: 1 },
   scrollTrigger: { trigger: el, start: 'top 85%' } });
 ```
+
+## 16. Exploded stack (burger layers, plates on a bar, coin stacks, crates)
+
+The scroll lifts the layers of one object apart along a single axis, one caption per layer, then locks them back.
+Build the object as a `Group` of layers ordered bottom to top, then:
+```js
+const order = group.children.slice().sort((a, b) => a.position.y - b.position.y);
+order.forEach((c, i) => { c.userData.home = c.position.clone(); c.userData.lift = (i - (order.length - 1) / 2) * .4; });
+// in frame(): burst rises and falls through the middle of the chapter
+const burst = Math.sin(clamp((prog - .3) / .4) * Math.PI);
+order.forEach(c => c.position.y = c.userData.home.y + c.userData.lift * burst * 1.3);
+group.scale.setScalar(base * (1 - .22 * burst));              // stay inside the frame while it grows taller
+```
+Food colours: `new THREE.Color(hex).convertSRGBToLinear()` with `MeshStandardMaterial` (roughness ≥ .55, low
+envMapIntensity); otherwise reds and yellows wash out to pastel under sRGB output. Attach captions to layers only
+when the content names them (a menu item, an ingredient); otherwise use the page's section headings.
+
+## 17. Type sandwich turntable (product-launch hero)
+
+The business name split into two halves in giant type, left and right, with the object turning in the gap; small
+spec-style captions in the corners (hours, location, a short real line). From product-launch pages.
+```css
+.stage { position: sticky; top: 0; height: 100vh; display: flex; align-items: center; justify-content: space-between; gap: 28vw; padding: 0 var(--pad) }
+.stage .half { font: 800 clamp(3rem, 9vw, 10rem)/.92 var(--display); flex: 1 }
+.stage .half + canvas + .half { text-align: right }
+@media (max-width: 900px) { .stage { flex-direction: column; gap: 0; padding: 14vh var(--pad) 30vh } }
+```
+```js
+group.rotation.y = prog * Math.PI * 3;                       // only turns and grows; never slides sideways
+group.scale.setScalar(lerp(.5, .78, ease(clamp(prog / .3))));
+halves[0].style.transform = `translateX(${-prog * 6}%)`; halves[1].style.transform = `translateX(${prog * 6}%)`;
+```
+Split on words (`"Maison" | "Lumière"`); a one-word name splits in the middle of its letters.
+
+## 18. Dark spotlight stage with fog (deconstructed / atelier)
+
+A near-black stage, one cone of light from above, soft fog at the floor; the object (or the business's best photo in
+a frame) sits in the light and comes apart into panels on scroll (recipe 7 explode variant).
+```js
+const spot = new THREE.SpotLight(0xffffff, 3, 20, Math.PI / 7, .6); spot.position.set(0, 7, 2); scene.add(spot, spot.target);
+scene.fog = new THREE.FogExp2(0x0b0b0d, .08);
+```
+CSS fallback/overlay: `background: radial-gradient(40% 55% at 50% 30%, rgba(255,255,255,.12), transparent 70%)`
+plus a blurred grain layer at the bottom for fog. Serif headline right-aligned beside the object.
+
+## 19. Layered photo depth (cut-out collage)
+
+The hero made from 3–5 of the business's own photos at different depths: each in its own frame, offset and
+overlapping, moving at a different scroll speed and pointer parallax. Reads as 3D without WebGL.
+```js
+layers.forEach((el, i) => gsap.to(el, { yPercent: -(i + 1) * 12, ease: 'none',
+  scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: true } }));
+addEventListener('pointermove', e => layers.forEach((el, i) =>
+  gsap.to(el, { x: (e.clientX / innerWidth - .5) * (i + 1) * 14, y: (e.clientY / innerHeight - .5) * (i + 1) * 10, duration: .8 })));
+```
+A large framed colour block behind the middle photo gives the "photo in front of a panel" look.
+
+## 20. Scene cards with flowing ribbons (lookbook as a film)
+
+A pinned stage that swaps "scenes": a floating card (product photo or a service) in the centre, a small scene counter
+(`Scene 3 / 7`, since the scenes really are a sequence), a serif title on the left, one real detail on the right
+(a price, a year, an opening time from the content), and silk ribbons (recipe 21) flowing behind the card.
+```js
+const tl = gsap.timeline({ scrollTrigger: { trigger: stage, start: 'top top', end: () => '+=' + scenes.length * innerHeight, pin: true, scrub: 1 } });
+scenes.forEach((s, i) => { if (i) tl.fromTo(s, { autoAlpha: 0, yPercent: 12, rotateY: -18 }, { autoAlpha: 1, yPercent: 0, rotateY: 0 })
+  .to(scenes[i - 1], { autoAlpha: 0, yPercent: -12, rotateY: 18 }, '<'); });
+```
+
+## 21. Silk ribbon (fabric bands in WebGL)
+
+Build a flat band along a curve from Frenet frames (a flattened tube z-fights and shows stripes):
+```js
+function ribbon(curve, n, w) {
+  const fr = curve.computeFrenetFrames(n, false), pos = [], idx = [];
+  for (let i = 0; i <= n; i++) {
+    const p = curve.getPointAt(i / n), tw = i / n * Math.PI * 1.5;
+    const b = fr.binormals[i].clone().multiplyScalar(Math.cos(tw)).add(fr.normals[i].clone().multiplyScalar(Math.sin(tw))).multiplyScalar(w);
+    pos.push(p.x + b.x, p.y + b.y, p.z + b.z, p.x - b.x, p.y - b.y, p.z - b.z);
+    if (i < n) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx); g.computeVertexNormals(); return g;
+}
+// material: MeshPhysicalMaterial({ color: accent, roughness: .3, clearcoat: 1, side: THREE.DoubleSide })
+```
+
+## 22. Image to particles (logo or photo dissolves into points)
+
+Sample the business's own logo or photo into a point cloud that assembles on load and drifts apart on scroll. The
+image proxy sends `Access-Control-Allow-Origin: *`, so load it with `crossOrigin = 'anonymous'` and read pixels:
+```js
+const img = new Image(); img.crossOrigin = 'anonymous'; img.src = proxiedUrl;
+img.onload = () => { const c = document.createElement('canvas'), W = 160, H = Math.round(160 * img.height / img.width);
+  c.width = W; c.height = H; const x = c.getContext('2d'); x.drawImage(img, 0, 0, W, H);
+  const d = x.getImageData(0, 0, W, H).data, pts = [], cols = [];
+  for (let y = 0; y < H; y += 2) for (let i = 0; i < W; i += 2) { const k = (y * W + i) * 4;
+    if (d[k + 3] > 128 && d[k] + d[k + 1] + d[k + 2] < 700) { pts.push((i - W / 2) / 40, (H / 2 - y) / 40, 0); cols.push(d[k] / 255, d[k + 1] / 255, d[k + 2] / 255); } }
+  /* BufferGeometry with position + color, PointsMaterial({ vertexColors: true, size: .03 }) */ };
+```
+Animate each point from a random start to its target with one progress value; wrap the pixel read in try/catch and
+keep the plain image if the canvas is tainted.

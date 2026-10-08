@@ -195,12 +195,17 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
   }
   const facts = [{ k: "Location", t: where }, ...(hours[0] ? [{ k: "Hours", t: hours[0] }] : []), ...(phone ? [{ k: "Call", t: phone }] : email ? [{ k: "Email", t: email }] : [])];
   while (caps.length < 3 && facts.length) caps.push(facts.shift()!);
-  const variant = opts.dna && ["cinematic", "luxury", "gallery", "organic"].includes(opts.dna.concept.id) ? "orbit" : "explode";
+  const variant = opts.dna?.blueprint?.motion ?? (opts.dna && ["cinematic", "luxury", "gallery", "organic"].includes(opts.dna.concept.id) ? "orbit" : "explode");
+  // Turntable: the name is split in two with the object turning between the halves.
+  const words = lead.name.trim().split(/\s+/);
+  const cut = words.length > 1 ? Math.ceil(words.length / 2) : Math.ceil(lead.name.length / 2);
+  const halves = words.length > 1 ? [words.slice(0, cut).join(" "), words.slice(cut).join(" ")] : [lead.name.slice(0, cut), lead.name.slice(cut)];
+  const typeSpans = variant === "turntable" ? halves.map((h) => `<span>${esc(h)}</span>`).join("") : `<span>${name}</span><span>${name}</span>`;
   const chapter = isHome
     ? `<section class="chapter" data-variant="${variant}" aria-label="${name}">
   <div class="chapter-sticky">
-    <div class="chapter-type" aria-hidden="true"><span>${name}</span><span>${name}</span></div>
-    <canvas id="obj-gl" aria-hidden="true"></canvas>
+    <div class="chapter-type" aria-hidden="true">${typeSpans}</div>
+    <canvas id="obj-gl" aria-hidden="true" data-kind="${opts.dna?.blueprint?.object ?? t.object}"></canvas>
     <div class="chapter-caps">${caps.map((c, i) => `<p class="cap cap-${i}"><span class="cap-k">${esc(c.k)}</span><span class="cap-t">${esc(c.t)}</span></p>`).join("")}</div>
     <div class="chapter-progress" aria-hidden="true"><i></i></div>
   </div>
@@ -489,6 +494,13 @@ h1,h2,h3{font-family:var(--display);font-weight:${t.displayWeight};letter-spacin
 .cap-t{font:${t.displayWeight} clamp(1.3rem,2.4vw,2.1rem)/1.2 var(--display);letter-spacing:${t.displayTracking}}
 .chapter-progress{position:absolute;left:var(--pad);right:var(--pad);bottom:4vh;height:2px;background:var(--line);z-index:2}
 .chapter-progress i{display:block;height:100%;width:100%;background:var(--accent);transform:scaleX(0);transform-origin:left}
+.chapter[data-variant=turntable] .chapter-type{flex-direction:row;align-items:center;justify-content:space-between;padding:0 var(--pad);gap:28vw}
+.chapter[data-variant=turntable] .chapter-type span{font-size:clamp(3rem,9vw,10rem);color:var(--ink);-webkit-text-stroke:0;white-space:normal;flex:1;line-height:.92}
+.chapter[data-variant=turntable] .chapter-type span:last-child{text-align:right;color:var(--ink)}
+.chapter[data-variant=turntable] .cap-0{top:auto;bottom:11vh;transform:none}
+.chapter[data-variant=turntable] .cap-1{top:12vh;transform:none}
+.chapter[data-variant=turntable] .cap-2{left:auto;right:var(--pad);transform:none;text-align:right;max-width:min(380px,40vw)}
+.chapter[data-variant=turntable] .cap-t{font-size:clamp(1.05rem,1.6vw,1.4rem)}
 .no-js .chapter{height:auto}.no-js .chapter-sticky{position:relative;height:auto;padding:60px var(--pad)}.no-js .cap{position:static;opacity:1;transform:none;max-width:none;text-align:left;margin-bottom:24px}.no-js #obj-gl,.no-js .chapter-type,.no-js .chapter-progress{display:none}
 .title-w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.06em}.title-w>span{display:inline-block}
 .explore{display:grid;grid-template-columns:minmax(0,1fr);gap:clamp(32px,6vw,96px);padding:clamp(60px,9vw,130px) var(--pad);max-width:1440px;margin:0 auto;align-items:start}
@@ -569,6 +581,8 @@ body.hero-centered .hero-facts{width:100%;text-align:left}
   .listing-head,.prose-head{position:static}
   .cap{max-width:none;left:var(--pad)!important;right:var(--pad)!important;top:auto!important;bottom:12vh!important;transform:none!important;text-align:left!important}
   .chapter{height:300vh}
+  .chapter[data-variant=turntable] .chapter-type{flex-direction:column;justify-content:space-between;padding:14vh var(--pad) 30vh;gap:0}
+  .chapter[data-variant=turntable] .chapter-type span{font-size:clamp(2.6rem,14vw,5rem)}
   .gallery .g-track{overflow-x:auto;width:auto;flex-wrap:nowrap!important;scroll-snap-type:x mandatory;padding-bottom:12px}
   .g-item{scroll-snap-align:center;width:78vw!important}
   .visit-map,.visit-map iframe,.visit-map img{min-height:300px}
@@ -787,7 +801,7 @@ function clientScript(t: Theme, stockHero: string): string {
     var fill = new T.PointLight(0xffffff, .6, 20); fill.position.set(0, -4, 4); scene.add(fill);
     function M(color, metal, rough){ return new T.MeshPhysicalMaterial({ color: color, metalness: metal, roughness: rough, clearcoat: 1, clearcoatRoughness: .2 }); }
     var g = new T.Group(); scene.add(g); var floaters = [];
-    var kind = '${t.object}';
+    var kind = canvas.getAttribute('data-kind') || '${t.object}';
     if (kind === 'rings') {
       var brass = M(accent, .85, .22);
       for (var i = 0; i < 3; i++) { var ring = new T.Mesh(new T.TorusGeometry(1.55 - i * .32, .07, 32, 180), brass); ring.rotation.set(i * .9, i * .6, 0); ring.userData.s = .003 + i * .002; floaters.push(ring); g.add(ring); }
@@ -838,31 +852,6 @@ function clientScript(t: Theme, stockHero: string): string {
         orbit.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, 0); orbit.userData.s = .004 + Math.random() * .006; floaters.push(orbit); g.add(orbit);
       }
     }
-    // Studio reflections for metals and gloss.
-    if (T.RoomEnvironment && T.PMREMGenerator) {
-      var pm = new T.PMREMGenerator(r); scene.environment = pm.fromScene(new T.RoomEnvironment(), .04).texture;
-      scene.traverse(function(o){ if (o.material && 'envMapIntensity' in o.material) o.material.envMapIntensity = ${t.dark ? "1" : ".45"}; });
-      scene.children.forEach(function(l){ if (l.isLight && !l.isPointLight) l.intensity *= .55; });
-    }
-    // Remember where every part sits so the chapter can pull the object apart and put it back.
-    g.children.forEach(function(c, i){
-      c.userData.home = c.position.clone();
-      var d = c.position.clone(); if (d.length() < .05) d.set(Math.cos(i * 2.4), Math.sin(i * 1.7), Math.sin(i * 3.1));
-      c.userData.dir = d.normalize();
-    });
-    // A particle field that gathers around the object late in the chapter.
-    var chapter = canvas.closest('.chapter'), variant = chapter ? chapter.getAttribute('data-variant') : 'explode';
-    var N = 1600, pos = new Float32Array(N * 3);
-    for (var pi = 0; pi < N; pi++) {
-      var u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rad = variant === 'orbit' ? 3.2 + Math.random() * .5 : 2.4 + Math.random() * 1.8;
-      var yy = variant === 'orbit' ? (Math.random() - .5) * .35 : u;
-      var rr = variant === 'orbit' ? 1 : Math.sqrt(1 - u * u);
-      pos[pi * 3] = rad * rr * Math.cos(th); pos[pi * 3 + 1] = rad * yy; pos[pi * 3 + 2] = rad * rr * Math.sin(th);
-    }
-    var pg = new T.BufferGeometry(); pg.setAttribute('position', new T.BufferAttribute(pos, 3));
-    var pts = new T.Points(pg, new T.PointsMaterial({ color: accent, size: .035, transparent: true, opacity: 0, depthWrite: false }));
-    scene.add(pts);
-
     if (kind === 'cup') {
       var ceramic = M(0xf7f3ee, .05, .25), glaze = M(accent, .2, .3);
       var body = new T.Mesh(new T.CylinderGeometry(1.05, .78, 1.5, 72, 1, true), ceramic); g.add(body);
@@ -880,6 +869,126 @@ function clientScript(t: Theme, stockHero: string): string {
       var band = new T.Mesh(new T.TorusGeometry(2.1, .035, 16, 160), ringM); band.rotation.x = Math.PI / 2.4; band.userData.s = .003; floaters.push(band); g.add(band);
       for (var q2 = 0; q2 < 7; q2++) { var sm = new T.Mesh(new T.OctahedronGeometry(.22, 0), q2 % 2 ? facet : ringM); var qa = q2 / 7 * Math.PI * 2; sm.position.set(Math.cos(qa) * 2.6, Math.sin(qa * 1.5) * .9, Math.sin(qa) * 2.6); sm.userData.s = .01; floaters.push(sm); g.add(sm); }
     }
+    // Food and paper: colours given in sRGB, soft sheen, little reflection.
+    function F(color, rough){ var m = new T.MeshStandardMaterial({ color: new T.Color(color).convertSRGBToLinear(), metalness: 0, roughness: Math.max(.55, rough) }); m.userData.matte = true; return m; }
+    function glassM(tint){ return new T.MeshPhysicalMaterial({ color: tint, metalness: 0, roughness: .04, transmission: .92, transparent: true, opacity: .55, clearcoat: 1, side: T.DoubleSide }); }
+    if (kind === 'burger') {
+      // Layers bottom to top; the stack motion lifts them apart along y.
+      var bun = F(0xd18a3b, .45);
+      var layer = function(geo, mat, y){ var m = new T.Mesh(geo, mat); m.position.y = y; g.add(m); return m; };
+      layer(new T.CylinderGeometry(1.28, 1.2, .38, 72), bun, -.95);
+      layer(new T.CylinderGeometry(1.36, 1.36, .34, 72), F(0x4b2a18, .85), -.58);
+      var cheese = layer(new T.BoxGeometry(2.3, .06, 2.3), F(0xf2b631, .35), -.38); cheese.rotation.y = Math.PI / 4;
+      layer(new T.CylinderGeometry(1.18, 1.18, .12, 48), F(0xd23b2b, .3), -.24);
+      layer(new T.CylinderGeometry(1.24, 1.24, .1, 48), F(0xc9452f, .3), -.12);
+      var leaf = layer(new T.TorusGeometry(1.2, .12, 12, 72), F(0x63b33b, .5), .02); leaf.rotation.x = Math.PI / 2; leaf.scale.z = .45;
+      var topBun = layer(new T.SphereGeometry(1.32, 72, 36, 0, Math.PI * 2, 0, Math.PI / 2), bun, .1); topBun.scale.y = .78;
+      for (var se = 0; se < 18; se++) {
+        var seed = new T.Mesh(new T.SphereGeometry(.05, 12, 8), F(0xf6ecd2, .4)); seed.scale.set(1, .5, 1.7);
+        var sa = se * 2.4, sr = .25 + (se % 6) * .16, sy = Math.sqrt(Math.max(0, 1.32 * 1.32 - sr * sr));
+        seed.position.set(Math.cos(sa) * sr, sy, Math.sin(sa) * sr); seed.rotation.y = sa; topBun.add(seed);
+      }
+      g.rotation.x = .28;
+    }
+    if (kind === 'pizza') {
+      // Eight slices; each sits a hair off-centre so the explode motion pulls it straight out.
+      var crust = F(0xd59a55, .6), cheeseP = F(0xf1c24f, .35), pep = F(0xb12d24, .4), basil = F(0x3f8f3a, .5);
+      for (var sl = 0; sl < 8; sl++) {
+        var a0 = sl / 8 * Math.PI * 2, mid = a0 + Math.PI / 8, slice = new T.Group();
+        slice.add(new T.Mesh(new T.CylinderGeometry(1.75, 1.75, .14, 24, 1, false, a0 + .01, Math.PI / 4 - .02), crust));
+        var top = new T.Mesh(new T.CylinderGeometry(1.58, 1.58, .05, 24, 1, false, a0 + .03, Math.PI / 4 - .06), cheeseP); top.position.y = .09; slice.add(top);
+        [.75, 1.2].forEach(function(rr, j){ var d = new T.Mesh(new T.CylinderGeometry(.17, .17, .04, 32), j && sl % 2 ? basil : pep); d.position.set(Math.sin(mid + (j ? .12 : -.1)) * rr, .13, Math.cos(mid + (j ? .12 : -.1)) * rr); slice.add(d); });
+        slice.position.set(Math.sin(mid) * .02, 0, Math.cos(mid) * .02); slice.userData.reach = .45; g.add(slice);
+      }
+      g.rotation.x = .55;
+    }
+    if (kind === 'glass') {
+      var prof = [[0, -1.5], [.72, -1.5], [.74, -1.45], [.1, -1.38], [.07, -.45], [.12, -.3], [.6, -.02], [.8, .5], [.76, 1.25], [.73, 1.3]].map(function(q){ return new T.Vector2(q[0], q[1]); });
+      g.add(new T.Mesh(new T.LatheGeometry(prof, 96), glassM(0xffffff)));
+      var wine = [[0, -.22], [.55, -.02], [.72, .4], [.0, .4]].map(function(q){ return new T.Vector2(q[0], q[1]); });
+      g.add(new T.Mesh(new T.LatheGeometry(wine, 96), F(0x6a0f1d, .15)));
+      for (var gr = 0; gr < 7; gr++) { var grape = new T.Mesh(new T.SphereGeometry(.2, 32, 20), M(accent, .05, .25)); var ga = gr / 7 * Math.PI * 2; grape.position.set(Math.cos(ga) * 2.2, Math.sin(ga * 2) * .7, Math.sin(ga) * 2.2); grape.userData.o = ga; floaters.push(grape); g.add(grape); }
+    }
+    if (kind === 'kettlebell') {
+      var iron = M(0x2b2d31, .55, .42);
+      var bell = new T.Mesh(new T.SphereGeometry(1.15, 72, 48), iron); bell.scale.y = .92; g.add(bell);
+      var handle = new T.Mesh(new T.TorusGeometry(.72, .17, 28, 72, Math.PI), iron); handle.position.y = .72; g.add(handle);
+      [-1, 1].forEach(function(sx){ var post = new T.Mesh(new T.CylinderGeometry(.17, .2, .4, 32), iron); post.position.set(sx * .72, .6, 0); g.add(post); });
+      var stripe = new T.Mesh(new T.TorusGeometry(1.14, .05, 16, 120), M(accent, .3, .3)); stripe.rotation.x = Math.PI / 2; stripe.position.y = -.1; g.add(stripe);
+      var foot = new T.Mesh(new T.CylinderGeometry(.75, .75, .1, 48), iron); foot.position.y = -1.05; g.add(foot);
+      for (var pl = 0; pl < 5; pl++) { var disc = new T.Mesh(new T.CylinderGeometry(.32, .32, .08, 40), M(accent, .4, .35)); var pa = pl / 5 * Math.PI * 2; disc.position.set(Math.cos(pa) * 2.3, Math.sin(pa * 2) * .8, Math.sin(pa) * 2.3); disc.rotation.set(pa, pa, 0); disc.userData.s = .01; floaters.push(disc); g.add(disc); }
+    }
+    if (kind === 'perfume') {
+      g.add(new T.Mesh(new T.BoxGeometry(1.45, 1.85, .75), glassM(0xffffff)));
+      var juice = new T.Mesh(new T.BoxGeometry(1.25, 1.25, .58), new T.MeshPhysicalMaterial({ color: accent, roughness: .1, transmission: .5, transparent: true, opacity: .85 })); juice.position.y = -.25; g.add(juice);
+      var neck = new T.Mesh(new T.CylinderGeometry(.18, .2, .25, 32), M(0xd9c48a, .9, .2)); neck.position.y = 1.05; g.add(neck);
+      var capP = new T.Mesh(new T.CylinderGeometry(.42, .42, .62, 6), M(0xd9c48a, .9, .18)); capP.position.y = 1.45; g.add(capP);
+      for (var bb = 0; bb < 9; bb++) { var bub = new T.Mesh(new T.SphereGeometry(.09 + (bb % 3) * .05, 24, 16), glassM(accent)); var ba2 = bb / 9 * Math.PI * 2; bub.position.set(Math.cos(ba2) * 2.1, Math.sin(ba2 * 3) * 1.1, Math.sin(ba2) * 2.1); bub.userData.o = ba2; floaters.push(bub); g.add(bub); }
+    }
+    if (kind === 'parcel') {
+      var kraft = F(0xc79a62, .7), tape = M(accent, .2, .35);
+      [[1.6, .9, -.85, .1], [1.25, .75, .0, -.25], [.95, .6, .68, .35]].forEach(function(b0){
+        var crate = new T.Group(); var w = b0[0], h = b0[1];
+        crate.add(new T.Mesh(new T.BoxGeometry(w, h, w * .8), kraft));
+        var r1 = new T.Mesh(new T.BoxGeometry(w + .02, h + .02, .14), tape); crate.add(r1);
+        var r2 = new T.Mesh(new T.BoxGeometry(.14, h + .02, w * .8 + .02), tape); crate.add(r2);
+        crate.position.y = b0[2]; crate.rotation.y = b0[3]; crate.userData.reach = .32; g.add(crate);
+      });
+      var bow = new T.Group(); [-1, 1].forEach(function(sx){ var loop = new T.Mesh(new T.TorusGeometry(.2, .06, 12, 40), tape); loop.position.x = sx * .18; loop.rotation.y = sx * .6; bow.add(loop); });
+      bow.position.y = 1.03; bow.userData.reach = .9; g.add(bow);
+    }
+    // A flat band that follows a curve and twists along it (a tube would z-fight when flattened).
+    function ribbonGeo(curve, n, w){
+      var fr = curve.computeFrenetFrames(n, false), pos = [], idx = [];
+      for (var i = 0; i <= n; i++) {
+        var pt = curve.getPointAt(i / n), tw = i / n * Math.PI * 1.5, b = fr.binormals[i].clone().multiplyScalar(Math.cos(tw)).add(fr.normals[i].clone().multiplyScalar(Math.sin(tw))).multiplyScalar(w);
+        pos.push(pt.x + b.x, pt.y + b.y, pt.z + b.z, pt.x - b.x, pt.y - b.y, pt.z - b.z);
+        if (i < n) { var k0 = i * 2; idx.push(k0, k0 + 1, k0 + 2, k0 + 1, k0 + 3, k0 + 2); }
+      }
+      var geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals(); return geo;
+    }
+    if (kind === 'ribbon') {
+      // Silk bands that flow around the frame, like fabric in a fashion film.
+      var silk = new T.MeshPhysicalMaterial({ color: accent, metalness: .15, roughness: .3, clearcoat: 1, clearcoatRoughness: .15, side: T.DoubleSide });
+      var silk2 = new T.MeshPhysicalMaterial({ color: ${t.dark ? "0xe9e2d6" : "0xf3ece2"}, metalness: .1, roughness: .35, clearcoat: 1, side: T.DoubleSide });
+      [-.9, 0, .9].forEach(function(y0, ri){
+        var pts0 = []; for (var k = 0; k < 9; k++) { var ang = k / 8 * Math.PI * 2.2 + ri; pts0.push(new T.Vector3(Math.cos(ang) * (1.4 + ri * .25), y0 + Math.sin(k * 1.3 + ri) * .35, Math.sin(ang) * (1.4 + ri * .25))); }
+        var band = new T.Mesh(ribbonGeo(new T.CatmullRomCurve3(pts0), 240, .26), ri === 1 ? silk2 : silk);
+        band.position.y = y0 * .2; band.userData.s = .002 + ri * .001; floaters.push(band); g.add(band);
+      });
+      g.add(new T.Mesh(new T.SphereGeometry(.45, 48, 32), M(0xd9c48a, .9, .2)));
+    }
+    // Studio reflections for metals and gloss.
+    if (T.RoomEnvironment && T.PMREMGenerator) {
+      var pm = new T.PMREMGenerator(r); scene.environment = pm.fromScene(new T.RoomEnvironment(), .04).texture;
+      scene.traverse(function(o){ if (o.material && 'envMapIntensity' in o.material) o.material.envMapIntensity = o.material.userData.matte ? .5 : ${t.dark ? "1" : ".45"}; });
+      scene.children.forEach(function(l){ if (l.isLight && !l.isPointLight) l.intensity *= .55; });
+    }
+    // Remember where every part sits so the chapter can pull the object apart and put it back.
+    g.children.forEach(function(c, i){
+      c.userData.home = c.position.clone();
+      var d = c.position.clone(); if (d.length() < .05) d.set(Math.cos(i * 2.4), Math.sin(i * 1.7), Math.sin(i * 3.1));
+      c.userData.dir = d.normalize().multiplyScalar(c.userData.reach || 1);
+    });
+    var chapterEl = canvas.closest('.chapter'), motion = chapterEl ? chapterEl.getAttribute('data-variant') : 'explode';
+    if (motion === 'stack') {
+      // Layers lift apart along their own axis, the further from the middle the further they travel.
+      var order = g.children.slice().sort(function(a, b){ return a.userData.home.y - b.userData.home.y; });
+      order.forEach(function(c, i){ c.userData.dir = new T.Vector3(0, (i - (order.length - 1) / 2) * (order.length > 12 ? .1 : .4), 0); });
+    }
+    // A particle field that gathers around the object late in the chapter.
+    var chapter = canvas.closest('.chapter'), variant = chapter ? chapter.getAttribute('data-variant') : 'explode';
+    var N = 1600, pos = new Float32Array(N * 3);
+    for (var pi = 0; pi < N; pi++) {
+      var u = Math.random() * 2 - 1, th = Math.random() * Math.PI * 2, rad = variant === 'orbit' ? 3.2 + Math.random() * .5 : 2.4 + Math.random() * 1.8;
+      var yy = variant === 'orbit' ? (Math.random() - .5) * .35 : u;
+      var rr = variant === 'orbit' ? 1 : Math.sqrt(1 - u * u);
+      pos[pi * 3] = rad * rr * Math.cos(th); pos[pi * 3 + 1] = rad * yy; pos[pi * 3 + 2] = rad * rr * Math.sin(th);
+    }
+    var pg = new T.BufferGeometry(); pg.setAttribute('position', new T.BufferAttribute(pos, 3));
+    var pts = new T.Points(pg, new T.PointsMaterial({ color: accent, size: .035, transparent: true, opacity: 0, depthWrite: false }));
+    scene.add(pts);
+
     function size(){ var w = box.clientWidth, h = box.clientHeight; r.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
     size(); addEventListener('resize', size);
     var target = 0, prog = 0, mx = 0, my = 0;
@@ -908,7 +1017,14 @@ function clientScript(t: Theme, stockHero: string): string {
       g.scale.setScalar(s0);
       g.rotation.y = p * Math.PI * 2.2 + mx * .5 + t2 * .05;
       g.rotation.x = baseX + Math.sin(p * Math.PI) * .35 + my * .2;
-      var burst = variant === 'explode' ? Math.sin(Math.max(0, Math.min(1, (p - .3) / .4)) * Math.PI) : 0;
+      if (variant === 'turntable') {
+        // Centre stage between the two halves of the name; the object only turns and grows.
+        g.position.x = 0; g.position.y = (narrow() ? .2 : 0) + Math.sin(t2 * .8) * .05;
+        g.scale.setScalar(lerp(narrow() ? .42 : .5, narrow() ? .62 : .78, ease(Math.min(1, p / .3))));
+        g.rotation.y = p * Math.PI * 3 + mx * .4 + t2 * .1;
+      }
+      var burst = variant === 'explode' || variant === 'stack' ? Math.sin(Math.max(0, Math.min(1, (p - .3) / .4)) * Math.PI) : 0;
+      if (variant === 'stack') g.scale.multiplyScalar((1 - .22 * burst) * (narrow() ? .78 : 1));
       g.children.forEach(function(c){ if (c.userData.home) c.position.copy(c.userData.home).addScaledVector(c.userData.dir, burst * spread); });
       floaters.forEach(function(f){ if (f.userData.s) { f.rotation.y += f.userData.s; f.rotation.x += f.userData.s * .5; } if (f.userData.o !== undefined) f.rotation.z += .004; });
       if (variant === 'orbit') {
@@ -924,7 +1040,8 @@ function clientScript(t: Theme, stockHero: string): string {
         var a0 = [.04, .38, .72][i], o = win(p, a0, a0 + .26, .07);
         c.style.opacity = o; c.style.translate = '0 ' + ((1 - o) * 24) + 'px';
       });
-      if (types[0]) { types[0].style.transform = 'translateX(' + (10 - p * 60) + '%)'; types[1].style.transform = 'translateX(' + (-50 + p * 60) + '%)'; }
+      if (types[0] && variant === 'turntable') { types[0].style.transform = 'translateX(' + (-p * 6) + '%)'; types[1].style.transform = 'translateX(' + (p * 6) + '%)'; }
+      else if (types[0]) { types[0].style.transform = 'translateX(' + (10 - p * 60) + '%)'; types[1].style.transform = 'translateX(' + (-50 + p * 60) + '%)'; }
       if (bar) bar.style.transform = 'scaleX(' + p + ')';
       r.render(scene, cam);
     }
