@@ -7,7 +7,7 @@ interface Db {
   DB: D1Database;
 }
 
-const TEMPLATE_CSP =
+export const TEMPLATE_CSP =
   "default-src 'none'; script-src 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: http: data: blob:; frame-src https://www.openstreetmap.org; frame-ancestors 'self'; base-uri 'none'; form-action 'none'";
 // Claude-written pages run in a sandbox with an opaque origin: they can't read cookies or call the API as the user.
 const AI_CSP =
@@ -141,7 +141,7 @@ export async function imageProxy(req: Request, url: URL, env: Db, ctx: Execution
   return res;
 }
 
-function html(body: string, csp: string): Response {
+export function html(body: string, csp: string): Response {
   return new Response(body, {
     headers: { "content-type": "text/html; charset=utf-8", "x-robots-tag": "noindex, nofollow", "content-security-policy": csp },
   });

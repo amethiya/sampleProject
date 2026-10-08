@@ -238,6 +238,7 @@ export default function Dashboard() {
           <a className="nav-item active" aria-current="page" onClick={() => setMenu(false)}><Icon d={I.leads} />Leads</a>
           <button className="nav-item" onClick={() => { setPanel("sheet"); setMenu(false); }}><Icon d={I.sheet} />Google Sheet</button>
           <button className="nav-item" onClick={exportCsv}><Icon d={I.download} />Export CSV</button>
+          <a className="nav-item" href="/templates" target="_blank" rel="noreferrer"><Icon d={I.external} />Templates</a>
           <a className="nav-item" href="/" target="_blank" rel="noreferrer"><Icon d={I.external} />Public page</a>
         </nav>
         <div className="side-foot">
