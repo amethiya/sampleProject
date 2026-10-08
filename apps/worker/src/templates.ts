@@ -6,14 +6,8 @@ import { TEMPLATE_CSP, html } from "./redesign";
 const GALLERY_CSP =
   "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'self'";
 
-const HEROES = ["fullbleed", "split", "editorial", "centered"];
 const CORNERS = ["sharp", "soft", "round"];
-const MOTION: Record<string, string> = {
-  explode: "Pulls apart",
-  stack: "Layers lift apart",
-  orbit: "Camera orbit",
-  turntable: "Turntable between split name",
-};
+const HERO: Record<string, string> = { fullbleed: "Full-screen photo", split: "Split: text and photo", editorial: "Editorial headline", centered: "Centred" };
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -29,7 +23,8 @@ export function templates(url: URL): Response {
 
 /** Each demo gets its own palette, type and concept so the gallery shows the range, not one look. */
 function demoKey(b: Blueprint, i: number): string {
-  return [PALETTES[i % PALETTES.length].id, FONT_PAIRS[(i * 5) % FONT_PAIRS.length].id, HEROES[i % 4], CORNERS[i % 3], CONCEPTS[(i * 3) % CONCEPTS.length].id, b.id].join("|");
+  const pals = PALETTES.filter((p) => b.mood === "any" || p.dark === (b.mood === "dark"));
+  return [pals[i % pals.length].id, FONT_PAIRS[(i * 5) % FONT_PAIRS.length].id, b.hero, CORNERS[i % 3], CONCEPTS[(i * 3) % CONCEPTS.length].id, b.id].join("|");
 }
 
 function demo(b: Blueprint, i: number, origin: string): string {
@@ -56,8 +51,8 @@ function demo(b: Blueprint, i: number, origin: string): string {
       title: b.name,
       description: b.signature,
       sections: [
-        { heading: "The signature moment", paragraphs: [b.signature], items: [], images: [] },
-        { heading: "Storyboard", paragraphs: ["Each beat is filled with the business's own content when a real site is redesigned."], items: b.beats, images: [] },
+        { heading: "First impression", paragraphs: [b.signature], items: [], images: [] },
+        { heading: "Home page sections", paragraphs: ["Each section is filled with the business's own content when a real site is redesigned."], items: b.beats, images: [] },
         { heading: "Used for", paragraphs: [`${b.categories.map((c) => THEMES[c].label).join(", ")}.${b.keywords.length ? ` Picked first when a site mentions ${b.keywords.slice(0, 6).join(", ")}.` : ""}`], items: [], images: [] },
       ],
     }],
@@ -72,7 +67,7 @@ function gallery(origin: string): Response {
     groups.set(label, [...(groups.get(label) ?? []), b]);
   }
   const card = (b: Blueprint) => `<a class="card" href="${origin}/templates/${b.id}/" target="_blank" rel="noopener">
-  <span class="tags"><span>${esc(b.object)}</span><span>${esc(MOTION[b.motion])}</span></span>
+  <span class="tags"><span>${esc(HERO[b.hero])}</span><span>${b.mood === "any" ? "Light or dark" : b.mood === "dark" ? "Dark" : "Light"}</span></span>
   <strong>${esc(b.name)}</strong>
   <span class="sig">${esc(b.signature)}</span>
   <span class="open">Open live demo</span>
@@ -105,7 +100,7 @@ h2{font-size:1.1rem;font-weight:600;margin:40px 0 14px;padding-top:20px;border-t
 <body>
 <main>
 <h1>Redesign templates</h1>
-<p class="lead">All ${BLUEPRINTS.length} scene templates. Each redesign is given one automatically, based on the business's category and the words on its website, and consecutive redesigns get different ones. Each demo below uses sample text that describes the template; scroll the demo to see the 3D chapter.</p>
+<p class="lead">All ${BLUEPRINTS.length} layout templates, modelled on how good websites in each trade are built. Each redesign is given one automatically, based on the business's category and the words on its website, and consecutive redesigns get different ones. The demos use category photography and sample text that describes the template; real redesigns use the business's own photos and words.</p>
 ${[...groups].map(([label, list]) => `<h2>${esc(label)} <span class="sig">(${list.length})</span></h2>\n<div class="grid">${list.map(card).join("")}</div>`).join("\n")}
 </main>
 </body>

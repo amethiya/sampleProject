@@ -1,5 +1,5 @@
 import {
-  BLUEPRINTS, auditCandidate, blueprintById, categoryById, crawlSite, dnaFromKey, hostId, normalizeWebsite, pickDna, renderSitePage, snapshotFromLead,
+  BLUEPRINTS, DNA_VERSION, auditCandidate, blueprintById, categoryById, crawlSite, dnaFromKey, hostId, normalizeWebsite, pickDna, renderSitePage, snapshotFromLead,
   type DesignDna, type Lead, type SiteSnapshot,
 } from "@rr/core";
 
@@ -51,22 +51,22 @@ function siteText(lead: Lead, site: SiteSnapshot | null): string {
 /** The site's DNA, assigning one that differs from recent redesigns the first time it is rendered. */
 async function ensureDna(env: Db, id: string, lead: Lead, style: string | null, site: SiteSnapshot | null): Promise<DesignDna> {
   const existing = style ? dnaFromKey(style) : null;
-  if (existing?.blueprint) return existing;
+  if (existing?.blueprint && style!.split("|")[6] === DNA_VERSION) return existing;
   const fresh = pickDna(id, lead.category, await recentStyles(env), siteText(lead, site));
-  // Older sites keep their palette and type and only gain a scene blueprint.
-  const dna = existing ? { ...existing, blueprint: fresh.blueprint, key: `${existing.key.split("|").slice(0, 5).join("|")}|${fresh.blueprint!.id}` } : fresh;
+  // Looks stored before the current templates get a complete new look (layout, mood and colours belong together).
+  const dna = fresh;
   await env.DB.prepare("UPDATE sites SET style = ?, styled_at = datetime('now') WHERE id = ?").bind(dna.key, id).run();
   return dna;
 }
 
 /** Replace the scene blueprint in a DNA key. */
 function withBlueprint(key: string, blueprint: string): string {
-  return [...key.split("|").slice(0, 5), blueprint].join("|");
+  return [...key.split("|").slice(0, 5), blueprint, DNA_VERSION].join("|");
 }
 
 export function describeDna(key: string): string {
   const d = dnaFromKey(key);
-  return d ? `${d.concept.name} concept, ${d.hero} hero, ${d.palette.id} palette, ${d.fonts.id} type${d.blueprint ? `, "${d.blueprint.name}" scene` : ""}` : key;
+  return d ? `${d.concept.name} concept, ${d.hero} hero, ${d.palette.id} palette, ${d.fonts.id} type${d.blueprint ? `, "${d.blueprint.name}" layout` : ""}` : key;
 }
 
 /** Crawl the whole site once and keep it; later previews and Claude jobs reuse the snapshot. */
@@ -200,7 +200,7 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
       const site = await ensureSite(env, id, data.lead, data.site);
       const recent = await recentStyles(env);
       if (data.style) recent.unshift(data.style);
-      let dna = pickDna(`${id}:${Date.now()}`, data.lead.category, recent, "");
+      let dna = pickDna(`${id}:${Date.now()}`, data.lead.category, recent, siteText(data.lead, site));
       let key = dna.key;
       if (body.blueprint && blueprintById(body.blueprint)) key = withBlueprint(key, body.blueprint);
       else if (data.style && dnaFromKey(data.style)?.blueprint?.id === dna.blueprint?.id) {
@@ -315,7 +315,7 @@ async function status(env: Db, id: string, site: SiteSnapshot | null) {
   return {
     templateBlueprint: style?.style ? dnaFromKey(style.style)?.blueprint?.id ?? null : null,
     claudeBlueprint: done?.style ? dnaFromKey(done.style)?.blueprint?.id ?? null : null,
-    blueprints: BLUEPRINTS.map((b) => ({ id: b.id, name: b.name, categories: b.categories, object: b.object, motion: b.motion })),
+    blueprints: BLUEPRINTS.map((b) => ({ id: b.id, name: b.name, categories: b.categories, hero: b.hero, mood: b.mood })),
     templateStyle: style?.style ? describeDna(style.style) : null,
     claudeStyle: (job as { style?: string } | null)?.style ? describeDna((job as { style: string }).style) : null,
     crawledAt: site?.crawledAt ?? null,

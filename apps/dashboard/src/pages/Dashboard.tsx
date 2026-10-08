@@ -498,7 +498,7 @@ function AuditTab({ lead }: { lead: LeadRow }) {
   );
 }
 
-interface BlueprintInfo { id: string; name: string; categories: string[]; object: string; motion: string }
+interface BlueprintInfo { id: string; name: string; categories: string[]; hero: string; mood: string }
 interface RedesignStatus {
   templateStyle: string | null;
   claudeStyle: string | null;
@@ -522,8 +522,8 @@ function TemplateSelect({ value, onChange, blueprints, category, first, label }:
       <span>{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)}>
         {first.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        <optgroup label={`For ${CATEGORY_LABELS[category] ?? category}`}>{mine.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.object})</option>)}</optgroup>
-        <optgroup label="Other templates">{rest.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.object})</option>)}</optgroup>
+        <optgroup label={`For ${CATEGORY_LABELS[category] ?? category}`}>{mine.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</optgroup>
+        <optgroup label="Other templates">{rest.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</optgroup>
       </select>
     </label>
   );
@@ -644,7 +644,7 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
           <h3>Instant redesign</h3>
           <p className="muted small">Built by Revamp Radar on Cloudflare in a second, from the site's own text and photos. Doesn't need your Mac.{st.templateBlueprint && ` Now: ${bpName(st.templateBlueprint)}.`}</p>
         </div>
-        <TemplateSelect label="Template" value={look} onChange={setLook} blueprints={st.blueprints} category={lead.category} first={[{ value: "auto", label: "Surprise me (new look and scene)" }]} />
+        <TemplateSelect label="Template" value={look} onChange={setLook} blueprints={st.blueprints} category={lead.category} first={[{ value: "auto", label: "Surprise me (new layout and colours)" }]} />
         <div className="row-actions">
           <button className="btn" onClick={restyle} disabled={!!busy}>{busy === "restyle" ? "Applying…" : "Apply new look"}</button>
           <a className="text-link small" href="/templates" target="_blank" rel="noreferrer">See all templates</a>
@@ -676,7 +676,7 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
             <label className="field">
               <span>What should Claude change? <span className="muted">(optional)</span></span>
               <textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={4000}
-                placeholder="For example: darker and more premium, bigger food photos at the top, make the menu easier to read, use the exploded burger scene, less animation on mobile." />
+                placeholder="For example: darker and more premium, bigger food photos at the top, make the menu easier to read, show opening hours higher up, use the Chef's table layout." />
             </label>
             <TemplateSelect label="Template" value={claudeTemplate} onChange={setClaudeTemplate} blueprints={st.blueprints} category={lead.category}
               first={[...(st.claudePages.length && mode === "revise" ? firstBp(st.claudeBlueprint) : []), { value: "auto", label: "Choose automatically" }]} />
