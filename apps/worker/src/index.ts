@@ -97,6 +97,8 @@ async function api(req: Request, url: URL, env: Env, ctx: ExecutionContext): Pro
     const where = ["state = 'audited'"];
     const binds: unknown[] = [];
     if (url.searchParams.get("all") !== "1") where.push("qualified = 1");
+    const one = url.searchParams.get("id"); // a single lead, for its own page
+    if (one) (where.push("id = ?"), binds.push(one));
     const cat = url.searchParams.get("category");
     if (cat) (where.push("category = ?"), binds.push(cat));
     const status = url.searchParams.get("status");
