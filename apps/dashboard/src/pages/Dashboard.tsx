@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Logo from "../Logo";
 import { api, CATEGORY_LABELS, countryName, REGION_LABELS, Unauthorized } from "../api";
-import { navigate } from "../router";
+import { linkProps, navigate, usePath } from "../router";
 import { applyTheme, getTheme, type ThemeChoice } from "../theme";
 import appsScript from "../../../../integrations/google-apps-script/Code.gs?raw";
 
@@ -51,6 +51,8 @@ interface SheetState {
 }
 
 type Tab = "audit" | "redesign" | "pitch";
+const TABS: Tab[] = ["audit", "redesign", "pitch"];
+const leadPath = (id: string, tab: Tab) => `/app/leads/${encodeURIComponent(id)}/${tab}`;
 
 const STATUSES = ["new", "contacted", "replied", "won", "lost", "ignored"];
 const STATUS_LABELS: Record<string, string> = { new: "Ready to pitch", contacted: "Email sent", replied: "Replied", won: "Won", lost: "Lost", ignored: "Ignored" };
@@ -100,6 +102,7 @@ const I = {
   sheet: "M4 4h16v16H4zM4 9h16M4 14h16M10 4v16",
   download: "M12 4v11M7 10l5 5l5-5M5 20h14",
   external: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
+  back: "M19 12H5M11 6l-6 6l6 6",
   close: "M6 6l12 12M18 6L6 18",
   menu: "M4 7h16M4 12h16M4 17h16",
   leads: "M4 6h16M4 12h16M4 18h10",
@@ -143,7 +146,8 @@ export default function Dashboard() {
   const [busy, setBusy] = useState("");
   const [toast, setToast] = useState("");
   const [error, setError] = useState("");
-  const [open, setOpen] = useState<{ id: string; tab: Tab } | null>(null);
+  const path = usePath();
+  const route = path.match(/^\/app\/leads\/([^/]+)(?:\/(audit|redesign|pitch))?\/?$/);
   const [panel, setPanel] = useState<"" | "sheet" | "add">("");
   const [menu, setMenu] = useState(false);
 
@@ -224,7 +228,6 @@ export default function Dashboard() {
     navigate("/login");
   };
 
-  const lead = useMemo(() => leads.find((l) => l.id === open?.id) ?? null, [leads, open]);
   const count = (s: string) => (s === "ready" ? stats?.byStatus?.new : s === "all" ? stats?.qualified : stats?.byStatus?.[s]) ?? 0;
 
   return (
@@ -235,7 +238,7 @@ export default function Dashboard() {
           <button className="icon-btn side-close" onClick={() => setMenu(false)} aria-label="Close menu"><Icon d={I.close} /></button>
         </div>
         <nav aria-label="Main">
-          <a className="nav-item active" aria-current="page" onClick={() => setMenu(false)}><Icon d={I.leads} />Leads</a>
+          <a className="nav-item active" aria-current={route ? undefined : "page"} {...linkProps("/app")} onClickCapture={() => setMenu(false)}><Icon d={I.leads} />Leads</a>
           <button className="nav-item" onClick={() => { setPanel("sheet"); setMenu(false); }}><Icon d={I.sheet} />Google Sheet</button>
           <button className="nav-item" onClick={exportCsv}><Icon d={I.download} />Export CSV</button>
           <a className="nav-item" href="/templates" target="_blank" rel="noreferrer"><Icon d={I.external} />Templates</a>
@@ -256,6 +259,9 @@ export default function Dashboard() {
           <button className="icon-btn" onClick={() => setPanel("add")} aria-label="Redesign any website"><Icon d={I.plus} /></button>
         </header>
 
+        {route ? (
+          <LeadPage id={decodeURIComponent(route[1])} tab={(route[2] as Tab) ?? "audit"} onStatus={updateStatus} onError={guard} onChanged={load} />
+        ) : (
         <div className="content">
           <div className="page-head">
             <div>
@@ -318,9 +324,9 @@ export default function Dashboard() {
               </thead>
               <tbody>
                 {leads.map((l) => (
-                  <tr key={l.id} className={open?.id === l.id ? "sel" : ""}>
+                  <tr key={l.id}>
                     <td>
-                      <button className="link-strong" onClick={() => setOpen({ id: l.id, tab: "audit" })}>{l.name}</button>
+                      <a className="link-strong" {...linkProps(leadPath(l.id, "audit"))}>{l.name}</a>
                       <span className="sub">{CATEGORY_LABELS[l.category] ?? l.category} · {domainOf(l.website)}</span>
                       <span className="sub ellipsis">{l.emails[0]}</span>
                     </td>
@@ -330,8 +336,8 @@ export default function Dashboard() {
                     <td><RedesignChip state={l.redesign} /></td>
                     <td className="ta-r">
                       <div className="row-actions end">
-                        <button className="btn btn-sm" onClick={() => setOpen({ id: l.id, tab: "redesign" })}>Redesign</button>
-                        <button className="btn btn-sm btn-primary" onClick={() => setOpen({ id: l.id, tab: "pitch" })}>Pitch</button>
+                        <a className="btn btn-sm" {...linkProps(leadPath(l.id, "redesign"))}>Redesign</a>
+                        <a className="btn btn-sm btn-primary" {...linkProps(leadPath(l.id, "pitch"))}>Pitch</a>
                       </div>
                     </td>
                   </tr>
@@ -344,16 +350,16 @@ export default function Dashboard() {
           <ul className="cards">
             {leads.map((l) => (
               <li key={l.id} className="card">
-                <button className="card-main" onClick={() => setOpen({ id: l.id, tab: "audit" })}>
+                <a className="card-main" {...linkProps(leadPath(l.id, "audit"))}>
                   <span className="card-top"><b>{l.name}</b><Score value={l.score} compact /></span>
                   <span className="sub">{CATEGORY_LABELS[l.category] ?? l.category} · {[l.city, l.country && countryName(l.country)].filter(Boolean).join(", ")}</span>
                   <span className="sub ellipsis">{l.emails[0]}</span>
                   <span className="card-chip"><RedesignChip state={l.redesign} /></span>
-                </button>
+                </a>
                 <div className="card-actions">
                   <StatusSelect value={l.status} onChange={(s) => updateStatus(l.id, s)} label={l.name} />
-                  <button className="btn btn-sm" onClick={() => setOpen({ id: l.id, tab: "redesign" })}>Redesign</button>
-                  <button className="btn btn-sm btn-primary" onClick={() => setOpen({ id: l.id, tab: "pitch" })}>Pitch</button>
+                  <a className="btn btn-sm" {...linkProps(leadPath(l.id, "redesign"))}>Redesign</a>
+                  <a className="btn btn-sm btn-primary" {...linkProps(leadPath(l.id, "pitch"))}>Pitch</a>
                 </div>
               </li>
             ))}
@@ -371,20 +377,18 @@ export default function Dashboard() {
           )}
           {loading && !leads.length && <div className="empty"><p className="muted">Loading leads…</p></div>}
         </div>
+        )}
 
-        <div className="mobile-bar">
+        {!route && <div className="mobile-bar">
           <button className="btn btn-primary btn-block" onClick={findLeads} disabled={!!busy}><Icon d={I.radar} />{busy === "find" ? "Finding leads…" : "Find new leads"}</button>
-        </div>
+        </div>}
       </div>
 
-      {lead && open && (
-        <LeadPanel key={lead.id} lead={lead} initialTab={open.tab} onClose={() => setOpen(null)} onStatus={(s) => updateStatus(lead.id, s)} onError={guard} onChanged={load} />
-      )}
       {panel === "sheet" && <SheetPanel onClose={() => setPanel("")} onError={guard} onToast={setToast} onSynced={load} />}
       {panel === "add" && (
         <AddWebsite
           onClose={() => setPanel("")}
-          onAdded={async (id, name) => { setPanel(""); setToast(`${name} added.`); setSegment("all"); await load(); setOpen({ id, tab: "redesign" }); }}
+          onAdded={async (id, name) => { setPanel(""); setToast(`${name} added.`); setSegment("all"); await load(); navigate(leadPath(id, "redesign")); }}
           onError={guard}
         />
       )}
@@ -426,37 +430,50 @@ function Sheet({ title, onClose, children, wide = false, full = false }: { title
   );
 }
 
-function LeadPanel({ lead, initialTab, onClose, onStatus, onError, onChanged }: { lead: LeadRow; initialTab: Tab; onClose(): void; onStatus(s: string): void; onError(e: unknown): void; onChanged(): void }) {
-  const [tab, setTab] = useState<Tab>(initialTab);
-  const [full, setFull] = useState(false);
+/** A lead on its own page: /app/leads/<id>/<audit|redesign|pitch>. */
+function LeadPage({ id, tab, onStatus, onError, onChanged }: { id: string; tab: Tab; onStatus(id: string, s: string): Promise<void>; onError(e: unknown): void; onChanged(): void }) {
+  const [lead, setLead] = useState<LeadRow | null>(null);
+  const [missing, setMissing] = useState(false);
+  const reload = useCallback(() => {
+    api<LeadRow[]>(`/api/leads?segment=all&id=${encodeURIComponent(id)}`)
+      .then((r) => { setLead(r[0] ?? null); setMissing(!r.length); })
+      .catch(onError);
+  }, [id, onError]);
+  useEffect(() => { setLead(null); reload(); }, [reload]);
+  const changed = useCallback(() => { reload(); onChanged(); }, [reload, onChanged]);
+  const setStatus = async (s: string) => { setLead((l) => (l ? { ...l, status: s } : l)); await onStatus(id, s); };
+
+  const back = <a className="back-link" {...linkProps("/app")}><Icon d={I.back} size={16} />All leads</a>;
+  if (missing) return <div className="content">{back}<div className="empty"><h2>Lead not found</h2><p className="muted">It may have been removed. Go back to the list to pick another.</p></div></div>;
+  if (!lead) return <div className="content">{back}<p className="muted">Loading…</p></div>;
   return (
-    <Sheet title={lead.name} onClose={onClose} wide full={full && tab === "redesign"}>
-      <header className="drawer-head">
+    <div className="content lead-page">
+      {back}
+      <header className="lead-head">
         <div className="drawer-title">
-          <h2>{lead.name}</h2>
+          <h1>{lead.name}</h1>
           <p className="muted">{CATEGORY_LABELS[lead.category] ?? lead.category}{lead.city ? ` · ${lead.city}` : ""}{lead.country ? `, ${countryName(lead.country)}` : ""}</p>
         </div>
-        <button className="icon-btn" onClick={onClose} aria-label="Close"><Icon d={I.close} /></button>
+        <div className="lead-meta">
+          <StatusSelect value={lead.status} onChange={setStatus} label={lead.name} />
+          <RedesignChip state={lead.redesign} />
+          <a className="btn btn-sm" href={lead.website} target="_blank" rel="noreferrer">Current site<Icon d={I.external} size={14} /></a>
+          <a className="btn btn-sm" href={`/preview/${encodeURIComponent(lead.id)}/`} target="_blank" rel="noreferrer">Open redesign<Icon d={I.external} size={14} /></a>
+        </div>
       </header>
-      <div className="drawer-meta">
-        <StatusSelect value={lead.status} onChange={onStatus} label={lead.name} />
-        <RedesignChip state={lead.redesign} />
-        <a className="btn btn-sm" href={lead.website} target="_blank" rel="noreferrer">Current site<Icon d={I.external} size={14} /></a>
-        <a className="btn btn-sm" href={`/preview/${encodeURIComponent(lead.id)}/`} target="_blank" rel="noreferrer">Open redesign<Icon d={I.external} size={14} /></a>
-      </div>
-      <div className="tabs" role="tablist">
-        {(["audit", "redesign", "pitch"] as Tab[]).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>
+      <nav className="tabs page-tabs" aria-label="Lead sections">
+        {TABS.map((t) => (
+          <a key={t} {...linkProps(leadPath(lead.id, t))} aria-current={tab === t ? "page" : undefined} className={tab === t ? "on" : ""}>
             {t === "audit" ? "Audit" : t === "redesign" ? "Redesign" : "Pitch email"}
-          </button>
+          </a>
         ))}
-      </div>
-      <div className="drawer-body">
+      </nav>
+      <div className="lead-body">
         {tab === "audit" && <AuditTab lead={lead} />}
-        {tab === "redesign" && <RedesignTab lead={lead} onError={onError} onChanged={onChanged} full={full} onFull={setFull} />}
-        {tab === "pitch" && <PitchTab lead={lead} onStatus={onStatus} onError={onError} />}
+        {tab === "redesign" && <RedesignTab key={lead.id} lead={lead} onError={onError} onChanged={changed} />}
+        {tab === "pitch" && <PitchTab lead={lead} onStatus={setStatus} onError={onError} />}
       </div>
-    </Sheet>
+    </div>
   );
 }
 
@@ -512,7 +529,7 @@ function TemplateSelect({ value, onChange, blueprints, category, first, label }:
   );
 }
 
-function RedesignTab({ lead, onError, onChanged, full, onFull }: { lead: LeadRow; onError(e: unknown): void; onChanged(): void; full: boolean; onFull(v: boolean): void }) {
+function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: unknown): void; onChanged(): void }) {
   const [st, setSt] = useState<RedesignStatus | null>(null);
   const [slug, setSlug] = useState("home");
   const [view, setView] = useState<View>("template");
@@ -604,12 +621,11 @@ function RedesignTab({ lead, onError, onChanged, full, onFull }: { lead: LeadRow
           <button className={!compare && view === "original" ? "on" : ""} onClick={() => { setCompare(false); setView("original"); }}>Current</button>
           <button className={!compare && view === "template" ? "on" : ""} onClick={() => { setCompare(false); setView("template"); }}>Instant</button>
           <button className={!compare && view === "claude" ? "on" : ""} onClick={() => { setCompare(false); setView("claude"); }} disabled={!hasClaude} title={hasClaude ? "" : "No Claude version for this page yet"}>Claude</button>
-          <button className={compare ? "on" : ""} onClick={() => { setCompare(!compare); onFull(!compare); }}>Compare</button>
+          <button className={compare ? "on" : ""} onClick={() => setCompare(!compare)}>Compare</button>
         </div>
         <select value={slug} onChange={(e) => setSlug(e.target.value)} aria-label="Page">
           {st.pages.map((p) => <option key={p.slug} value={p.slug}>{p.label}</option>)}
         </select>
-        <button className="btn btn-sm hide-mobile" onClick={() => onFull(!full)}>{full ? "Narrow panel" : "Wide panel"}</button>
         <a className="btn btn-sm" href={view === "original" && !compare ? originalUrl : src(redesignView)} target="_blank" rel="noreferrer">Full screen<Icon d={I.external} size={14} /></a>
       </div>
 
@@ -638,7 +654,7 @@ function RedesignTab({ lead, onError, onChanged, full, onFull }: { lead: LeadRow
       <section className="callout">
         <div>
           <h3>Claude redesign</h3>
-          <p className="muted small">Claude rebuilds all {st.pages.length} pages using the website-redesign skill. It runs on your Mac (<code>npm run redesign-runner</code>) or a Claude cloud session and takes about 10–15 minutes. You can close this panel while it works.</p>
+          <p className="muted small">Claude rebuilds all {st.pages.length} pages using the website-redesign skill. It runs on your Mac (<code>npm run redesign-runner</code>) or a Claude cloud session and takes about 10–15 minutes. You can leave this page while it works.</p>
           {job && (
             <div className={`job job-${job.status}`} role="status">
               {job.status === "queued" && "Queued. Waiting for your Mac runner or a cloud session to pick it up."}
