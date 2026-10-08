@@ -12,7 +12,7 @@ OpenStreetMap (Overpass)  ──►  Cloudflare Worker (cron every 10 min)  ─�
    businesses with websites      audit → score → extract contacts            │
                                                                              ├─► Google Sheet (Apps Script webhook)
                                                                              ├─► Dashboard (React, same Worker)
-                                                                             └─► /preview/<domain>  (3D animated redesign)
+                                                                             └─► /preview/<domain>  (professional redesign) 
 ```
 
 ## Repo layout
@@ -42,7 +42,7 @@ RR_URL=… RR_TOKEN=… npm run discover -- --push --slices 6   # discovery only
 ### Full-site redesigns
 
 Opening a redesign crawls the business's site (home page plus up to 7 linked pages), keeps every heading,
-paragraph, list and image in order, and renders each page in our theme with motion and 3D:
+paragraph, list and image in order, and renders each page in a professional, photo-led layout:
 `/preview/<domain>/` and `/preview/<domain>/<page>`. Add `?engine=template` or `?engine=claude` to pick a version.
 
 **Redesign with Claude** (dashboard → lead → Redesign → *Redesign with Claude*) queues a job. A runner on your

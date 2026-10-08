@@ -120,6 +120,9 @@ function rotate<T>(xs: T[], seed: number): T[] {
   return xs.map((_, i) => xs[(i + seed) % n]);
 }
 
+/** Bumped when the picking rules change, so looks chosen under older rules are picked again. */
+export const DNA_VERSION = "2";
+
 /** Rebuild a DNA from its stored key ("palette|fonts|hero|corners|concept|blueprint"). */
 export function dnaFromKey(key: string): DesignDna | null {
   const [p, f, h, c, k, b] = key.split("|");
@@ -143,12 +146,17 @@ export function pickDna(siteId: string, category: string, recentKeys: string[], 
   const palIds = CATEGORY_PALETTES[category] ?? PALETTES.map((p) => p.id);
 
   const pickFrom = <T>(items: T[], avoid: Set<T>, s: number) => rotate(items, s).find((x) => !avoid.has(x)) ?? rotate(items, s)[0];
-  const palette = PALETTES.find((p) => p.id === pickFrom(palIds, used((d) => d.palette.id, 6), seed))!;
+  // The layout template comes first: it fixes the hero layout and whether the site is light or dark.
+  const blueprint = pickBlueprint(siteId, category as CategoryId, text, recent.map((d) => d.blueprint?.id ?? ""));
+  const moodIds = palIds.filter((id) => {
+    const pal = PALETTES.find((x) => x.id === id)!;
+    return blueprint.mood === "any" || pal.dark === (blueprint.mood === "dark");
+  });
+  const palette = PALETTES.find((p) => p.id === pickFrom(moodIds.length ? moodIds : palIds, used((d) => d.palette.id, 6), seed))!;
   const fonts = FONT_PAIRS.find((f) => f.id === pickFrom(FONT_PAIRS.map((x) => x.id), used((d) => d.fonts.id, 6), seed >>> 3))!;
-  const hero = pickFrom(HERO_LAYOUTS, used((d) => d.hero, 1), seed >>> 5);
+  const hero = blueprint.hero;
   const corners = pickFrom(CORNERS, used((d) => d.corners, 1), seed >>> 7);
   const concept = CONCEPTS.find((c) => c.id === pickFrom(CONCEPTS.map((x) => x.id), used((d) => d.concept.id, 4), seed >>> 9))!;
-  const blueprint = pickBlueprint(siteId, category as CategoryId, text, recent.map((d) => d.blueprint?.id ?? ""));
-  const key = [palette.id, fonts.id, hero, corners, concept.id, blueprint.id].join("|");
+  const key = [palette.id, fonts.id, hero, corners, concept.id, blueprint.id, DNA_VERSION].join("|");
   return { key, palette, fonts, hero, corners, concept, blueprint };
 }

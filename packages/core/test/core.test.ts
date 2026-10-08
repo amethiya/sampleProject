@@ -109,52 +109,55 @@ describe("buildPitch", () => {
   });
 });
 
-describe("scene blueprints", () => {
-  it("matches the business: pizzeria → slice pull, burger bar → exploded burger", async () => {
+describe("layout templates", () => {
+  it("matches the business: pizzeria, burger bar, barber, dentist", async () => {
     const { pickBlueprint } = await import("../src");
-    expect(pickBlueprint("a.com", "restaurant", "Luigi's Pizzeria — wood fired pizza since 1980").id).toBe("pizza-pull");
-    expect(pickBlueprint("b.com", "restaurant", "Smash burgers and fries").id).toBe("burger-stack");
-    expect(pickBlueprint("c.com", "salon", "Barber shop and hair stylist").id).toBe("silk-ribbon");
-    expect(pickBlueprint("dentalelements.com", "healthcare", "Dental Elements https://dentalelements.com Welcome to our practice in the city. Our clinic offers medical care and health checks").id).toBe("clean-turntable");
+    expect(pickBlueprint("a.com", "restaurant", "Luigi's Pizzeria — wood fired pizza since 1980").id).toBe("pizzeria");
+    expect(pickBlueprint("b.com", "restaurant", "Smash burgers and fries").id).toBe("burger-joint");
+    expect(pickBlueprint("c.com", "salon", "Joe's Barber shop").id).toBe("barber-shop");
+    // Filed as a shop by the map data, but the name says food.
+    expect(pickBlueprint("riseandshinedenver.com", "retail", "Rise & Shine Biscuit Kitchen riseandshinedenver.com").categories).toContain("restaurant");
+    expect(pickBlueprint("dentalelements.com", "healthcare", "Dental Elements https://dentalelements.com Welcome to our practice in the city. Our clinic offers medical care and health checks").id).toBe("dental-clinic");
   });
 
-  it("rotates when nothing matches, avoiding recent blueprints", async () => {
+  it("rotates when nothing matches, avoiding recent templates", async () => {
     const { pickBlueprint } = await import("../src");
     const first = pickBlueprint("d.com", "accounting", "");
     const next = pickBlueprint("d.com", "accounting", "", [first.id]);
     expect(next.id).not.toBe(first.id);
   });
 
-  it("covers every category, uses known recipes, and is in the skill catalogue", async () => {
+  it("covers every category, uses known patterns, and is in the skill catalogue", async () => {
     const { BLUEPRINTS, CATEGORIES } = await import("../src");
     const { readFileSync } = await import("node:fs");
     const md = readFileSync(new URL("../../../.claude/skills/website-redesign/references/blueprints.md", import.meta.url), "utf8");
     for (const c of CATEGORIES) expect(BLUEPRINTS.filter((b) => b.categories.includes(c.id)).length).toBeGreaterThanOrEqual(3);
     for (const b of BLUEPRINTS) {
       expect(md, `run npm run skill:catalog (${b.id} missing)`).toContain(`\`${b.id}\``);
-      for (const r of b.recipes) expect(r).toBeLessThanOrEqual(22);
+      for (const r of b.patterns) expect(r).toBeLessThanOrEqual(8);
     }
     expect(new Set(BLUEPRINTS.map((b) => b.id)).size).toBe(BLUEPRINTS.length);
   });
 
-  it("stores the blueprint in the DNA key and still reads older keys", async () => {
+  it("stores the template in the DNA key, matches its hero and mood, and still reads older keys", async () => {
     const { pickDna, dnaFromKey } = await import("../src");
     const dna = pickDna("e.com", "restaurant", [], "pizza");
-    expect(dna.key.split("|")).toHaveLength(6);
-    expect(dnaFromKey(dna.key)?.blueprint?.id).toBe("pizza-pull");
+    expect(dna.key.split("|")).toHaveLength(7);
+    expect(dnaFromKey(dna.key)?.blueprint?.id).toBe("pizzeria");
+    expect(dna.hero).toBe("fullbleed");
+    expect(dna.palette.dark).toBe(true);
     const old = dnaFromKey(dna.key.split("|").slice(0, 5).join("|"));
     expect(old).not.toBeNull();
     expect(old?.blueprint).toBeUndefined();
   });
 
-  it("renders the blueprint's object and motion in the 3D chapter", async () => {
+  it("renders a calm, photo-led page with no 3D, loader or animation libraries", async () => {
     const { dnaFromKey, renderSitePage, snapshotFromLead } = await import("../src");
-    const lead = { id: "x", name: "Tony Burger", website: "https://t.com", category: "restaurant", city: "Austin", country: "US", contacts: { emails: ["a@t.com"], phones: [] }, audit: { score: 50, issues: [] }, content: { title: "T", description: "", headings: [], paragraphs: [], images: [] } } as never;
+    const lead = { id: "x", name: "Tony Burger", website: "https://t.com", category: "restaurant", city: "Austin", country: "US", contacts: { emails: ["a@t.com"], phones: [] }, audit: { score: 50, issues: [] }, content: { title: "T", description: "", headings: ["Our burgers"], paragraphs: ["Every patty is smashed to order on a seasoned flat-top grill."], images: [] } } as never;
     const site = snapshotFromLead(lead);
-    const html = renderSitePage(lead, site, site.pages[0].slug, { dna: dnaFromKey("ember|jakarta|split|soft|bold|kettlebell-turntable")! });
-    expect(html).toContain('data-variant="turntable"');
-    expect(html).toContain('data-kind="kettlebell"');
-    expect(html).toContain("<span>Tony</span><span>Burger</span>");
+    const html = renderSitePage(lead, site, site.pages[0].slug, { dna: dnaFromKey("ember|jakarta|split|soft|bold|burger-joint")! });
+    expect(html).toContain("hero-editorial");
+    expect(html).not.toMatch(/three(\.min)?\.js|gsap|lenis|<canvas|class="loader"|class="cursor"|marquee/);
   });
 });
 

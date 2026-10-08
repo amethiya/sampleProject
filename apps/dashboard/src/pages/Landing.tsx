@@ -6,7 +6,7 @@ import { linkProps } from "../router";
 const STEPS = [
   { title: "Discover", text: "Pulls restaurants, gyms, clinics, accountants and traders with websites from OpenStreetMap across 30 US and EU cities." },
   { title: "Score", text: "Checks about 25 signs of an aging site, from missing HTTPS and no mobile layout to table layouts and old copyright years." },
-  { title: "Redesign", text: "Rebuilds the site from its own content with smooth motion and 3D, on a link you can share." },
+  { title: "Redesign", text: "Rebuilds the site from its own text and photos as a modern, professional website, on a link you can share." },
   { title: "Pitch", text: "Drafts a personal email in Gmail with the redesign link. You review it and press send." },
 ];
 
