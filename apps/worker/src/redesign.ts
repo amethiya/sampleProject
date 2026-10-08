@@ -1,5 +1,5 @@
 import {
-  auditCandidate, categoryById, crawlSite, dnaFromKey, hostId, normalizeWebsite, pickDna, renderSitePage, snapshotFromLead,
+  BLUEPRINTS, auditCandidate, blueprintById, categoryById, crawlSite, dnaFromKey, hostId, normalizeWebsite, pickDna, renderSitePage, snapshotFromLead,
   type DesignDna, type Lead, type SiteSnapshot,
 } from "@rr/core";
 
@@ -57,6 +57,11 @@ async function ensureDna(env: Db, id: string, lead: Lead, style: string | null, 
   const dna = existing ? { ...existing, blueprint: fresh.blueprint, key: `${existing.key.split("|").slice(0, 5).join("|")}|${fresh.blueprint!.id}` } : fresh;
   await env.DB.prepare("UPDATE sites SET style = ?, styled_at = datetime('now') WHERE id = ?").bind(dna.key, id).run();
   return dna;
+}
+
+/** Replace the scene blueprint in a DNA key. */
+function withBlueprint(key: string, blueprint: string): string {
+  return [...key.split("|").slice(0, 5), blueprint].join("|");
 }
 
 export function describeDna(key: string): string {
@@ -166,15 +171,45 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
       return json(await status(env, id, data.site));
     }
     if (lm[2] === "redesign" && m === "POST") {
+      // Body (all optional): notes for Claude, a template (blueprint id), and whether to improve the last version.
+      const body = (await req.json().catch(() => ({}))) as { notes?: string; blueprint?: string; mode?: string };
+      const notes = (body.notes ?? "").trim().slice(0, 4000) || null;
       const site = await ensureSite(env, id, data.lead, data.site);
       const active = await env.DB.prepare("SELECT id FROM redesign_jobs WHERE lead_id = ? AND status IN ('queued', 'running')").bind(id).first();
-      if (!active) {
-        // A new look every time: avoid recent redesigns, including this site's current one.
+      if (active) return json({ error: "A Claude redesign of this site is already queued or running." }, 409);
+      const lastDone = await env.DB.prepare("SELECT style FROM redesign_jobs WHERE lead_id = ? AND status = 'done' ORDER BY id DESC LIMIT 1").bind(id).first<{ style: string | null }>();
+      const hasPages = await env.DB.prepare("SELECT 1 FROM ai_pages WHERE lead_id = ? LIMIT 1").bind(id).first();
+      const mode = body.mode === "revise" && hasPages ? "revise" : "fresh";
+      let key: string;
+      if (mode === "revise" && lastDone?.style) {
+        key = lastDone.style; // same look, refined with the notes
+      } else {
+        // A new look every time: avoid recent redesigns, including this site's current ones.
         const recent = await recentStyles(env);
         if (data.style) recent.unshift(data.style);
-        const dna = pickDna(`${id}:${Date.now()}`, data.lead.category, recent, siteText(data.lead, site));
-        await env.DB.prepare("INSERT INTO redesign_jobs (lead_id, style) VALUES (?, ?)").bind(id, dna.key).run();
+        if (lastDone?.style) recent.unshift(lastDone.style);
+        key = pickDna(`${id}:${Date.now()}`, data.lead.category, recent, siteText(data.lead, site)).key;
       }
+      if (body.blueprint && blueprintById(body.blueprint)) key = withBlueprint(key, body.blueprint);
+      await env.DB.prepare("INSERT INTO redesign_jobs (lead_id, style, notes, mode) VALUES (?, ?, ?, ?)").bind(id, key, notes, mode).run();
+      return json(await status(env, id, site));
+    }
+    // Instant: give the template redesign a new look (optionally a chosen template). No runner needed.
+    if (lm[2] === "restyle" && m === "POST") {
+      const body = (await req.json().catch(() => ({}))) as { blueprint?: string };
+      const site = await ensureSite(env, id, data.lead, data.site);
+      const recent = await recentStyles(env);
+      if (data.style) recent.unshift(data.style);
+      let dna = pickDna(`${id}:${Date.now()}`, data.lead.category, recent, "");
+      let key = dna.key;
+      if (body.blueprint && blueprintById(body.blueprint)) key = withBlueprint(key, body.blueprint);
+      else if (data.style && dnaFromKey(data.style)?.blueprint?.id === dna.blueprint?.id) {
+        // "Surprise me" should change the 3D scene too, not only colours and type.
+        const other = BLUEPRINTS.filter((b) => b.categories.includes(data.lead.category) && b.id !== dna.blueprint?.id);
+        if (other.length) key = withBlueprint(key, other[Date.now() % other.length].id);
+      }
+      dna = dnaFromKey(key)!;
+      await env.DB.prepare("UPDATE sites SET style = ?, styled_at = datetime('now') WHERE id = ?").bind(dna.key, id).run();
       return json(await status(env, id, site));
     }
   }
@@ -210,9 +245,9 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
     // Optionally claim the job for one specific website (cloud sessions asked to redesign X).
     const { leadId } = (await req.json().catch(() => ({}))) as { leadId?: string };
     const job = await (leadId
-      ? env.DB.prepare("SELECT id, lead_id, style FROM redesign_jobs WHERE status = 'queued' AND lead_id = ? ORDER BY created_at LIMIT 1").bind(leadId)
-      : env.DB.prepare("SELECT id, lead_id, style FROM redesign_jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1")
-    ).first<{ id: number; lead_id: string; style: string | null }>();
+      ? env.DB.prepare("SELECT id, lead_id, style, notes, mode FROM redesign_jobs WHERE status = 'queued' AND lead_id = ? ORDER BY created_at LIMIT 1").bind(leadId)
+      : env.DB.prepare("SELECT id, lead_id, style, notes, mode FROM redesign_jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1")
+    ).first<{ id: number; lead_id: string; style: string | null; notes: string | null; mode: string }>();
     if (!job) return json({ job: null });
     const claimed = await env.DB.prepare("UPDATE redesign_jobs SET status = 'running', started_at = datetime('now') WHERE id = ? AND status = 'queued'").bind(job.id).run();
     if (!claimed.meta.changes) return json({ job: null });
@@ -223,7 +258,14 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
     }
     const site = await ensureSite(env, job.lead_id, data.lead, data.site);
     const avoid = (await recentStyles(env, 8)).filter((k) => k !== job.style).slice(0, 5).map(describeDna);
-    return json({ job: { id: job.id, leadId: job.lead_id, style: job.style }, lead: data.lead, site: withProxiedImages(url.origin, site), avoid });
+    // Revisions start from the previous Claude pages.
+    const previous = job.mode === "revise"
+      ? (await env.DB.prepare("SELECT slug, html FROM ai_pages WHERE lead_id = ?").bind(job.lead_id).all<{ slug: string; html: string }>()).results
+      : [];
+    return json({
+      job: { id: job.id, leadId: job.lead_id, style: job.style, notes: job.notes, mode: job.mode },
+      lead: data.lead, site: withProxiedImages(url.origin, site), avoid: job.mode === "revise" ? [] : avoid, previous,
+    });
   }
 
   const jm = path.match(/^\/api\/redesign-jobs\/(\d+)\/(complete|fail)$/);
@@ -265,11 +307,15 @@ async function finish(env: Db, id: number, status: string, error: string | null)
 
 async function status(env: Db, id: string, site: SiteSnapshot | null) {
   const job = await env.DB.prepare(
-    "SELECT id, status, error, style, created_at AS createdAt, started_at AS startedAt, finished_at AS finishedAt FROM redesign_jobs WHERE lead_id = ? ORDER BY id DESC LIMIT 1",
+    "SELECT id, status, error, style, notes, mode, created_at AS createdAt, started_at AS startedAt, finished_at AS finishedAt FROM redesign_jobs WHERE lead_id = ? ORDER BY id DESC LIMIT 1",
   ).bind(id).first();
   const { results: ai } = await env.DB.prepare("SELECT slug, created_at AS createdAt FROM ai_pages WHERE lead_id = ?").bind(id).all<{ slug: string; createdAt: string }>();
   const style = await env.DB.prepare("SELECT style FROM sites WHERE id = ?").bind(id).first<{ style: string | null }>();
+  const done = await env.DB.prepare("SELECT style FROM redesign_jobs WHERE lead_id = ? AND status = 'done' ORDER BY id DESC LIMIT 1").bind(id).first<{ style: string | null }>();
   return {
+    templateBlueprint: style?.style ? dnaFromKey(style.style)?.blueprint?.id ?? null : null,
+    claudeBlueprint: done?.style ? dnaFromKey(done.style)?.blueprint?.id ?? null : null,
+    blueprints: BLUEPRINTS.map((b) => ({ id: b.id, name: b.name, categories: b.categories, object: b.object, motion: b.motion })),
     templateStyle: style?.style ? describeDna(style.style) : null,
     claudeStyle: (job as { style?: string } | null)?.style ? describeDna((job as { style: string }).style) : null,
     crawledAt: site?.crawledAt ?? null,

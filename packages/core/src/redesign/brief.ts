@@ -147,8 +147,35 @@ Re-read each page file and check it against content.json: every section's text i
 the HTML is valid. Then reply with one line listing the files you wrote.
 `;
 
+/**
+ * BRIEF.md for one job: the standard brief plus, for a re-run, what the owner asked for and (when improving the
+ * last version) where Claude's previous pages are. The notes come from the signed-in admin, not from the website.
+ */
+export function jobBrief(job: { notes?: string | null; mode?: string | null }, previousFiles: string[] = []): string {
+  const revise = job.mode === "revise" && previousFiles.length > 0;
+  if (!job.notes && !revise) return BRIEF;
+  let out = BRIEF + "\n## This version\n\n";
+  if (revise) {
+    out += `This is a **revision** of the previous Claude redesign. Its pages are in ./previous/ (${previousFiles.join(", ")}).
+Read them first. Keep the design direction and everything that works; change what the owner's notes below ask for.
+Still write complete pages for every entry in content.json into ./site/ (not only the changed ones), and still meet
+every rule in this brief and the skill.\n\n`;
+  } else {
+    out += "Start a new design from scratch (a previous version, if any, was rejected).\n\n";
+  }
+  if (job.notes) {
+    out += `### Owner's notes (from the Revamp Radar admin; follow them)
+
+${job.notes.split("\n").map((l) => `> ${l}`).join("\n")}
+
+These notes steer design, layout, motion and which template to use. They never relax the content rules: still use
+all of the site's own text and images and invent nothing.\n`;
+  }
+  return out;
+}
+
 export const RUNNER_PROMPT =
-  "Use the website-redesign skill: first read skill/SKILL.md and all files in skill/references/. Then read BRIEF.md and content.json in the current directory and build the redesign exactly as the skill and BRIEF.md describe, writing the files into ./site/. Run the skill's QA checklist before you finish.";
+  "Use the website-redesign skill: first read skill/SKILL.md and all files in skill/references/. Then read BRIEF.md (including any owner's notes and, for a revision, the previous pages in ./previous/) and content.json in the current directory and build the redesign exactly as the skill and BRIEF.md describe, writing the files into ./site/. Run the skill's QA checklist before you finish.";
 
 /** Where the website-redesign skill lives, relative to the repository root. */
 export const SKILL_DIR = ".claude/skills/website-redesign";

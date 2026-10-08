@@ -11,12 +11,12 @@
  * ./site/, and the runner uploads the pages to the Worker.
  */
 import { spawn } from "node:child_process";
-import { cp, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { BRIEF, RUNNER_PROMPT, SKILL_DIR, briefContent, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
+import { RUNNER_PROMPT, SKILL_DIR, briefContent, jobBrief, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
 
 const skillSource = resolve(fileURLToPath(import.meta.url), "../../../..", SKILL_DIR);
 
@@ -48,10 +48,11 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 }
 
 interface NextJob {
-  job: { id: number; leadId: string; style: string | null } | null;
+  job: { id: number; leadId: string; style: string | null; notes?: string | null; mode?: string } | null;
   lead?: Lead;
   site?: SiteSnapshot;
   avoid?: string[];
+  previous?: { slug: string; html: string }[];
 }
 
 function runClaude(cwd: string, timeoutMin: number): Promise<string> {
@@ -89,7 +90,7 @@ async function collectPages(dir: string, allowed: Set<string>) {
   return pages;
 }
 
-async function processJob({ job, lead, site, avoid = [] }: NextJob) {
+async function processJob({ job, lead, site, avoid = [], previous = [] }: NextJob) {
   if (!job || !lead || !site) return;
   const started = Date.now();
   const dna = job.style ? dnaFromKey(job.style) ?? undefined : undefined;
@@ -99,7 +100,14 @@ async function processJob({ job, lead, site, avoid = [] }: NextJob) {
     // Every redesign uses the website-redesign skill: give it to Claude both as files and as a project skill.
     await cp(skillSource, join(dir, "skill"), { recursive: true });
     await cp(skillSource, join(dir, SKILL_DIR), { recursive: true });
-    await writeFile(join(dir, "BRIEF.md"), BRIEF);
+    // A revision starts from the previous Claude pages; the owner's notes go into BRIEF.md.
+    const prevFiles = previous.map((p) => (p.slug === "home" ? "index.html" : `${p.slug}.html`));
+    if (previous.length) {
+      await mkdir(join(dir, "previous"), { recursive: true });
+      await Promise.all(previous.map((p, i) => writeFile(join(dir, "previous", prevFiles[i]), p.html)));
+    }
+    await writeFile(join(dir, "BRIEF.md"), jobBrief(job, prevFiles));
+    if (job.notes || previous.length) console.log(`  ${previous.length ? "Revising the previous version" : "New design"}${job.notes ? `; notes: ${job.notes.slice(0, 200)}` : ""}`);
     await writeFile(join(dir, "content.json"), JSON.stringify(briefContent(lead, site, dna, avoid), null, 2));
     const result = await runClaude(dir, Number(args.timeout));
     let summary = result.slice(-300);

@@ -157,3 +157,17 @@ describe("scene blueprints", () => {
     expect(html).toContain("<span>Tony</span><span>Burger</span>");
   });
 });
+
+describe("job brief", () => {
+  it("adds the owner's notes and points revisions at the previous pages", async () => {
+    const { BRIEF, jobBrief } = await import("../src");
+    expect(jobBrief({})).toBe(BRIEF);
+    const fresh = jobBrief({ notes: "Darker, bigger photos", mode: "fresh" });
+    expect(fresh).toContain("> Darker, bigger photos");
+    expect(fresh).toContain("Start a new design");
+    const rev = jobBrief({ notes: "Bigger menu", mode: "revise" }, ["index.html", "menu.html"]);
+    expect(rev).toContain("./previous/ (index.html, menu.html)");
+    expect(rev).toContain("never relax the content rules");
+    expect(jobBrief({ mode: "revise" }, [])).toBe(BRIEF); // nothing to revise from
+  });
+});

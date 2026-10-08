@@ -3,6 +3,7 @@
  *
  *   npm run job -- fetch --url example.com --category restaurant [--city Vienna]   add a website and claim its job
  *   npm run job -- fetch --lead example.com                                          claim the job for a known lead
+ *        [--notes "what to change"] [--revise] [--template burger-stack]           (with --lead or --url)
  *   npm run job -- fetch                                                             claim the oldest queued job
  *   npm run job -- upload jobs/<id>                                                  upload jobs/<id>/site/*.html
  *   npm run job -- fail jobs/<id> --reason "..."                                     give the job back as failed
@@ -12,7 +13,7 @@
 import { cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { BRIEF, SKILL_DIR, briefContent, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
+import { SKILL_DIR, briefContent, jobBrief, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
 
 const { values: args, positionals } = parseArgs({
   allowPositionals: true,
@@ -22,6 +23,9 @@ const { values: args, positionals } = parseArgs({
     city: { type: "string" },
     lead: { type: "string" },
     reason: { type: "string", default: "Abandoned" },
+    notes: { type: "string" },
+    revise: { type: "boolean", default: false },
+    template: { type: "string" },
   },
 });
 
@@ -44,10 +48,11 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 }
 
 interface NextJob {
-  job: { id: number; leadId: string; style: string | null } | null;
+  job: { id: number; leadId: string; style: string | null; notes?: string | null; mode?: string } | null;
   lead?: Lead;
   site?: SiteSnapshot;
   avoid?: string[];
+  previous?: { slug: string; html: string }[];
 }
 
 async function fetchJob() {
@@ -57,7 +62,11 @@ async function fetchJob() {
     console.log(`Added ${added.name} (${added.id}).`);
     leadId = added.id;
   }
-  if (leadId) await call(`/api/leads/${encodeURIComponent(leadId)}/redesign`);
+  if (leadId) {
+    // Queue a job (ignored when one is already queued, e.g. from the admin portal with its own notes).
+    await call(`/api/leads/${encodeURIComponent(leadId)}/redesign`, { notes: args.notes, mode: args.revise ? "revise" : "fresh", blueprint: args.template })
+      .catch((e: Error) => { if (!/ 409 /.test(e.message)) throw e; });
+  }
   const next = await call<NextJob>("/api/redesign-jobs/next", leadId ? { leadId } : {});
   if (!next.job || !next.lead || !next.site) {
     console.log(leadId ? `No queued job for ${leadId} (it may already be running or done).` : "No queued redesign jobs.");
@@ -67,12 +76,23 @@ async function fetchJob() {
   await mkdir(join(dir, "site"), { recursive: true });
   const dna = next.job.style ? dnaFromKey(next.job.style) ?? undefined : undefined;
   await cp(resolve(process.env.INIT_CWD ?? process.cwd(), SKILL_DIR), join(dir, "skill"), { recursive: true });
-  await writeFile(join(dir, "BRIEF.md"), BRIEF);
+  const previous = await writePrevious(dir, next.previous ?? []);
+  await writeFile(join(dir, "BRIEF.md"), jobBrief(next.job, previous));
   await writeFile(join(dir, "content.json"), JSON.stringify(briefContent(next.lead, next.site, dna, next.avoid ?? []), null, 2));
+  if (next.job.notes) console.log(`Owner's notes: ${next.job.notes}`);
   await writeFile(join(dir, "job.json"), JSON.stringify({ id: next.job.id, leadId: next.job.leadId, preview: `${base}/preview/${encodeURIComponent(next.job.leadId)}/` }, null, 2));
   console.log(`Job ${next.job.id}: ${next.lead.name}, ${next.site.pages.length} pages${dna ? `, ${dna.concept.name} concept` : ""}.`);
   console.log(`Next: use the website-redesign skill (${dir}/skill/SKILL.md), read BRIEF.md and content.json, write the pages into ${dir}/site/, then run`);
   console.log(`  npm run job -- upload jobs/${next.job.id}`);
+}
+
+/** A revision starts from the previous Claude pages: write them to ./previous/. */
+async function writePrevious(dir: string, pages: { slug: string; html: string }[]): Promise<string[]> {
+  if (!pages.length) return [];
+  await mkdir(join(dir, "previous"), { recursive: true });
+  const files = pages.map((p) => (p.slug === "home" ? "index.html" : `${p.slug}.html`));
+  await Promise.all(pages.map((p, i) => writeFile(join(dir, "previous", files[i]), p.html)));
+  return files;
 }
 
 async function jobInfo(dirArg: string | undefined) {

@@ -411,7 +411,7 @@ function StatusSelect({ value, onChange, label }: { value: string; onChange(s: s
   );
 }
 
-function Sheet({ title, onClose, children, wide = false }: { title: string; onClose(): void; children: React.ReactNode; wide?: boolean }) {
+function Sheet({ title, onClose, children, wide = false, full = false }: { title: string; onClose(): void; children: React.ReactNode; wide?: boolean; full?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     addEventListener("keydown", onKey);
@@ -421,15 +421,16 @@ function Sheet({ title, onClose, children, wide = false }: { title: string; onCl
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <aside className={`drawer${wide ? " wide" : ""}`} role="dialog" aria-label={title}>{children}</aside>
+      <aside className={`drawer${wide ? " wide" : ""}${full ? " full" : ""}`} role="dialog" aria-label={title}>{children}</aside>
     </>
   );
 }
 
 function LeadPanel({ lead, initialTab, onClose, onStatus, onError, onChanged }: { lead: LeadRow; initialTab: Tab; onClose(): void; onStatus(s: string): void; onError(e: unknown): void; onChanged(): void }) {
   const [tab, setTab] = useState<Tab>(initialTab);
+  const [full, setFull] = useState(false);
   return (
-    <Sheet title={lead.name} onClose={onClose} wide>
+    <Sheet title={lead.name} onClose={onClose} wide full={full && tab === "redesign"}>
       <header className="drawer-head">
         <div className="drawer-title">
           <h2>{lead.name}</h2>
@@ -452,7 +453,7 @@ function LeadPanel({ lead, initialTab, onClose, onStatus, onError, onChanged }: 
       </div>
       <div className="drawer-body">
         {tab === "audit" && <AuditTab lead={lead} />}
-        {tab === "redesign" && <RedesignTab lead={lead} onError={onError} onChanged={onChanged} />}
+        {tab === "redesign" && <RedesignTab lead={lead} onError={onError} onChanged={onChanged} full={full} onFull={setFull} />}
         {tab === "pitch" && <PitchTab lead={lead} onStatus={onStatus} onError={onError} />}
       </div>
     </Sheet>
@@ -480,26 +481,55 @@ function AuditTab({ lead }: { lead: LeadRow }) {
   );
 }
 
+interface BlueprintInfo { id: string; name: string; categories: string[]; object: string; motion: string }
 interface RedesignStatus {
   templateStyle: string | null;
   claudeStyle: string | null;
+  templateBlueprint: string | null;
+  claudeBlueprint: string | null;
+  blueprints: BlueprintInfo[];
   crawledAt: string | null;
   pages: { slug: string; label: string; url: string }[];
-  job: { id: number; status: "queued" | "running" | "done" | "failed"; error: string | null; createdAt: string; startedAt: string | null; finishedAt: string | null } | null;
+  job: { id: number; status: "queued" | "running" | "done" | "failed"; error: string | null; notes: string | null; mode: string; createdAt: string; startedAt: string | null; finishedAt: string | null } | null;
   claudePages: string[];
 }
 
-function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: unknown): void; onChanged(): void }) {
+type View = "original" | "template" | "claude";
+
+/** Template picker: this business type first, then everything else. */
+function TemplateSelect({ value, onChange, blueprints, category, first, label }: { value: string; onChange(v: string): void; blueprints: BlueprintInfo[]; category: string; first: { value: string; label: string }[]; label: string }) {
+  const mine = blueprints.filter((b) => b.categories.includes(category));
+  const rest = blueprints.filter((b) => !b.categories.includes(category));
+  return (
+    <label className="field">
+      <span>{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {first.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        <optgroup label={`For ${CATEGORY_LABELS[category] ?? category}`}>{mine.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.object})</option>)}</optgroup>
+        <optgroup label="Other templates">{rest.map((b) => <option key={b.id} value={b.id}>{b.name} ({b.object})</option>)}</optgroup>
+      </select>
+    </label>
+  );
+}
+
+function RedesignTab({ lead, onError, onChanged, full, onFull }: { lead: LeadRow; onError(e: unknown): void; onChanged(): void; full: boolean; onFull(v: boolean): void }) {
   const [st, setSt] = useState<RedesignStatus | null>(null);
   const [slug, setSlug] = useState("home");
-  const [engine, setEngine] = useState<"template" | "claude">("template");
+  const [view, setView] = useState<View>("template");
+  const [compare, setCompare] = useState(false);
   const [busy, setBusy] = useState("");
+  const [rev, setRev] = useState(0); // reloads the preview after a new look
+  const [look, setLook] = useState("auto");
+  const [notes, setNotes] = useState("");
+  const [mode, setMode] = useState<"revise" | "fresh">("revise");
+  const [claudeTemplate, setClaudeTemplate] = useState("keep");
+  const [msg, setMsg] = useState("");
   const base = `/api/leads/${encodeURIComponent(lead.id)}`;
 
   useEffect(() => {
     api<RedesignStatus>(`${base}/redesign`)
       .then(async (s) => (s.crawledAt ? s : api<RedesignStatus>(`${base}/crawl`, { method: "POST" })))
-      .then((s) => { setSt(s); if (s.claudePages.length) setEngine("claude"); })
+      .then((s) => { setSt(s); if (s.claudePages.length) setView("claude"); })
       .catch(onError);
   }, [base, onError]);
 
@@ -510,16 +540,37 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
       const next = await api<RedesignStatus>(`${base}/redesign`).catch(() => null);
       if (next) {
         setSt(next);
-        if (next.job?.status !== "queued" && next.job?.status !== "running") onChanged();
-        if (next.job?.status === "done") setEngine("claude");
+        if (next.job?.status !== "queued" && next.job?.status !== "running") { onChanged(); setRev((r) => r + 1); }
+        if (next.job?.status === "done") setView("claude");
       }
     }, 10_000);
     return () => clearInterval(t);
   }, [active, base, onChanged]);
 
-  const act = async (path: "/redesign" | "/crawl") => {
-    setBusy(path);
-    try { setSt(await api<RedesignStatus>(base + path, { method: "POST" })); onChanged(); } catch (e) { onError(e); }
+  const restyle = async () => {
+    setBusy("restyle"); setMsg("");
+    try {
+      setSt(await api<RedesignStatus>(`${base}/restyle`, { method: "POST", body: JSON.stringify({ blueprint: look === "auto" ? undefined : look }) }));
+      setView("template"); setRev((r) => r + 1); onChanged();
+    } catch (e) { onError(e); }
+    setBusy("");
+  };
+  const sendToClaude = async () => {
+    setBusy("claude"); setMsg("");
+    const hasClaude = !!st?.claudePages.length;
+    try {
+      setSt(await api<RedesignStatus>(`${base}/redesign`, {
+        method: "POST",
+        body: JSON.stringify({ notes: notes.trim() || undefined, mode: hasClaude ? mode : "fresh", blueprint: claudeTemplate === "keep" || claudeTemplate === "auto" ? undefined : claudeTemplate }),
+      }));
+      setNotes(""); setMsg("Sent. Claude picks it up as soon as your Mac runner or a cloud session is running.");
+      onChanged();
+    } catch (e) { onError(e); }
+    setBusy("");
+  };
+  const reread = async () => {
+    setBusy("crawl");
+    try { setSt(await api<RedesignStatus>(`${base}/crawl`, { method: "POST" })); setRev((r) => r + 1); onChanged(); } catch (e) { onError(e); }
     setBusy("");
   };
 
@@ -532,44 +583,100 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
     );
   }
   const hasClaude = st.claudePages.includes(slug);
-  const shown = engine === "claude" && hasClaude ? "claude" : "template";
-  const src = `/preview/${encodeURIComponent(lead.id)}/${slug === "home" ? "" : encodeURIComponent(slug)}?engine=${shown}`;
+  const page = st.pages.find((p) => p.slug === slug) ?? st.pages[0];
+  const originalUrl = page?.url ?? lead.website;
+  const redesignView: "template" | "claude" = view === "claude" && hasClaude ? "claude" : "template";
+  const src = (engine: "template" | "claude") => `/preview/${encodeURIComponent(lead.id)}/${slug === "home" ? "" : encodeURIComponent(slug)}?engine=${engine}&v=${rev}`;
+  const frame = (v: View) => v === "original"
+    ? originalUrl.startsWith("https:")
+      ? <iframe key={originalUrl} src={originalUrl} title={`Current website of ${lead.name}`} referrerPolicy="no-referrer" sandbox="allow-scripts allow-same-origin" />
+      : <div className="pv-empty"><p>This site has no secure (HTTPS) address, so it can't be shown inside the portal.</p><a className="btn btn-sm" href={originalUrl} target="_blank" rel="noreferrer">Open current site<Icon d={I.external} size={14} /></a></div>
+    : <iframe key={src(v)} src={src(v)} title={`${v === "claude" ? "Claude" : "Instant"} redesign of ${lead.name}`} />;
+  const label = (v: View) => (v === "original" ? "Current site" : v === "claude" ? "Claude redesign" : "Instant redesign");
   const job = st.job;
+  const bpName = (id: string | null) => st.blueprints.find((b) => b.id === id)?.name;
+  const firstBp = (id: string | null) => (id && bpName(id) ? [{ value: "keep", label: `Keep: ${bpName(id)}` }] : []);
 
   return (
     <div className="stack">
       <div className="rd-bar">
         <div className="seg" role="group" aria-label="Version">
-          <button className={shown === "template" ? "on" : ""} onClick={() => setEngine("template")}>Template</button>
-          <button className={shown === "claude" ? "on" : ""} onClick={() => setEngine("claude")} disabled={!hasClaude} title={hasClaude ? "" : "No Claude version for this page yet"}>Claude</button>
+          <button className={!compare && view === "original" ? "on" : ""} onClick={() => { setCompare(false); setView("original"); }}>Current</button>
+          <button className={!compare && view === "template" ? "on" : ""} onClick={() => { setCompare(false); setView("template"); }}>Instant</button>
+          <button className={!compare && view === "claude" ? "on" : ""} onClick={() => { setCompare(false); setView("claude"); }} disabled={!hasClaude} title={hasClaude ? "" : "No Claude version for this page yet"}>Claude</button>
+          <button className={compare ? "on" : ""} onClick={() => { setCompare(!compare); onFull(!compare); }}>Compare</button>
         </div>
         <select value={slug} onChange={(e) => setSlug(e.target.value)} aria-label="Page">
           {st.pages.map((p) => <option key={p.slug} value={p.slug}>{p.label}</option>)}
         </select>
-        <a className="btn btn-sm" href={src} target="_blank" rel="noreferrer">Full screen<Icon d={I.external} size={14} /></a>
+        <button className="btn btn-sm hide-mobile" onClick={() => onFull(!full)}>{full ? "Narrow panel" : "Wide panel"}</button>
+        <a className="btn btn-sm" href={view === "original" && !compare ? originalUrl : src(redesignView)} target="_blank" rel="noreferrer">Full screen<Icon d={I.external} size={14} /></a>
       </div>
-      <div className="pv-frame"><iframe key={src} src={src} title={`Redesign of ${lead.name}`} /></div>
-      <div className="callout">
+
+      {compare ? (
+        <div className="compare">
+          <figure><figcaption>{label("original")}</figcaption><div className="pv-frame">{frame("original")}</div></figure>
+          <figure><figcaption>{label(redesignView)}</figcaption><div className="pv-frame">{frame(redesignView)}</div></figure>
+        </div>
+      ) : (
+        <div className="pv-frame">{frame(view === "original" ? "original" : redesignView)}</div>
+      )}
+      {(compare || view === "original") && <p className="muted small">If the current site stays blank, it blocks being shown inside other pages. Use Full screen to open it.</p>}
+
+      <section className="callout">
         <div>
-          <h3>Bespoke redesign with Claude</h3>
-          <p className="muted small">Claude rebuilds all {st.pages.length} pages with the site's own text and photos, a new design and 3D motion. It runs on your Mac runner or a Claude cloud session and takes about 10–15 minutes.</p>
+          <h3>Instant redesign</h3>
+          <p className="muted small">Built by Revamp Radar on Cloudflare in a second, from the site's own text and photos. Doesn't need your Mac.{st.templateBlueprint && ` Now: ${bpName(st.templateBlueprint)}.`}</p>
+        </div>
+        <TemplateSelect label="Template" value={look} onChange={setLook} blueprints={st.blueprints} category={lead.category} first={[{ value: "auto", label: "Surprise me (new look and scene)" }]} />
+        <div className="row-actions">
+          <button className="btn" onClick={restyle} disabled={!!busy}>{busy === "restyle" ? "Applying…" : "Apply new look"}</button>
+          <a className="text-link small" href="/templates" target="_blank" rel="noreferrer">See all templates</a>
+        </div>
+      </section>
+
+      <section className="callout">
+        <div>
+          <h3>Claude redesign</h3>
+          <p className="muted small">Claude rebuilds all {st.pages.length} pages using the website-redesign skill. It runs on your Mac (<code>npm run redesign-runner</code>) or a Claude cloud session and takes about 10–15 minutes. You can close this panel while it works.</p>
           {job && (
-            <p className={`job job-${job.status}`} role="status">
-              {job.status === "queued" && "Queued. Waiting for a runner or cloud session to pick it up."}
+            <div className={`job job-${job.status}`} role="status">
+              {job.status === "queued" && "Queued. Waiting for your Mac runner or a cloud session to pick it up."}
               {job.status === "running" && `Claude is building the site (started ${new Date(job.startedAt + "Z").toLocaleTimeString()}).`}
-              {job.status === "done" && `Claude version ready: ${st.claudePages.length} pages.`}
+              {job.status === "done" && `Claude version ready: ${st.claudePages.length} pages${st.claudeBlueprint ? `, ${bpName(st.claudeBlueprint)}` : ""}.`}
               {job.status === "failed" && `Last attempt didn't finish: ${job.error ?? "unknown error"}`}
-            </p>
+              {job.notes && <p className="muted small job-notes">Your notes{job.mode === "revise" ? " (improving the previous version)" : ""}: “{job.notes}”</p>}
+            </div>
           )}
         </div>
+        {!active && (
+          <>
+            {st.claudePages.length > 0 && (
+              <div className="seg" role="group" aria-label="What to do">
+                <button className={mode === "revise" ? "on" : ""} onClick={() => setMode("revise")}>Improve this version</button>
+                <button className={mode === "fresh" ? "on" : ""} onClick={() => setMode("fresh")}>Start a new design</button>
+              </div>
+            )}
+            <label className="field">
+              <span>What should Claude change? <span className="muted">(optional)</span></span>
+              <textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={4000}
+                placeholder="For example: darker and more premium, bigger food photos at the top, make the menu easier to read, use the exploded burger scene, less animation on mobile." />
+            </label>
+            <TemplateSelect label="Template" value={claudeTemplate} onChange={setClaudeTemplate} blueprints={st.blueprints} category={lead.category}
+              first={[...(st.claudePages.length && mode === "revise" ? firstBp(st.claudeBlueprint) : []), { value: "auto", label: "Choose automatically" }]} />
+          </>
+        )}
         <div className="row-actions">
-          <button className="btn btn-primary" onClick={() => act("/redesign")} disabled={!!busy || active}>{active ? "In progress…" : st.claudePages.length ? "Redesign again with Claude" : "Redesign with Claude"}</button>
-          <button className="btn" onClick={() => act("/crawl")} disabled={!!busy || active}>{busy === "/crawl" ? "Reading site…" : "Re-read website"}</button>
+          <button className="btn btn-primary" onClick={sendToClaude} disabled={!!busy || active}>
+            {active ? "In progress…" : busy === "claude" ? "Sending…" : st.claudePages.length ? (mode === "revise" ? "Send changes to Claude" : "Redesign again with Claude") : "Redesign with Claude"}
+          </button>
+          <button className="btn" onClick={reread} disabled={!!busy || active}>{busy === "crawl" ? "Reading site…" : "Re-read website"}</button>
         </div>
-      </div>
+        {msg && <p className="muted small" role="status">{msg}</p>}
+      </section>
       <p className="muted small">
         {st.pages.length} pages read{st.crawledAt ? ` on ${new Date(st.crawledAt).toLocaleDateString()}` : ""}.
-        {st.templateStyle && ` Template look: ${st.templateStyle}.`}
+        {st.templateStyle && ` Instant look: ${st.templateStyle}.`}
         {st.claudeStyle && ` Claude look: ${st.claudeStyle}.`}
       </p>
     </div>

@@ -263,6 +263,15 @@ select.st-lost, select.st-ignored { color: var(--muted); }
 .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .4); z-index: 40; animation: fade .18s ease-out; }
 .drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(520px, 100vw); background: var(--bg); z-index: 41; display: flex; flex-direction: column; border-left: 1px solid var(--line); box-shadow: -24px 0 60px -24px rgba(0, 0, 0, .3); animation: slide .26s cubic-bezier(.2, .8, .2, 1); padding-top: env(safe-area-inset-top, 0px); }
 .drawer.wide { width: min(720px, 100vw); }
+.drawer.full { width: min(1440px, 100vw); }
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.compare figure { margin: 0; display: grid; gap: 6px; min-width: 0; }
+.compare figcaption { font-size: 13px; font-weight: 600; }
+.compare .pv-frame { aspect-ratio: 10 / 11; }
+.pv-empty { height: 100%; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 24px; text-align: center; background: var(--bg); color: var(--ink); }
+.field textarea { padding: 10px 12px; border: 1px solid var(--line-2); border-radius: var(--r); background: var(--bg); color: var(--ink); font: inherit; font-weight: 400; resize: vertical; min-height: 96px; }
+.field textarea:focus { outline: none; border-color: var(--ink); }
+.job-notes { margin-top: 6px; font-weight: 400; }
 @keyframes slide { from { transform: translateX(32px); opacity: 0; } }
 @keyframes fade { from { opacity: 0; } }
 .drawer-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 20px 22px 12px; }
@@ -355,7 +364,9 @@ select.st-lost, select.st-ignored { color: var(--muted); }
   .card-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; padding: 0 14px 14px; }
   .card-actions select.status { max-width: none; width: 100%; height: 32px; }
   .mobile-bar { display: block; position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px)); background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(12px); border-top: 1px solid var(--line); }
-  .drawer, .drawer.wide { width: 100vw; border-left: 0; }
+  .drawer, .drawer.wide, .drawer.full { width: 100vw; border-left: 0; }
+  .compare { grid-template-columns: 1fr; }
+  .hide-mobile { display: none; }
   .drawer-head { padding: 16px 16px 10px; }
   .drawer-meta, .tabs { padding-left: 16px; padding-right: 16px; }
   .drawer-body { padding: 16px 16px calc(28px + env(safe-area-inset-bottom, 0px)); }
