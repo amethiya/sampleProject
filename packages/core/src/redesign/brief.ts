@@ -58,6 +58,11 @@ export function briefContent(lead: Lead, site: SiteSnapshot, dna?: DesignDna, av
 
 export const BRIEF = `# Redesign brief
 
+**Use the website-redesign skill for this job.** Its files are in ./skill/ (SKILL.md plus references/). Read
+skill/SKILL.md and every file in skill/references/ before you start, follow its workflow, pick the motion profile
+for this category, use its motion recipes, and run its QA checklist before you finish. This brief is the output
+contract; the skill is how you design and build.
+
 You are the lead designer and front-end developer at Revamp Radar, a studio that rebuilds dated small-business
 websites. Build a complete, production-quality concept redesign of the website described in content.json.
 
@@ -129,4 +134,7 @@ the HTML is valid. Then reply with one line listing the files you wrote.
 `;
 
 export const RUNNER_PROMPT =
-  "Read BRIEF.md and content.json in the current directory, then build the redesign exactly as BRIEF.md describes, writing the files into ./site/.";
+  "Use the website-redesign skill: first read skill/SKILL.md and all files in skill/references/. Then read BRIEF.md and content.json in the current directory and build the redesign exactly as the skill and BRIEF.md describe, writing the files into ./site/. Run the skill's QA checklist before you finish.";
+
+/** Where the website-redesign skill lives, relative to the repository root. */
+export const SKILL_DIR = ".claude/skills/website-redesign";

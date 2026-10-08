@@ -9,10 +9,10 @@
  *
  * Needs RR_URL and RR_TOKEN (the limited RUNNER_TOKEN is enough). Job folders live in ./jobs (git-ignored).
  */
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { BRIEF, briefContent, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
+import { BRIEF, SKILL_DIR, briefContent, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
 
 const { values: args, positionals } = parseArgs({
   allowPositionals: true,
@@ -66,11 +66,12 @@ async function fetchJob() {
   const dir = join(root, String(next.job.id));
   await mkdir(join(dir, "site"), { recursive: true });
   const dna = next.job.style ? dnaFromKey(next.job.style) ?? undefined : undefined;
+  await cp(resolve(process.env.INIT_CWD ?? process.cwd(), SKILL_DIR), join(dir, "skill"), { recursive: true });
   await writeFile(join(dir, "BRIEF.md"), BRIEF);
   await writeFile(join(dir, "content.json"), JSON.stringify(briefContent(next.lead, next.site, dna, next.avoid ?? []), null, 2));
   await writeFile(join(dir, "job.json"), JSON.stringify({ id: next.job.id, leadId: next.job.leadId, preview: `${base}/preview/${encodeURIComponent(next.job.leadId)}/` }, null, 2));
   console.log(`Job ${next.job.id}: ${next.lead.name}, ${next.site.pages.length} pages${dna ? `, ${dna.concept.name} concept` : ""}.`);
-  console.log(`Next: read ${dir}/BRIEF.md and content.json, write the pages into ${dir}/site/, then run`);
+  console.log(`Next: use the website-redesign skill (${dir}/skill/SKILL.md), read BRIEF.md and content.json, write the pages into ${dir}/site/, then run`);
   console.log(`  npm run job -- upload jobs/${next.job.id}`);
 }
 

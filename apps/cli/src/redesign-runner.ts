@@ -11,11 +11,14 @@
  * ./site/, and the runner uploads the pages to the Worker.
  */
 import { spawn } from "node:child_process";
-import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { BRIEF, RUNNER_PROMPT, briefContent, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
+import { BRIEF, RUNNER_PROMPT, SKILL_DIR, briefContent, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
+
+const skillSource = resolve(fileURLToPath(import.meta.url), "../../../..", SKILL_DIR);
 
 const { values: args } = parseArgs({
   options: {
@@ -58,7 +61,7 @@ function runClaude(cwd: string, timeoutMin: number): Promise<string> {
     "--permission-mode", "acceptEdits",
     "--disallowedTools", "Bash,WebFetch,WebSearch",
     ...(args.model ? ["--model", args.model] : []),
-    "--allowedTools", "Read,Write,Edit",
+    "--allowedTools", "Read,Write,Edit,Skill",
   ];
   return new Promise((resolve, reject) => {
     const child = spawn("claude", cliArgs, { cwd, stdio: ["ignore", "pipe", "pipe"] });
@@ -93,6 +96,9 @@ async function processJob({ job, lead, site, avoid = [] }: NextJob) {
   console.log(`\n▶ Job ${job.id}: ${lead.name} (${site.pages.length} pages)${dna ? `, ${dna.concept.name} / ${dna.palette.id} / ${dna.fonts.id}` : ""}`);
   const dir = await mkdtemp(join(tmpdir(), `rr-${job.id}-`));
   try {
+    // Every redesign uses the website-redesign skill: give it to Claude both as files and as a project skill.
+    await cp(skillSource, join(dir, "skill"), { recursive: true });
+    await cp(skillSource, join(dir, SKILL_DIR), { recursive: true });
     await writeFile(join(dir, "BRIEF.md"), BRIEF);
     await writeFile(join(dir, "content.json"), JSON.stringify(briefContent(lead, site, dna, avoid), null, 2));
     const result = await runClaude(dir, Number(args.timeout));
