@@ -1,5 +1,5 @@
 import {
-  LOOKS, auditCandidate, categoryById, lookById, makeDna, crawlSite, dnaFromKey, hostId, normalizeWebsite, pickDna, renderSitePage, snapshotFromLead,
+  LOOKS, USER_AGENT, auditCandidate, categoryById, lookById, makeDna, crawlSite, dnaFromKey, hostId, normalizeWebsite, pickDna, renderSitePage, snapshotFromLead,
   type DesignDna, type Lead, type SiteSnapshot,
 } from "@rr/core";
 
@@ -132,13 +132,17 @@ export async function imageProxy(req: Request, url: URL, env: Db, ctx: Execution
   if (!known) return new Response("Not allowed", { status: 403 });
 
   let upstream: Response | null = null;
-  for (const candidate of [target.href, target.href.replace(/^https:/, "http:")]) {
-    upstream = await fetch(candidate, { headers: { accept: "image/*" }, redirect: "follow" }).catch(() => null);
+  const tried: string[] = []; // reported in x-upstream when the image is unavailable
+  // Some hosts refuse Cloudflare's network outright; the public wsrv.nl image CDN is the last resort.
+  const relay = `https://wsrv.nl/?url=${encodeURIComponent(target.href)}`;
+  for (const candidate of [target.href, target.href.replace(/^https:/, "http:"), relay]) {
+    upstream = await fetch(candidate, { headers: { accept: "image/*", "user-agent": USER_AGENT }, redirect: "follow" }).catch((e) => (tried.push(String(e).slice(0, 80)), null));
+    if (upstream) tried.push(`${upstream.status} ${upstream.headers.get("content-type") ?? ""}`);
     if (upstream?.ok) break;
   }
   const type = upstream?.headers.get("content-type") ?? "";
   const size = Number(upstream?.headers.get("content-length") ?? 0);
-  if (!upstream?.ok || !type.startsWith("image/") || size > 8_000_000) return new Response("Image unavailable", { status: 404 });
+  if (!upstream?.ok || !type.startsWith("image/") || size > 8_000_000) return new Response("Image unavailable", { status: 404, headers: { "x-upstream": tried.join(" | ") } });
   const res = new Response(upstream.body, {
     headers: { "content-type": type, "cache-control": "public, max-age=604800", "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox", "access-control-allow-origin": "*" },
   });

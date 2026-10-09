@@ -10,7 +10,7 @@
   var $$ = function(s, r){ return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var topOfPage = function(el){ return !!el.closest('.hero, .page-top'); };
 
-  var SEQ = 'main section .disc, main section .muted, main section .sub, main section .ulink, main section .ctas, .info > div, .zig-txt, .dish-card, .svc, .slide, .order .loc, .order .phones, details, .price-list li, table.drinks tr, .tbl-title, .art a, .logos > div, .framed > .disc, .contact > *, .printed > div, .story .ph, .foot-cta > div, .foot-grid > *';
+  var SEQ = 'main section .disc, main section .muted, main section .sub, main section .ulink, main section .ctas, .info > div, .zig-txt, .dish-card, .svc, .slide, .order .loc, .order .phones, details, .price-list li, table.drinks tr, .tbl-title, .art a, .logos > div, .framed > .disc, .contact > *, .printed > div, .foot-cta > div, .foot-grid > *';
   var seq = $$(SEQ).filter(function(el){ return !topOfPage(el) && !el.closest('.cloud-reveal'); });
 
   // Fewer-motion visitors: soft fades only.

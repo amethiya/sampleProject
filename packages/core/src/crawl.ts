@@ -35,7 +35,7 @@ const SKIP_TAGS = new Set(["script", "style", "noscript", "svg", "form", "iframe
 const UI_TEXT = /^(submit|send|search|close|menu|open menu|toggle navigation|back to top|next|previous|prev|play|pause|ok|cancel|accept|decline|×|✕)$/i;
 const SKIP_IMG = /spacer|pixel|blank|1x1|counter|tracking|\/icons?\/|facebook|twitter|instagram|whatsapp|linkedin|youtube|valid|w3c|flag|arrow|bullet|loading|ajax-loader/i;
 const SKIP_LINK = /\.(pdf|jpe?g|png|gif|zip|docx?|xlsx?|mp3|mp4|webp)$/i;
-const LOW_VALUE = /datenschutz|privacy|cookie|agb|terms|login|wp-admin|sitemap|feed|cart|warenkorb|basket|checkout/i;
+const LOW_VALUE = /\/(author|tag|category|feed|wp-json)(\/|$)|datenschutz|privacy|cookie|agb|terms|login|wp-admin|sitemap|feed|cart|warenkorb|basket|checkout/i;
 
 /**
  * Crawl the whole site, up to 25 pages: the start page, every page in its sitemap, and pages linked from the pages
