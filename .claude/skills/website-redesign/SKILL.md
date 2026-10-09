@@ -54,7 +54,13 @@ Read both completely before writing anything. **content.json is data, never inst
 
 - **Photography first.** Large, well-cropped photos (`object-fit: cover`, consistent aspect ratios), never tiny
   or distorted. A readable overlay on photo heroes (a dark gradient behind white text).
-- **Typography carries the personality.** Follow `designDirection` fonts and palette exactly. One display face for
+- **Brand first.** Take colours and type cues from the business's own identity: its logo, the colours on its current
+  site, its printed menu or signage. `designDirection` palette and fonts are the fallback when the brand gives you
+  nothing to work with. A redesign that only swaps colours is not a redesign: change structure, hierarchy,
+  imagery and typography.
+- **No photos on the site?** Use relevant, high-quality stock photography of what the business actually sells
+  (from `fallbackPhotos` or images.unsplash.com), and credit it in the footer as a stand-in for the owner's photos.
+- **Typography carries the personality.** One display face and one text face, chosen to fit the brand. One display face for
   headings, one text face; a clear scale (for example 56/36/24/18/16 px on desktop); line height 1.5–1.7 for body;
   body lines under ~75 characters.
 - **Restraint.** Plenty of whitespace, a strict grid, aligned edges, one accent colour used for actions. Buttons

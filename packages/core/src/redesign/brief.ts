@@ -139,7 +139,11 @@ websites. Build a complete, production-quality concept redesign of the website d
 - Build in the visual style in "designDirection.visualStyle" (minimalism, bento grid, glassmorphism, liquid glass,
   neumorphism, claymorphism, skeuomorphism, brutalism, maximalism or spatial UI), applied with taste: it shapes
   surfaces, cards, header and layout, and never hurts readability. Do not mix in other styles.
-- Photography carries the design: the business's own photos first; "fallbackPhotos" for the hero or empty areas.
+- Brand first: take colours and type cues from the business's own logo, current site and printed materials; the
+  palette and fonts in "designDirection" are the fallback. Change structure, hierarchy, imagery and typography, not
+  only colours.
+- Photography carries the design: the business's own photos first. If the site has none, use relevant stock
+  photography of what the business sells ("fallbackPhotos" or images.unsplash.com) and credit it in the footer.
 - Every page of content.json is redesigned completely: no page skipped, no section dropped, nothing added.
 - Typography: a clear scale, generous spacing, body text under about 75 characters per line.
 - Motion is minimal: at most a short fade-in as content first appears and a header that turns solid on scroll.
