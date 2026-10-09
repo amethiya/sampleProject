@@ -12,7 +12,8 @@
 - [ ] Navigation lists every page using the `link` values (`./`, `./<slug>`); the current page is marked.
 - [ ] Contact block (address, phone, email, hours if present, OpenStreetMap link) and footer on every page.
 - [ ] `<meta name="robots" content="noindex, nofollow">`, a `<title>`, `lang` set, valid HTML (all tags closed).
-- [ ] No external scripts. Only Google Fonts, the given images, images.unsplash.com and openstreetmap.org.
+- [ ] External scripts only from content.json.libraries. Only Google Fonts, the given images, images.unsplash.com
+      and openstreetmap.org otherwise.
       No forms that submit, no fetch/XHR, no analytics.
 
 ## Professional standard
@@ -20,9 +21,10 @@
       `designDirection.visualStyle`, and the palette, fonts and corner style.
 - [ ] Every page in content.json has its own file, and every page's `links` (order online, menus, maps) are used.
 - [ ] The first screen shows what the business is, where it is and the main action.
-- [ ] Looks like a real business website: no 3D, particles, loaders, custom cursors, marquees, parallax,
-      pinned/sideways sections, animated letters, wavy dividers or giant pill buttons.
-- [ ] Only motion: one gentle fade-in and the header turning solid. `prefers-reduced-motion` respected.
+- [ ] Looks like a real, premium business website: no 3D, WebGL, particles, custom cursors or cartoonish effects.
+- [ ] Motion follows references/motion.js: opening sequence, reveals, parallax, word brightening, page transitions.
+- [ ] With scripts blocked, everything is visible; with `prefers-reduced-motion`, nothing animates.
+- [ ] Scroll the whole page once in a browser: nothing is left hidden.
 - [ ] Text contrast is comfortable; body lines stay under ~75 characters; consistent spacing and alignment.
 
 ## Responsive

@@ -33,8 +33,10 @@ Alternate light and dark sections, and photo-led and type-led sections:
   tone for eyebrows. Taken from the brand (their black-and-white printed menu), not a random palette.
 - Photography: large, warm, appetising, consistent; real photos of what the business sells. Stock is credited.
 - Inner pages open with a photo header (dark gradient for legibility) or a big type header; never a bare title.
-- Pill buttons with an arrow that nudges on hover; underline-on-hover nav; subtle image zoom on hover. Nothing moves
-  on its own.
+- Pill buttons with an arrow that nudges on hover; underline-on-hover nav; subtle image zoom on hover.
+- Motion (references/motion.js): the owner scored the static version 6/10 and asked for "beautiful animation".
+  Curtain and hero opening sequence, smooth scrolling, photo reveals, parallax, word-by-word statements, sequenced
+  content, a slow ticker and curtain page transitions lift it to the expected level.
 - Every overlay is checked for contrast: image at z-index 0, gradient at 1, text at 2.
 - Check every page on desktop and phone with screenshots before calling it done; fix anything that reads as a
   template.

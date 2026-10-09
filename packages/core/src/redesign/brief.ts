@@ -5,8 +5,12 @@ import { applyDna, themeCategory } from "./render";
 import type { DesignDna } from "./styles";
 import { THEMES, photoUrl } from "./themes";
 
-/** External scripts Claude may load. None: the few lines of JavaScript a professional site needs are inline. */
-export const LIBRARIES: Record<string, string> = {};
+/** External scripts Claude may load: GSAP + ScrollTrigger and Lenis for refined, award-style motion. */
+export const LIBRARIES: Record<string, string> = {
+  gsap: "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js",
+  scrollTrigger: "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js",
+  lenis: "https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js",
+};
 
 /**
  * Visual styles the skill can build with. Each site gets one primary style (plus at most one accent from the
@@ -146,13 +150,16 @@ websites. Build a complete, production-quality concept redesign of the website d
   photography of what the business sells ("fallbackPhotos" or images.unsplash.com) and credit it in the footer.
 - Every page of content.json is redesigned completely: no page skipped, no section dropped, nothing added.
 - Typography: a clear scale, generous spacing, body text under about 75 characters per line.
-- Motion is minimal: at most a short fade-in as content first appears and a header that turns solid on scroll.
-- Never use: Three.js or WebGL, 3D objects, particles, loading screens, custom cursors, magnetic buttons,
-  marquees, parallax, scroll-jacking or smooth-scroll libraries, pinned or horizontally scrolling sections,
-  text that animates letter by letter, wavy dividers, or oversized pill-shaped navigation.
+- Motion is elegant and purposeful, like award-winning restaurant and brand sites (the skill's
+  references/motion.js is the reference implementation): an opening curtain and hero sequence (photo wipe, headline
+  rising word by word from a mask), weighted smooth scrolling (Lenis), photos that open up and settle as they enter,
+  slow parallax on large photos, statements that brighten word by word, content arriving in sequence, a slow ticker
+  of the business's own words, and curtain page transitions. Never: Three.js/WebGL, 3D objects, particles, custom
+  cursors, magnetic buttons, letter-by-letter typing, wavy dividers, or anything cartoonish.
+- Starting states are set by the script while the curtain covers the page, never by CSS alone, so content is
+  visible if scripts fail; respect prefers-reduced-motion (no curtain, no animation, everything visible).
 - Structure that real customers expect: clear navigation, the most useful information (menu, services,
   hours, phone, booking) within the first two screens, readable price lists, a proper footer.
-- Respect prefers-reduced-motion. Content must be readable if any script fails to load.
 - Responsive from 360px to 1600px wide with no horizontal scrolling; a mobile menu when the navigation does not
   fit. Visible keyboard focus, semantic HTML, alt text, sufficient contrast.
 - Every page shows: a navigation bar with all pages, the page content, a contact block (address, phone, email,
@@ -162,7 +169,7 @@ websites. Build a complete, production-quality concept redesign of the website d
 - Add <meta name="robots" content="noindex, nofollow">.
 
 ## Allowed external resources
-- Scripts: none from outside; a few lines of inline JavaScript only (mobile menu, header, fade-in).
+- Scripts: only the URLs in "libraries" (GSAP, ScrollTrigger, Lenis), plus inline JavaScript.
 - Fonts: fonts.googleapis.com / fonts.gstatic.com.
 - Images: the URLs in content.json and images.unsplash.com.
 - Map: https://www.openstreetmap.org links (an embedded iframe from https://www.openstreetmap.org/export/embed.html is allowed when "map" is set).
