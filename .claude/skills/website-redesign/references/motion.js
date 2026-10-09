@@ -9,7 +9,7 @@
   var $$ = function(s, r){ return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var topOfPage = function(el){ return !!el.closest('.hero, .page-top'); };
 
-  var SEQ = 'main section .disc, main section .muted, main section .sub, main section .ulink, main section .ctas, .info > div, .zig-txt, .dish-card, .svc, .slide, .order .loc, .order .phones, details, .price-list li, table.drinks tr, .tbl-title, .art a, .logos > div, .framed > .disc, .contact > *, .printed > div, .story .ph';
+  var SEQ = 'main section .disc, main section .muted, main section .sub, main section .ulink, main section .ctas, .info > div, .zig-txt, .dish-card, .svc, .slide, .order .loc, .order .phones, details, .price-list li, table.drinks tr, .tbl-title, .art a, .logos > div, .framed > .disc, .contact > *, .printed > div, .story .ph, .foot-cta > div, .foot-grid > *';
   var seq = $$(SEQ).filter(function(el){ return !topOfPage(el) && !el.closest('.cloud-reveal'); });
 
   // Fewer-motion visitors: soft fades only.
@@ -127,6 +127,11 @@
   // The info strip's line draws across; icons glow in.
   $$('.info').forEach(function(s){
     gsap.fromTo(s, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', duration: 1.6, ease: 'expo.inOut', scrollTrigger: { trigger: s, start: 'top 88%', once: true } });
+  });
+
+  // Footer wordmark draws in as you reach the bottom.
+  $$('.wordmark').forEach(function(w){
+    gsap.fromTo(w, { letterSpacing: '0.12em', opacity: 0, y: 60 }, { letterSpacing: '0.01em', opacity: 1, y: 0, ease: 'none', scrollTrigger: { trigger: w, start: 'top bottom', end: 'bottom 85%', scrub: 1 } });
   });
 
   // 7. Everything else arrives in sequence.

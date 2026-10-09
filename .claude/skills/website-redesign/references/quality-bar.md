@@ -57,3 +57,8 @@ Alternate light and dark sections, and photo-led and type-led sections:
 - An info strip with thin gold line icons (locate us, open hours, call ahead), a row of service icons that glow on
   hover, a sliding row of press quotes with arrow controls, and an "Order for pickup" section over a dark photo.
 - Loader with a counter and a thin gold line; curtain page transitions.
+- Footer (the owner asked for a proper one): a call-to-action band (open hours line in large display type with the
+  main action buttons) over a thin gold rule; then four balanced columns: brand (logo, one real line about the
+  business, email), Explore and More link columns (current page in gold), and every location with address, phone,
+  hours and Order / Map links; a huge faint outlined wordmark; a bottom bar with domain, concept + photo credit and a
+  Back to top button. Never one long column of links or a lone email button.
