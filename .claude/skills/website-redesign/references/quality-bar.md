@@ -36,7 +36,9 @@ Alternate light and dark sections, and photo-led and type-led sections:
 - Pill buttons with an arrow that nudges on hover; underline-on-hover nav; subtle image zoom on hover.
 - Motion (references/motion.js): the owner scored the static version 6/10 and asked for "beautiful animation".
   Curtain and hero opening sequence, photo reveals, parallax, word-by-word statements, sequenced
-  content, a slow ticker and curtain page transitions lift it to the expected level. Scrolling stays native: a smooth-scroll library broke scrolling for the owner.
+  content, a slow ticker and curtain page transitions lift it to the expected level. The owner still rated subtle motion 6/10 and asked for "full animation": add
+  scroll-driven set pieces (pinned hero that opens the photo to full screen, a sideways gallery of the signature
+  offer, a circle-burst colour band, a loader counter). Scrolling stays native: a smooth-scroll library broke scrolling for the owner.
 - Every overlay is checked for contrast: image at z-index 0, gradient at 1, text at 2.
 - Check every page on desktop and phone with screenshots before calling it done; fix anything that reads as a
   template.

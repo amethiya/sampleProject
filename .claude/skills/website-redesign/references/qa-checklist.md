@@ -23,6 +23,8 @@
 - [ ] The first screen shows what the business is, where it is and the main action.
 - [ ] Looks like a real, premium business website: no 3D, WebGL, particles, custom cursors or cartoonish effects.
 - [ ] Motion follows references/motion.js: opening sequence, reveals, parallax, word brightening, page transitions.
+- [ ] Previews run sandboxed: never let sessionStorage/localStorage/cookies throw (wrap in try/catch), or the motion
+      script dies with content hidden. Test on the live preview URL, not only a local file.
 - [ ] With scripts blocked, everything is visible; with `prefers-reduced-motion`, nothing animates.
 - [ ] Scroll the whole page once in a browser: nothing is left hidden, and wheel, trackpad, keyboard and touch
       scrolling all work (no smooth-scroll library, no `scroll-behavior: smooth`).
