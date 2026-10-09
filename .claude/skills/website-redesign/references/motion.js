@@ -7,14 +7,7 @@
   var $$ = function(s, r){ return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
   var inHero = function(el){ return !!el.closest('.hero, .page-hero, .page-head'); };
 
-  // Weighted smooth scrolling.
-  var lenis = null;
-  if (window.Lenis) {
-    lenis = new Lenis({ lerp: 0.1, wheelMultiplier: 0.9 });
-    lenis.on('scroll', ScrollTrigger.update);
-    gsap.ticker.add(function(t){ lenis.raf(t * 1000); });
-    gsap.ticker.lagSmoothing(0);
-  }
+  // Native scrolling on purpose: smooth-scroll libraries can make trackpad and touch scrolling stick.
 
   // Split headings into masked words (hero titles are split in the HTML already).
   $$('main h2, .togo .big').forEach(function(h){

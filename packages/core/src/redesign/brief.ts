@@ -5,11 +5,10 @@ import { applyDna, themeCategory } from "./render";
 import type { DesignDna } from "./styles";
 import { THEMES, photoUrl } from "./themes";
 
-/** External scripts Claude may load: GSAP + ScrollTrigger and Lenis for refined, award-style motion. */
+/** External scripts Claude may load: GSAP + ScrollTrigger for refined, award-style motion (native scrolling). */
 export const LIBRARIES: Record<string, string> = {
   gsap: "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js",
   scrollTrigger: "https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js",
-  lenis: "https://cdn.jsdelivr.net/npm/lenis@1.1.13/dist/lenis.min.js",
 };
 
 /**
@@ -152,10 +151,12 @@ websites. Build a complete, production-quality concept redesign of the website d
 - Typography: a clear scale, generous spacing, body text under about 75 characters per line.
 - Motion is elegant and purposeful, like award-winning restaurant and brand sites (the skill's
   references/motion.js is the reference implementation): an opening curtain and hero sequence (photo wipe, headline
-  rising word by word from a mask), weighted smooth scrolling (Lenis), photos that open up and settle as they enter,
+  rising word by word from a mask), photos that open up and settle as they enter,
   slow parallax on large photos, statements that brighten word by word, content arriving in sequence, a slow ticker
   of the business's own words, and curtain page transitions. Never: Three.js/WebGL, 3D objects, particles, custom
   cursors, magnetic buttons, letter-by-letter typing, wavy dividers, or anything cartoonish.
+- Keep native scrolling: no smooth-scroll libraries and no CSS scroll-behavior: smooth (they make trackpad and
+  touch scrolling stick).
 - Starting states are set by the script while the curtain covers the page, never by CSS alone, so content is
   visible if scripts fail; respect prefers-reduced-motion (no curtain, no animation, everything visible).
 - Structure that real customers expect: clear navigation, the most useful information (menu, services,
@@ -169,7 +170,7 @@ websites. Build a complete, production-quality concept redesign of the website d
 - Add <meta name="robots" content="noindex, nofollow">.
 
 ## Allowed external resources
-- Scripts: only the URLs in "libraries" (GSAP, ScrollTrigger, Lenis), plus inline JavaScript.
+- Scripts: only the URLs in "libraries" (GSAP, ScrollTrigger), plus inline JavaScript.
 - Fonts: fonts.googleapis.com / fonts.gstatic.com.
 - Images: the URLs in content.json and images.unsplash.com.
 - Map: https://www.openstreetmap.org links (an embedded iframe from https://www.openstreetmap.org/export/embed.html is allowed when "map" is set).
