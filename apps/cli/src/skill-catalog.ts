@@ -1,38 +1,29 @@
-/** Writes the skill's blueprint catalogue from packages/core/src/redesign/blueprints.ts: `npm run skill:catalog`. */
+/**
+ * Writes the skill's design-system references from packages/core/src/redesign/system.ts: `npm run skill:catalog`.
+ * themes.md, trades.md, system.css, base.js and motion.js are generated; never edit them by hand.
+ */
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { BLUEPRINTS, SKILL_DIR } from "@rr/core";
-
-const SECTIONS: Record<string, string> = {
-  restaurant: "Restaurants", cafe: "Cafés and bakeries", gym: "Gyms and studios", salon: "Salons and beauty",
-  clothing: "Clothing and fashion", retail: "Retail shops", healthcare: "Healthcare", accounting: "Accounting and finance",
-  import_export: "Import and export", services: "Local services",
-};
+import { LOOKS, SKILL_DIR, SYSTEM_BASE_JS, SYSTEM_CSS, SYSTEM_MOTION_JS, TRADE_PROMPTS, lookVars } from "@rr/core";
 
 const root = resolve(fileURLToPath(import.meta.url), "../../../..");
-let md = `# Layout templates
+const ref = (f: string) => resolve(root, SKILL_DIR, "references", f);
+const note = "Generated from packages/core/src/redesign/system.ts by `npm run skill:catalog`. Do not edit by hand.";
 
-Generated from \`packages/core/src/redesign/blueprints.ts\` by \`npm run skill:catalog\`. Do not edit by hand.
+let themes = `# Themes\n\n${note}\n\nEvery site gets one theme in \`content.json → designDirection.theme\`. Use its colours and fonts exactly; the\nstarter pages already contain its CSS variables. Navy leads for most trades; themes rotate so neighbours differ.\n\n`;
+themes += "| Theme | Mode | Background | Text | Accent | Fonts |\n|---|---|---|---|---|---|\n";
+for (const l of LOOKS) themes += `| ${l.name} (\`${l.id}\`) | ${l.dark ? "dark" : "light"} | ${l.bg} | ${l.text} | ${l.accent} / ${l.accent2} | ${l.display.split(",")[0]} + ${l.body.split(",")[0]} |\n`;
+themes += "\n## CSS variables per theme\n\n";
+for (const l of LOOKS) themes += `### ${l.name}\n\n\`\`\`css\n${lookVars(l).replace(/;/g, ";\n  ").replace("{", "{\n  ")}\n\`\`\`\n\n`;
+writeFileSync(ref("themes.md"), themes);
 
-Every redesign is assigned one template in \`content.json → designDirection.layoutTemplate\`, chosen from the
-business's category and words in its name and content (pizza, dental, barber…) and rotated so consecutive
-redesigns differ. Follow its hero layout, mood and home-page sections, filling every section with the site's own
-content. Pattern numbers refer to [patterns.md](patterns.md).
-
-`;
-for (const [cat, label] of Object.entries(SECTIONS)) {
-  const list = BLUEPRINTS.filter((b) => b.categories[0] === cat);
-  if (!list.length) continue;
-  md += `## ${label}\n\n`;
-  for (const b of list) {
-    md += `### ${b.name} (\`${b.id}\`)\n`;
-    md += `- **For:** ${b.categories.join(", ")}${b.keywords.length ? `; picked first when the site mentions ${b.keywords.map((k) => `"${k}"`).join(", ")}` : ""}\n`;
-    md += `- **Hero and mood:** ${b.hero}, ${b.mood}\n`;
-    md += `- **First impression:** ${b.signature}\n`;
-    md += `- **Home page:** ${b.beats.map((x, i) => `${i + 1}. ${x}`).join(" ")}\n`;
-    md += `- **Patterns:** ${b.patterns.join(", ")}\n\n`;
-  }
+let trades = `# Trade prompts\n\n${note}\n\n\`content.json → designDirection.trade\` carries the prompt for this business. Follow it for the hero image,\nimagery, how the content maps onto the sections, and tone.\n\n`;
+for (const [id, p] of Object.entries(TRADE_PROMPTS)) {
+  trades += `## ${id.replace("_", " ")}\n\n- **Hero:** ${p.hero}\n- **Imagery:** ${p.imagery}\n- **Sections:** ${p.sections}\n- **Tone:** ${p.tone}\n\n`;
 }
-writeFileSync(resolve(root, SKILL_DIR, "references/blueprints.md"), md);
-console.log(`Wrote ${BLUEPRINTS.length} blueprints to ${SKILL_DIR}/references/blueprints.md`);
+writeFileSync(ref("trades.md"), trades);
+writeFileSync(ref("system.css"), `/* ${note} Theme variables (:root) come first; see themes.md. */\n${SYSTEM_CSS}`);
+writeFileSync(ref("base.js"), `// ${note}\n${SYSTEM_BASE_JS}\n`);
+writeFileSync(ref("motion.js"), `// ${note}\n${SYSTEM_MOTION_JS}\n`);
+console.log(`Wrote themes.md (${LOOKS.length} themes), trades.md, system.css, base.js, motion.js to ${SKILL_DIR}/references`);

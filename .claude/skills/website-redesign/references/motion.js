@@ -1,3 +1,4 @@
+// Generated from packages/core/src/redesign/system.ts by `npm run skill:catalog`. Do not edit by hand.
 (function(){
   var d = document.documentElement;
   var cur = document.querySelector('.curtain');
@@ -29,17 +30,19 @@
       h.appendChild(g);
     }
   });
+  var transparent = function(c){ return c.replace(/rgba?\(([^)]+)\)/, function(_, v){ var p = v.split(','); return 'rgba(' + p[0] + ',' + p[1] + ',' + p[2] + ',0)'; }); };
+  $$('.echo').forEach(function(h){ h.dataset.color = getComputedStyle(h).color; });
   var echoIn = function(h, delay){
     var tl = gsap.timeline({ delay: delay || 0 });
     var ghosts = $$('.ghost', h);
     tl.fromTo(ghosts, { y: function(i, el){ return (el.dataset.i * 0.42) + 'em'; }, opacity: 0.9 }, { y: 0, opacity: 0, duration: 1.3, ease: 'expo.out', stagger: 0.06 }, 0)
-      .fromTo(h, { color: 'rgba(236,230,218,0)' }, { color: 'rgba(236,230,218,1)', duration: 0.9, ease: 'power2.out' }, 0.35);
+      .fromTo(h, { color: transparent(h.dataset.color) }, { color: h.dataset.color, duration: 0.9, ease: 'power2.out', clearProps: 'color' }, 0.35);
     return tl;
   };
 
   // Starting states while the curtain still covers the page.
   gsap.set(seq, { opacity: 0, y: 34 });
-  $$('.echo').forEach(function(h){ gsap.set(h, { color: 'rgba(236,230,218,0)' }); gsap.set($$('.ghost', h), { opacity: 0 }); });
+  $$('.echo').forEach(function(h){ gsap.set(h, { color: transparent(h.dataset.color) }); gsap.set($$('.ghost', h), { opacity: 0 }); });
   gsap.set('.hero .disc, .hero .sub, .hero .muted, .hero .ctas, .page-top .disc, .page-top .muted, .page-top .btn, .page-top p', { opacity: 0, y: 24 });
   gsap.set('.plate-stage .plate', { opacity: 0, rotate: -120, scale: 0.7 });
   gsap.set('.plate-stage .dust', { opacity: 0, scale: 0.6, rotate: -30 });
@@ -151,3 +154,4 @@
   addEventListener('pageshow', function(ev){ if (ev.persisted && cur) gsap.set(cur, { yPercent: -100 }); });
   addEventListener('load', function(){ ScrollTrigger.refresh(); });
 })();
+

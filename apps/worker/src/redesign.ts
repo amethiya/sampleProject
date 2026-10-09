@@ -1,5 +1,5 @@
 import {
-  BLUEPRINTS, DNA_VERSION, auditCandidate, blueprintById, categoryById, crawlSite, dnaFromKey, hostId, normalizeWebsite, pickDna, renderSitePage, snapshotFromLead,
+  LOOKS, auditCandidate, categoryById, lookById, makeDna, crawlSite, dnaFromKey, hostId, normalizeWebsite, pickDna, renderSitePage, snapshotFromLead,
   type DesignDna, type Lead, type SiteSnapshot,
 } from "@rr/core";
 
@@ -48,25 +48,25 @@ function siteText(lead: Lead, site: SiteSnapshot | null): string {
     .slice(0, 20000);
 }
 
-/** The site's DNA, assigning one that differs from recent redesigns the first time it is rendered. */
+/** The site's DNA (theme + trade), assigning one that differs from recent redesigns the first time it is rendered. */
 async function ensureDna(env: Db, id: string, lead: Lead, style: string | null, site: SiteSnapshot | null): Promise<DesignDna> {
   const existing = style ? dnaFromKey(style) : null;
-  if (existing?.blueprint && style!.split("|")[6] === DNA_VERSION) return existing;
-  const fresh = pickDna(id, lead.category, await recentStyles(env), siteText(lead, site));
-  // Looks stored before the current templates get a complete new look (layout, mood and colours belong together).
-  const dna = fresh;
+  if (existing) return existing;
+  const dna = pickDna(id, lead.category, await recentStyles(env), siteText(lead, site));
   await env.DB.prepare("UPDATE sites SET style = ?, styled_at = datetime('now') WHERE id = ?").bind(dna.key, id).run();
   return dna;
 }
 
-/** Replace the scene blueprint in a DNA key. */
-function withBlueprint(key: string, blueprint: string): string {
-  return [...key.split("|").slice(0, 5), blueprint, DNA_VERSION].join("|");
+/** A DNA with a chosen theme, keeping the trade. */
+function withTheme(key: string, theme: string): string {
+  const d = dnaFromKey(key);
+  const look = lookById(theme);
+  return d && look ? makeDna(look, d.trade).key : key;
 }
 
 export function describeDna(key: string): string {
   const d = dnaFromKey(key);
-  return d ? `${d.concept.name} concept, ${d.hero} hero, ${d.palette.id} palette, ${d.fonts.id} type${d.blueprint ? `, "${d.blueprint.name}" layout` : ""}` : key;
+  return d ? `${d.look.name} theme, designed as ${d.trade.replace("_", " ")}` : key;
 }
 
 /** Crawl the whole site once and keep it; later previews and Claude jobs reuse the snapshot. */
@@ -157,7 +157,7 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
   const path = url.pathname.replace(/\/+$/, "");
   const m = req.method;
 
-  const lm = path.match(/^\/api\/leads\/([^/]+)\/(redesign|crawl)$/);
+  const lm = path.match(/^\/api\/leads\/([^/]+)\/(redesign|crawl|restyle)$/);
   if (lm) {
     const id = decodeURIComponent(lm[1]);
     const data = await loadLead(env, id);
@@ -171,8 +171,8 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
       return json(await status(env, id, data.site));
     }
     if (lm[2] === "redesign" && m === "POST") {
-      // Body (all optional): notes for Claude, a template (blueprint id), and whether to improve the last version.
-      const body = (await req.json().catch(() => ({}))) as { notes?: string; blueprint?: string; mode?: string };
+      // Body (all optional): notes for Claude, a theme id, and whether to improve the last version.
+      const body = (await req.json().catch(() => ({}))) as { notes?: string; theme?: string; mode?: string };
       const notes = (body.notes ?? "").trim().slice(0, 4000) || null;
       const site = await ensureSite(env, id, data.lead, data.site);
       const active = await env.DB.prepare("SELECT id FROM redesign_jobs WHERE lead_id = ? AND status IN ('queued', 'running')").bind(id).first();
@@ -181,7 +181,7 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
       const hasPages = await env.DB.prepare("SELECT 1 FROM ai_pages WHERE lead_id = ? LIMIT 1").bind(id).first();
       const mode = body.mode === "revise" && hasPages ? "revise" : "fresh";
       let key: string;
-      if (mode === "revise" && lastDone?.style) {
+      if (mode === "revise" && lastDone?.style && dnaFromKey(lastDone.style)) {
         key = lastDone.style; // same look, refined with the notes
       } else {
         // A new look every time: avoid recent redesigns, including this site's current ones.
@@ -190,26 +190,19 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
         if (lastDone?.style) recent.unshift(lastDone.style);
         key = pickDna(`${id}:${Date.now()}`, data.lead.category, recent, siteText(data.lead, site)).key;
       }
-      if (body.blueprint && blueprintById(body.blueprint)) key = withBlueprint(key, body.blueprint);
+      if (body.theme && lookById(body.theme)) key = withTheme(key, body.theme);
       await env.DB.prepare("INSERT INTO redesign_jobs (lead_id, style, notes, mode) VALUES (?, ?, ?, ?)").bind(id, key, notes, mode).run();
       return json(await status(env, id, site));
     }
-    // Instant: give the template redesign a new look (optionally a chosen template). No runner needed.
+    // Instant: give the redesign a new theme (a chosen one, or the next one that suits the trade). No runner needed.
     if (lm[2] === "restyle" && m === "POST") {
-      const body = (await req.json().catch(() => ({}))) as { blueprint?: string };
+      const body = (await req.json().catch(() => ({}))) as { theme?: string };
       const site = await ensureSite(env, id, data.lead, data.site);
       const recent = await recentStyles(env);
       if (data.style) recent.unshift(data.style);
-      let dna = pickDna(`${id}:${Date.now()}`, data.lead.category, recent, siteText(data.lead, site));
-      let key = dna.key;
-      if (body.blueprint && blueprintById(body.blueprint)) key = withBlueprint(key, body.blueprint);
-      else if (data.style && dnaFromKey(data.style)?.blueprint?.id === dna.blueprint?.id) {
-        // "Surprise me" should change the 3D scene too, not only colours and type.
-        const other = BLUEPRINTS.filter((b) => b.categories.includes(data.lead.category) && b.id !== dna.blueprint?.id);
-        if (other.length) key = withBlueprint(key, other[Date.now() % other.length].id);
-      }
-      dna = dnaFromKey(key)!;
-      await env.DB.prepare("UPDATE sites SET style = ?, styled_at = datetime('now') WHERE id = ?").bind(dna.key, id).run();
+      let key = pickDna(`${id}:${Date.now()}`, data.lead.category, recent, siteText(data.lead, site)).key;
+      if (body.theme && lookById(body.theme)) key = withTheme(key, body.theme);
+      await env.DB.prepare("UPDATE sites SET style = ?, styled_at = datetime('now') WHERE id = ?").bind(key, id).run();
       return json(await status(env, id, site));
     }
   }
@@ -313,9 +306,9 @@ async function status(env: Db, id: string, site: SiteSnapshot | null) {
   const style = await env.DB.prepare("SELECT style FROM sites WHERE id = ?").bind(id).first<{ style: string | null }>();
   const done = await env.DB.prepare("SELECT style FROM redesign_jobs WHERE lead_id = ? AND status = 'done' ORDER BY id DESC LIMIT 1").bind(id).first<{ style: string | null }>();
   return {
-    templateBlueprint: style?.style ? dnaFromKey(style.style)?.blueprint?.id ?? null : null,
-    claudeBlueprint: done?.style ? dnaFromKey(done.style)?.blueprint?.id ?? null : null,
-    blueprints: BLUEPRINTS.map((b) => ({ id: b.id, name: b.name, categories: b.categories, hero: b.hero, mood: b.mood })),
+    templateTheme: style?.style ? dnaFromKey(style.style)?.look.id ?? null : null,
+    claudeTheme: done?.style ? dnaFromKey(done.style)?.look.id ?? null : null,
+    themes: LOOKS.map((l) => ({ id: l.id, name: l.name, dark: l.dark, bg: l.bg, accent: l.accent })),
     templateStyle: style?.style ? describeDna(style.style) : null,
     claudeStyle: (job as { style?: string } | null)?.style ? describeDna((job as { style: string }).style) : null,
     crawledAt: site?.crawledAt ?? null,

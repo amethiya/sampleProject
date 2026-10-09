@@ -241,7 +241,7 @@ export default function Dashboard() {
           <a className="nav-item active" aria-current={route ? undefined : "page"} {...linkProps("/app")} onClickCapture={() => setMenu(false)}><Icon d={I.leads} />Leads</a>
           <button className="nav-item" onClick={() => { setPanel("sheet"); setMenu(false); }}><Icon d={I.sheet} />Google Sheet</button>
           <button className="nav-item" onClick={exportCsv}><Icon d={I.download} />Export CSV</button>
-          <a className="nav-item" href="/templates" target="_blank" rel="noreferrer"><Icon d={I.external} />Templates</a>
+          <a className="nav-item" href="/themes" target="_blank" rel="noreferrer"><Icon d={I.external} />Themes</a>
           <a className="nav-item" href="/" target="_blank" rel="noreferrer"><Icon d={I.external} />Public page</a>
         </nav>
         <div className="side-foot">
@@ -498,13 +498,13 @@ function AuditTab({ lead }: { lead: LeadRow }) {
   );
 }
 
-interface BlueprintInfo { id: string; name: string; categories: string[]; hero: string; mood: string }
+interface ThemeInfo { id: string; name: string; dark: boolean; bg: string; accent: string }
 interface RedesignStatus {
   templateStyle: string | null;
   claudeStyle: string | null;
-  templateBlueprint: string | null;
-  claudeBlueprint: string | null;
-  blueprints: BlueprintInfo[];
+  templateTheme: string | null;
+  claudeTheme: string | null;
+  themes: ThemeInfo[];
   crawledAt: string | null;
   pages: { slug: string; label: string; url: string }[];
   job: { id: number; status: "queued" | "running" | "done" | "failed"; error: string | null; notes: string | null; mode: string; createdAt: string; startedAt: string | null; finishedAt: string | null } | null;
@@ -514,16 +514,14 @@ interface RedesignStatus {
 type View = "original" | "template" | "claude";
 
 /** Template picker: this business type first, then everything else. */
-function TemplateSelect({ value, onChange, blueprints, category, first, label }: { value: string; onChange(v: string): void; blueprints: BlueprintInfo[]; category: string; first: { value: string; label: string }[]; label: string }) {
-  const mine = blueprints.filter((b) => b.categories.includes(category));
-  const rest = blueprints.filter((b) => !b.categories.includes(category));
+/** Theme picker for redesigns. */
+function ThemeSelect({ value, onChange, themes, first, label }: { value: string; onChange(v: string): void; themes: ThemeInfo[]; first: { value: string; label: string }[]; label: string }) {
   return (
     <label className="field">
       <span>{label}</span>
       <select value={value} onChange={(e) => onChange(e.target.value)}>
         {first.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        <optgroup label={`For ${CATEGORY_LABELS[category] ?? category}`}>{mine.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</optgroup>
-        <optgroup label="Other templates">{rest.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</optgroup>
+        <optgroup label="Themes">{themes.map((t) => <option key={t.id} value={t.id}>{t.name}{t.dark ? "" : " (light)"}</option>)}</optgroup>
       </select>
     </label>
   );
@@ -567,7 +565,7 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
   const restyle = async () => {
     setBusy("restyle"); setMsg("");
     try {
-      setSt(await api<RedesignStatus>(`${base}/restyle`, { method: "POST", body: JSON.stringify({ blueprint: look === "auto" ? undefined : look }) }));
+      setSt(await api<RedesignStatus>(`${base}/restyle`, { method: "POST", body: JSON.stringify({ theme: look === "auto" ? undefined : look }) }));
       setView("template"); setRev((r) => r + 1); onChanged();
     } catch (e) { onError(e); }
     setBusy("");
@@ -578,7 +576,7 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
     try {
       setSt(await api<RedesignStatus>(`${base}/redesign`, {
         method: "POST",
-        body: JSON.stringify({ notes: notes.trim() || undefined, mode: hasClaude ? mode : "fresh", blueprint: claudeTemplate === "keep" || claudeTemplate === "auto" ? undefined : claudeTemplate }),
+        body: JSON.stringify({ notes: notes.trim() || undefined, mode: hasClaude ? mode : "fresh", theme: claudeTemplate === "keep" || claudeTemplate === "auto" ? undefined : claudeTemplate }),
       }));
       setNotes(""); setMsg("Sent. Claude picks it up as soon as your Mac runner or a cloud session is running.");
       onChanged();
@@ -611,7 +609,7 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
     : <iframe key={src(v)} src={src(v)} title={`${v === "claude" ? "Claude" : "Instant"} redesign of ${lead.name}`} />;
   const label = (v: View) => (v === "original" ? "Current site" : v === "claude" ? "Claude redesign" : "Instant redesign");
   const job = st.job;
-  const bpName = (id: string | null) => st.blueprints.find((b) => b.id === id)?.name;
+  const bpName = (id: string | null) => st.themes.find((b) => b.id === id)?.name;
   const firstBp = (id: string | null) => (id && bpName(id) ? [{ value: "keep", label: `Keep: ${bpName(id)}` }] : []);
 
   return (
@@ -642,12 +640,12 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
       <section className="callout">
         <div>
           <h3>Instant redesign</h3>
-          <p className="muted small">Built by Revamp Radar on Cloudflare in a second, from the site's own text and photos. Doesn't need your Mac.{st.templateBlueprint && ` Now: ${bpName(st.templateBlueprint)}.`}</p>
+          <p className="muted small">Built by Revamp Radar on Cloudflare in a second, from the site's own text and photos. Doesn't need your Mac.{st.templateTheme && ` Now: ${bpName(st.templateTheme)}.`}</p>
         </div>
-        <TemplateSelect label="Template" value={look} onChange={setLook} blueprints={st.blueprints} category={lead.category} first={[{ value: "auto", label: "Surprise me (new layout and colours)" }]} />
+        <ThemeSelect label="Theme" value={look} onChange={setLook} themes={st.themes} first={[{ value: "auto", label: "Next theme for this trade" }]} />
         <div className="row-actions">
           <button className="btn" onClick={restyle} disabled={!!busy}>{busy === "restyle" ? "Applying…" : "Apply new look"}</button>
-          <a className="text-link small" href="/templates" target="_blank" rel="noreferrer">See all templates</a>
+          <a className="text-link small" href="/themes" target="_blank" rel="noreferrer">See all themes</a>
         </div>
       </section>
 
@@ -659,7 +657,7 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
             <div className={`job job-${job.status}`} role="status">
               {job.status === "queued" && "Queued. Waiting for your Mac runner or a cloud session to pick it up."}
               {job.status === "running" && `Claude is building the site (started ${new Date(job.startedAt + "Z").toLocaleTimeString()}).`}
-              {job.status === "done" && `Claude version ready: ${st.claudePages.length} pages${st.claudeBlueprint ? `, ${bpName(st.claudeBlueprint)}` : ""}.`}
+              {job.status === "done" && `Claude version ready: ${st.claudePages.length} pages${st.claudeTheme ? `, ${bpName(st.claudeTheme)}` : ""}.`}
               {job.status === "failed" && `Last attempt didn't finish: ${job.error ?? "unknown error"}`}
               {job.notes && <p className="muted small job-notes">Your notes{job.mode === "revise" ? " (improving the previous version)" : ""}: “{job.notes}”</p>}
             </div>
@@ -676,10 +674,10 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
             <label className="field">
               <span>What should Claude change? <span className="muted">(optional)</span></span>
               <textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={4000}
-                placeholder="For example: darker and more premium, bigger food photos at the top, make the menu easier to read, show opening hours higher up, use the Chef's table layout." />
+                placeholder="For example: darker and more premium, bigger food photos at the top, make the menu easier to read, show opening hours higher up, use the Midnight Navy theme." />
             </label>
-            <TemplateSelect label="Template" value={claudeTemplate} onChange={setClaudeTemplate} blueprints={st.blueprints} category={lead.category}
-              first={[...(st.claudePages.length && mode === "revise" ? firstBp(st.claudeBlueprint) : []), { value: "auto", label: "Choose automatically" }]} />
+            <ThemeSelect label="Theme" value={claudeTemplate} onChange={setClaudeTemplate} themes={st.themes}
+              first={[...(st.claudePages.length && mode === "revise" ? firstBp(st.claudeTheme) : []), { value: "auto", label: "Choose automatically" }]} />
           </>
         )}
         <div className="row-actions">

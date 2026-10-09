@@ -9,7 +9,7 @@
     "directory": "../dashboard/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/preview/*", "/img", "/templates", "/templates/*"]
+    "run_worker_first": ["/api/*", "/preview/*", "/img", "/templates", "/templates/*", "/themes", "/themes/*"]
   },
   "d1_databases": [
     // Run `npx wrangler d1 create revamp-radar` and paste the returned database_id here.

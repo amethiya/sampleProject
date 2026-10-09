@@ -26,7 +26,7 @@ export default {
     try {
       if (url.pathname.startsWith("/preview/")) return await preview(req, url, env);
       if (url.pathname === "/img") return await imageProxy(req, url, env, ctx);
-      if (url.pathname === "/templates" || url.pathname.startsWith("/templates/")) return templates(url);
+      if (/^\/(templates|themes)(\/|$)/.test(url.pathname)) return templates(url);
       if (url.pathname.startsWith("/api/")) {
         if (url.pathname === "/api/login" && req.method === "POST") return await login(req, env);
         if (url.pathname === "/api/logout" && req.method === "POST") return logout();

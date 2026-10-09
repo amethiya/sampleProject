@@ -148,7 +148,10 @@ export function slugFor(url: string): string {
     .normalize("NFKD")
     .replace(/[^\w]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return raw.slice(-48) || "home";
+  if (raw.length <= 48) return raw || "home";
+  // Long nested paths: keep the most specific part, cut at a word boundary.
+  const last = raw.split("-").reduceRight((acc, w) => (acc.length + w.length + 1 <= 48 ? (acc ? `${w}-${acc}` : w) : acc), "");
+  return last || raw.slice(0, 48);
 }
 
 function internalLinks(root: HTMLElement, base: string): { url: string; label: string }[] {

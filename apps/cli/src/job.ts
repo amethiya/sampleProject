@@ -3,7 +3,7 @@
  *
  *   npm run job -- fetch --url example.com --category restaurant [--city Vienna]   add a website and claim its job
  *   npm run job -- fetch --lead example.com                                          claim the job for a known lead
- *        [--notes "what to change"] [--revise] [--template burger-stack]           (with --lead or --url)
+ *        [--notes "what to change"] [--revise] [--theme midnight-navy]           (with --lead or --url)
  *   npm run job -- fetch                                                             claim the oldest queued job
  *   npm run job -- upload jobs/<id>                                                  upload jobs/<id>/site/*.html
  *   npm run job -- fail jobs/<id> --reason "..."                                     give the job back as failed
@@ -13,7 +13,7 @@
 import { cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
-import { SKILL_DIR, briefContent, jobBrief, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
+import { SKILL_DIR, briefContent, jobBrief, dnaFromKey, writeStarter, type Lead, type SiteSnapshot } from "@rr/core";
 
 const { values: args, positionals } = parseArgs({
   allowPositionals: true,
@@ -25,7 +25,7 @@ const { values: args, positionals } = parseArgs({
     reason: { type: "string", default: "Abandoned" },
     notes: { type: "string" },
     revise: { type: "boolean", default: false },
-    template: { type: "string" },
+    theme: { type: "string" },
   },
 });
 
@@ -64,7 +64,7 @@ async function fetchJob() {
   }
   if (leadId) {
     // Queue a job (ignored when one is already queued, e.g. from the admin portal with its own notes).
-    await call(`/api/leads/${encodeURIComponent(leadId)}/redesign`, { notes: args.notes, mode: args.revise ? "revise" : "fresh", blueprint: args.template })
+    await call(`/api/leads/${encodeURIComponent(leadId)}/redesign`, { notes: args.notes, mode: args.revise ? "revise" : "fresh", theme: args.theme })
       .catch((e: Error) => { if (!/ 409 /.test(e.message)) throw e; });
   }
   const next = await call<NextJob>("/api/redesign-jobs/next", leadId ? { leadId } : {});
@@ -79,10 +79,13 @@ async function fetchJob() {
   const previous = await writePrevious(dir, next.previous ?? []);
   await writeFile(join(dir, "BRIEF.md"), jobBrief(next.job, previous));
   await writeFile(join(dir, "content.json"), JSON.stringify(briefContent(next.lead, next.site, dna, next.avoid ?? []), null, 2));
+  // The design-system version of every page: Claude starts from it and makes it better.
+  await mkdir(join(dir, "starter"), { recursive: true });
+  for (const f of writeStarter(next.lead, next.site, dna)) await writeFile(join(dir, "starter", f.file), f.html);
   if (next.job.notes) console.log(`Owner's notes: ${next.job.notes}`);
   await writeFile(join(dir, "job.json"), JSON.stringify({ id: next.job.id, leadId: next.job.leadId, preview: `${base}/preview/${encodeURIComponent(next.job.leadId)}/` }, null, 2));
-  console.log(`Job ${next.job.id}: ${next.lead.name}, ${next.site.pages.length} pages${dna ? `, ${dna.concept.name} concept` : ""}.`);
-  console.log(`Next: use the website-redesign skill (${dir}/skill/SKILL.md), read BRIEF.md and content.json, write the pages into ${dir}/site/, then run`);
+  console.log(`Job ${next.job.id}: ${next.lead.name}, ${next.site.pages.length} pages${dna ? `, ${dna.look.name} theme` : ""}.`);
+  console.log(`Next: use the website-redesign skill (${dir}/skill/SKILL.md), read BRIEF.md, content.json and the pages in starter/, write the pages into ${dir}/site/, then run`);
   console.log(`  npm run job -- upload jobs/${next.job.id}`);
 }
 

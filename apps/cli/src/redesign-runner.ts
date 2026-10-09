@@ -17,7 +17,7 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
-import { RUNNER_PROMPT, SKILL_DIR, briefContent, jobBrief, dnaFromKey, type Lead, type SiteSnapshot } from "@rr/core";
+import { RUNNER_PROMPT, SKILL_DIR, briefContent, jobBrief, dnaFromKey, writeStarter, type Lead, type SiteSnapshot } from "@rr/core";
 
 const skillSource = resolve(fileURLToPath(import.meta.url), "../../../..", SKILL_DIR);
 
@@ -139,7 +139,7 @@ async function processJob({ job, lead, site, avoid = [], previous = [] }: NextJo
   if (!job || !lead || !site) return;
   const started = Date.now();
   const dna = job.style ? dnaFromKey(job.style) ?? undefined : undefined;
-  console.log(`\n▶ Job ${job.id}: ${lead.name} (${site.pages.length} pages)${dna ? `, ${dna.concept.name} / ${dna.palette.id} / ${dna.fonts.id}` : ""}`);
+  console.log(`\n▶ Job ${job.id}: ${lead.name} (${site.pages.length} pages)${dna ? `, ${dna.look.name} theme, designed as ${dna.trade}` : ""}`);
   const dir = await mkdtemp(join(tmpdir(), `rr-${job.id}-`));
   try {
     // Every redesign uses the website-redesign skill: give it to Claude both as files and as a project skill.
@@ -152,6 +152,9 @@ async function processJob({ job, lead, site, avoid = [], previous = [] }: NextJo
       await Promise.all(previous.map((p, i) => writeFile(join(dir, "previous", prevFiles[i]), p.html)));
     }
     await writeFile(join(dir, "BRIEF.md"), jobBrief(job, prevFiles));
+    // The design-system version of every page: Claude starts from it and makes it better.
+    await mkdir(join(dir, "starter"), { recursive: true });
+    for (const f of writeStarter(lead, site, dna)) await writeFile(join(dir, "starter", f.file), f.html);
     if (job.notes || previous.length) console.log(`  ${previous.length ? "Revising the previous version" : "New design"}${job.notes ? `; notes: ${job.notes.slice(0, 200)}` : ""}`);
     await writeFile(join(dir, "content.json"), JSON.stringify(briefContent(lead, site, dna, avoid), null, 2));
     current = { jobId: job.id, child: null };
