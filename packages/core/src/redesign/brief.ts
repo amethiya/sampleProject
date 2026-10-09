@@ -8,6 +8,44 @@ import { THEMES, photoUrl } from "./themes";
 /** External scripts Claude may load. None: the few lines of JavaScript a professional site needs are inline. */
 export const LIBRARIES: Record<string, string> = {};
 
+/**
+ * Visual styles the skill can build with. Each site gets one primary style (plus at most one accent from the
+ * same family), chosen from what suits its trade and rotated so neighbouring redesigns differ.
+ */
+export const VISUAL_STYLES: Record<string, string> = {
+  minimalism: "Minimalism: lots of white space, a strict grid, few colours, typography does the work.",
+  "bento-grid": "Bento grid: content in a tidy grid of differently sized tiles (photo, hours, a list, a quote from the site).",
+  glassmorphism: "Glassmorphism: frosted translucent panels (backdrop-filter blur) over large photos, used for the header and hero card only.",
+  "liquid-glass": "Liquid glass: a floating translucent pill header and soft highlights over full-bleed photography, Apple-like and restrained.",
+  neumorphism: "Neumorphism: soft extruded surfaces in one light tone, for cards and controls; keep text contrast high.",
+  claymorphism: "Claymorphism: rounded, soft-shadowed pastel cards; friendly and playful (cafés, bakeries, kids, pets).",
+  skeuomorphism: "Skeuomorphism: real-world material cues (paper menu card, chalkboard, stitched label) used sparingly on one element.",
+  brutalism: "Brutalism: raw, bold, high-contrast blocks, thick borders, oversized type; for confident, edgy brands.",
+  maximalism: "Maximalism: rich colour, layered photography and big type; for fashion, art and nightlife.",
+  "spatial-ui": "Spatial UI: layered cards with depth (soft shadows, overlap) that feel like panels floating in space.",
+};
+
+const STYLES_BY_CATEGORY: Record<string, string[]> = {
+  restaurant: ["bento-grid", "minimalism", "glassmorphism", "skeuomorphism", "maximalism"],
+  cafe: ["claymorphism", "bento-grid", "minimalism", "skeuomorphism"],
+  gym: ["brutalism", "bento-grid", "liquid-glass", "spatial-ui"],
+  salon: ["minimalism", "glassmorphism", "neumorphism", "liquid-glass"],
+  clothing: ["maximalism", "minimalism", "brutalism", "bento-grid"],
+  retail: ["bento-grid", "claymorphism", "minimalism", "spatial-ui"],
+  healthcare: ["minimalism", "neumorphism", "bento-grid", "liquid-glass"],
+  accounting: ["minimalism", "bento-grid", "spatial-ui", "glassmorphism"],
+  import_export: ["minimalism", "bento-grid", "spatial-ui", "brutalism"],
+  services: ["minimalism", "bento-grid", "liquid-glass", "spatial-ui"],
+};
+
+/** One visual style per design, fixed by the design key so a job always gets the same answer. */
+export function visualStyle(category: string, key = ""): string {
+  const list = STYLES_BY_CATEGORY[category] ?? Object.keys(VISUAL_STYLES);
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return list[h % list.length];
+}
+
 /** The data file handed to Claude: everything it may use, nothing else. */
 export function briefContent(lead: Lead, site: SiteSnapshot, dna?: DesignDna, avoid: string[] = []) {
   const t = applyDna(THEMES[themeCategory(lead.category, dna)], dna);
@@ -43,6 +81,7 @@ export function briefContent(lead: Lead, site: SiteSnapshot, dna?: DesignDna, av
       googleFontsQuery: t.fonts,
       displayFont: t.display,
       bodyFont: t.body,
+      visualStyle: (() => { const id = visualStyle(themeCategory(lead.category, dna), dna?.key); return { id, description: VISUAL_STYLES[id] }; })(),
       layoutTemplate: dna?.blueprint
         ? {
             id: dna.blueprint.id,
@@ -97,7 +136,11 @@ websites. Build a complete, production-quality concept redesign of the website d
 - It must look like a website a good studio built for this business: photo-led, typographically confident,
   calm, easy to use. Follow "designDirection": the layout template, palette, fonts (load them with the given
   Google Fonts query), corner style and call to action. Do not reuse the layouts in "mustLookDifferentFrom".
+- Build in the visual style in "designDirection.visualStyle" (minimalism, bento grid, glassmorphism, liquid glass,
+  neumorphism, claymorphism, skeuomorphism, brutalism, maximalism or spatial UI), applied with taste: it shapes
+  surfaces, cards, header and layout, and never hurts readability. Do not mix in other styles.
 - Photography carries the design: the business's own photos first; "fallbackPhotos" for the hero or empty areas.
+- Every page of content.json is redesigned completely: no page skipped, no section dropped, nothing added.
 - Typography: a clear scale, generous spacing, body text under about 75 characters per line.
 - Motion is minimal: at most a short fade-in as content first appears and a header that turns solid on scroll.
 - Never use: Three.js or WebGL, 3D objects, particles, loading screens, custom cursors, magnetic buttons,

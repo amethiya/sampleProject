@@ -10,17 +10,17 @@ export interface FetchedPage {
 }
 
 /** Fetch an HTML page with a timeout and a size cap. Returns null on any failure. */
-export async function fetchPage(url: string, timeoutMs = 12_000): Promise<FetchedPage | null> {
+export async function fetchPage(url: string, timeoutMs = 12_000, accept: "html" | "xml" = "html"): Promise<FetchedPage | null> {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(url, {
       redirect: "follow",
       signal: ctrl.signal,
-      headers: { "user-agent": USER_AGENT, accept: "text/html,application/xhtml+xml" },
+      headers: { "user-agent": USER_AGENT, accept: accept === "xml" ? "application/xml,text/xml" : "text/html,application/xhtml+xml" },
     });
     const type = res.headers.get("content-type") ?? "";
-    if (!res.ok || (type && !type.includes("html"))) return null;
+    if (!res.ok || (type && !type.includes(accept === "xml" ? "xml" : "html"))) return null;
     const text = await res.text();
     return { url: res.url || url, status: res.status, html: text.slice(0, MAX_BYTES) };
   } catch {

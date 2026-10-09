@@ -174,3 +174,12 @@ describe("job brief", () => {
     expect(jobBrief({ mode: "revise" }, [])).toBe(BRIEF); // nothing to revise from
   });
 });
+
+describe("crawler image resolution", () => {
+  it("asks site image services for the large original", async () => {
+    const { highestResolution } = await import("../src/crawl");
+    expect(highestResolution(new URL("https://example.com/wp-content/uploads/2020/05/pizza-300x200.jpg")).href).toBe("https://example.com/wp-content/uploads/2020/05/pizza.jpg");
+    expect(highestResolution(new URL("https://images.squarespace-cdn.com/content/v1/abc/photo.jpg?format=300w")).searchParams.get("format")).toBe("2500w");
+    expect(highestResolution(new URL("https://cdn.shopify.com/s/files/1/shirt_300x.jpg")).pathname).toBe("/s/files/1/shirt.jpg");
+  });
+});
