@@ -42,3 +42,18 @@ Alternate light and dark sections, and photo-led and type-led sections:
 - Every overlay is checked for contrast: image at z-index 0, gradient at 1, text at 2.
 - Check every page on desktop and phone with screenshots before calling it done; fix anything that reads as a
   template.
+
+## Owner's reference: "Edem Restaurant" (Olga Malinovska), shared as the standard to match
+- One consistent dark theme (#0e0e0d), cream text, a muted gold accent (#c9a55b) used only for thin lines, icons
+  with a soft glow, prices and labels. No other colours.
+- A light, classic display face (Marcellus, which also matches Trajan-style logos) with a light grotesk (Jost 300);
+  small "Discover" labels with a short gold rule above each section title; thin rectangular outline buttons whose
+  fill wipes up on hover.
+- Cut-out round plates of food floating on black with a flour/spice splash beside them (make them by cropping
+  top-down photos to a circle with transparency and embedding as WebP); they spin into place on load and roll in
+  from the side, turning, in a zigzag menu.
+- Headings arrive as three outlined "ghost" copies that collapse into the real line.
+- A cinematic transition: flour clouds part as you scroll to reveal a full-screen photo with one line of text.
+- An info strip with thin gold line icons (locate us, open hours, call ahead), a row of service icons that glow on
+  hover, a sliding row of press quotes with arrow controls, and an "Order for pickup" section over a dark photo.
+- Loader with a counter and a thin gold line; curtain page transitions.
