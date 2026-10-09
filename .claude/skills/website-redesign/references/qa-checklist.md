@@ -16,7 +16,9 @@
       No forms that submit, no fetch/XHR, no analytics.
 
 ## Professional standard
-- [ ] Follows the layout template in `designDirection.layoutTemplate` and the palette, fonts and corner style.
+- [ ] Follows the layout template in `designDirection.layoutTemplate`, the visual style in
+      `designDirection.visualStyle`, and the palette, fonts and corner style.
+- [ ] Every page in content.json has its own file, and every page's `links` (order online, menus, maps) are used.
 - [ ] The first screen shows what the business is, where it is and the main action.
 - [ ] Looks like a real business website: no 3D, particles, loaders, custom cursors, marquees, parallax,
       pinned/sideways sections, animated letters, wavy dividers or giant pill buttons.

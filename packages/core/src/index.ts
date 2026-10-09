@@ -9,7 +9,7 @@ export { renderRedesign, renderSitePage, snapshotFromLead, type RedesignInput } 
 export { THEMES } from "./redesign/themes";
 export * from "./outreach";
 export * from "./crawl";
-export { BRIEF, RUNNER_PROMPT, jobBrief, LIBRARIES, SKILL_DIR, briefContent } from "./redesign/brief";
+export { BRIEF, RUNNER_PROMPT, jobBrief, VISUAL_STYLES, visualStyle, LIBRARIES, SKILL_DIR, briefContent } from "./redesign/brief";
 export { pickDna, dnaFromKey, DNA_VERSION, PALETTES, FONT_PAIRS, CONCEPTS, type DesignDna } from "./redesign/styles";
 export { applyDna } from "./redesign/render";
 export { BLUEPRINTS, pickBlueprint, blueprintById, type Blueprint, type Mood } from "./redesign/blueprints";
