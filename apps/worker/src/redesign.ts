@@ -1,21 +1,16 @@
 import {
-  LOOKS, USER_AGENT, auditCandidate, categoryById, lookById, makeDna, crawlSite, dnaFromKey, hostId, normalizeWebsite, pickDna, renderSitePage, snapshotFromLead,
+  DIRECTIONS, LOOKS, USER_AGENT, auditCandidate, categoryById, lookById, makeDna, crawlSite, dnaFromKey, hostId, normalizeWebsite, pickDna, renderSitePage, snapshotFromLead,
   type DesignDna, type Lead, type SiteSnapshot,
+  AI_CSP, TEMPLATE_CSP,
 } from "@rr/core";
+import { claimNext, completeJob, failJob, jobDetail, jobStats, listJobs, progress, publicJob, queueBatch, queueJob, review, type JobRow } from "./jobs";
 
 interface Db {
   DB: D1Database;
 }
 
-export const TEMPLATE_CSP =
-  "default-src 'none'; script-src 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: http: data: blob:; frame-src https://www.openstreetmap.org; frame-ancestors 'self'; base-uri 'none'; form-action 'none'";
-// Claude-written pages run in a sandbox with an opaque origin: they can't read cookies or call the API as the user.
-const AI_CSP =
-  "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox; default-src 'none'; script-src 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: http: data: blob:; frame-src https://www.openstreetmap.org; connect-src 'none'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'";
-
 const SLUG = /^[a-z0-9_-]{1,64}$/;
 const MAX_PAGE_BYTES = 1_500_000;
-const STALE_MINUTES = 45;
 
 interface SiteRow {
   lead: string;
@@ -175,13 +170,11 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
       return json(await status(env, id, data.site));
     }
     if (lm[2] === "redesign" && m === "POST") {
-      // Body (all optional): notes for Claude, a theme id, and whether to improve the last version.
-      const body = (await req.json().catch(() => ({}))) as { notes?: string; theme?: string; mode?: string };
+      // Body (all optional): notes for Claude, a theme id, a creative direction id, and whether to improve the last version.
+      const body = (await req.json().catch(() => ({}))) as { notes?: string; theme?: string; mode?: string; direction?: string };
       const notes = (body.notes ?? "").trim().slice(0, 4000) || null;
       const site = await ensureSite(env, id, data.lead, data.site);
-      const active = await env.DB.prepare("SELECT id FROM redesign_jobs WHERE lead_id = ? AND status IN ('queued', 'running')").bind(id).first();
-      if (active) return json({ error: "A Claude redesign of this site is already queued or running." }, 409);
-      const lastDone = await env.DB.prepare("SELECT style FROM redesign_jobs WHERE lead_id = ? AND status = 'done' ORDER BY id DESC LIMIT 1").bind(id).first<{ style: string | null }>();
+      const lastDone = await env.DB.prepare("SELECT style FROM redesign_jobs WHERE lead_id = ? AND status IN ('done', 'needs_review') ORDER BY id DESC LIMIT 1").bind(id).first<{ style: string | null }>();
       const hasPages = await env.DB.prepare("SELECT 1 FROM ai_pages WHERE lead_id = ? LIMIT 1").bind(id).first();
       const mode = body.mode === "revise" && hasPages ? "revise" : "fresh";
       let key: string;
@@ -194,8 +187,10 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
         if (lastDone?.style) recent.unshift(lastDone.style);
         key = pickDna(`${id}:${Date.now()}`, data.lead.category, recent, siteText(data.lead, site)).key;
       }
-      if (body.theme && lookById(body.theme)) key = withTheme(key, body.theme);
-      await env.DB.prepare("INSERT INTO redesign_jobs (lead_id, style, notes, mode) VALUES (?, ?, ?, ?)").bind(id, key, notes, mode).run();
+      const theme = body.theme && lookById(body.theme) ? body.theme : null;
+      if (theme) key = withTheme(key, theme);
+      const jobId = await queueJob(env, id, { style: key, notes, mode, theme, direction: body.direction });
+      if (!jobId) return json({ error: "A Claude redesign of this site is already queued or running." }, 409);
       return json(await status(env, id, site));
     }
     // Instant: give the redesign a new theme (a chosen one, or the next one that suits the trade). No runner needed.
@@ -234,90 +229,115 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
     return json({ id, name: lead.name, score: lead.audit.score });
   }
 
-  // Runner protocol (used by `npm run redesign-runner` on a machine signed in to Claude Code).
+  // Owner: queue many leads at once, list jobs, metrics.
+  if (path === "/api/redesign-jobs/batch" && m === "POST") {
+    const body = (await req.json().catch(() => ({}))) as { count?: number; leadIds?: string[]; category?: string };
+    const recent = await recentStyles(env);
+    const r = await queueBatch(env, {
+      ...body,
+      styleFor: (leadId, category) => {
+        const key = pickDna(`${leadId}:${Date.now()}`, category, recent).key;
+        recent.unshift(key);
+        return key;
+      },
+    });
+    return json(r);
+  }
+  if (path === "/api/redesign-jobs" && m === "GET") return json(await listJobs(env, url));
+  if (path === "/api/redesign-stats" && m === "GET") return json(await jobStats(env));
+
+  // Runner protocol (used by `npm run redesign-runner` and `npm run job` on a machine signed in to Claude Code).
   if (path === "/api/redesign-jobs/next" && m === "POST") {
-    await env.DB.prepare(
-      `UPDATE redesign_jobs SET status = 'queued', started_at = NULL WHERE status = 'running' AND started_at < datetime('now', '-${STALE_MINUTES} minutes')`,
-    ).run();
-    // Optionally claim the job for one specific website (cloud sessions asked to redesign X).
-    const { leadId } = (await req.json().catch(() => ({}))) as { leadId?: string };
-    const job = await (leadId
-      ? env.DB.prepare("SELECT id, lead_id, style, notes, mode FROM redesign_jobs WHERE status = 'queued' AND lead_id = ? ORDER BY created_at LIMIT 1").bind(leadId)
-      : env.DB.prepare("SELECT id, lead_id, style, notes, mode FROM redesign_jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1")
-    ).first<{ id: number; lead_id: string; style: string | null; notes: string | null; mode: string }>();
-    if (!job) return json({ job: null });
-    const claimed = await env.DB.prepare("UPDATE redesign_jobs SET status = 'running', started_at = datetime('now') WHERE id = ? AND status = 'queued'").bind(job.id).run();
-    if (!claimed.meta.changes) return json({ job: null });
-    const data = await loadLead(env, job.lead_id);
-    if (!data) {
-      await finish(env, job.id, "failed", "Lead no longer exists");
-      return json({ job: null });
-    }
-    const site = await ensureSite(env, job.lead_id, data.lead, data.site);
+    const { leadId, runner } = (await req.json().catch(() => ({}))) as { leadId?: string; runner?: string };
+    const claimed = await claimNext(env, {
+      leadId, runner,
+      load: (id) => loadLead(env, id),
+      ensure: (id, lead, site) => ensureSite(env, id, lead, site),
+    });
+    if (!claimed) return json({ job: null });
+    const { job, lead, site, recentDirections } = claimed;
     const avoid = (await recentStyles(env, 8)).filter((k) => k !== job.style).slice(0, 5).map(describeDna);
     // Revisions start from the previous Claude pages.
     const previous = job.mode === "revise"
       ? (await env.DB.prepare("SELECT slug, html FROM ai_pages WHERE lead_id = ?").bind(job.lead_id).all<{ slug: string; html: string }>()).results
       : [];
     return json({
-      job: { id: job.id, leadId: job.lead_id, style: job.style, notes: job.notes, mode: job.mode },
-      lead: data.lead, site: withProxiedImages(url.origin, site), avoid: job.mode === "revise" ? [] : avoid, previous,
+      job: { id: job.id, leadId: job.lead_id, style: job.style, notes: job.notes, mode: job.mode, direction: job.direction, theme: job.forced_theme, attempts: job.attempts, maxAttempts: job.max_attempts },
+      lead, site: withProxiedImages(url.origin, site), avoid: job.mode === "revise" ? [] : avoid, recentDirections, previous,
     });
   }
 
-  const jm = path.match(/^\/api\/redesign-jobs\/(\d+)\/(complete|fail)$/);
-  if (jm && m === "POST") {
+  const jm = path.match(/^\/api\/redesign-jobs\/(\d+)(?:\/(progress|complete|fail|approve|reject|retry|cancel))?$/);
+  if (jm) {
     const jobId = Number(jm[1]);
-    const job = await env.DB.prepare("SELECT lead_id, status FROM redesign_jobs WHERE id = ?").bind(jobId).first<{ lead_id: string; status: string }>();
-    if (!job) return json({ error: "Job not found" }, 404);
-    if (jm[2] === "fail") {
-      const { error = "Unknown error" } = (await req.json().catch(() => ({}))) as { error?: string };
-      await finish(env, jobId, "failed", error.slice(0, 2000));
-      return json({ ok: true });
+    const action = jm[2];
+    if (!action && m === "GET") {
+      const d = await jobDetail(env, jobId);
+      return d ? json(d) : json({ error: "Job not found" }, 404);
     }
-    const { pages = [] } = (await req.json().catch(() => ({}))) as { pages?: { slug: string; html: string }[] };
-    const valid = pages.filter((p) => SLUG.test(p.slug) && typeof p.html === "string" && p.html.length > 200 && p.html.length <= MAX_PAGE_BYTES);
-    if (!valid.some((p) => p.slug === "home")) return json({ error: "A home page (index.html) is required" }, 400);
-    // Point any direct links to the business's own images at the HTTPS proxy.
-    const data = await loadLead(env, job.lead_id);
-    const originals = [...new Set((data?.site?.pages ?? []).flatMap((p) => p.sections.flatMap((x) => x.images)))].sort((a, b) => b.length - a.length);
-    for (const p of valid) {
-      for (const u of originals) {
-        const variants = [u, u.replace(/^http:/, "https:"), u.replace(/^https:/, "http:")];
-        for (const v of new Set(variants)) p.html = p.html.split(v).join(proxied(url.origin, u));
+    if (m !== "POST" || !action) return null;
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    if (action === "progress") {
+      const r = await progress(env, jobId, body as { stage?: string; message?: string; level?: string });
+      return json(r.body, r.status);
+    }
+    if (action === "fail") {
+      const r = await failJob(env, jobId, body as { error?: string; kind?: string });
+      return json(r.body, r.status);
+    }
+    if (action === "complete") {
+      const job = await env.DB.prepare("SELECT lead_id, status FROM redesign_jobs WHERE id = ?").bind(jobId).first<{ lead_id: string; status: string }>();
+      if (!job) return json({ error: "Job not found" }, 404);
+      // A runner that lost its lease (job reclaimed, cancelled or already finished) must not overwrite the result.
+      if (job.status !== "running") return json({ error: `Job is ${job.status}; this upload was not applied.` }, 409);
+      const { pages = [], qa, qaScore, pass, costUsd } = body as { pages?: { slug: string; html: string }[]; qa?: unknown; qaScore?: number; pass?: boolean; costUsd?: number };
+      const valid = pages.filter((p) => SLUG.test(p.slug) && typeof p.html === "string" && p.html.length > 200 && p.html.length <= MAX_PAGE_BYTES);
+      if (!valid.some((p) => p.slug === "home")) return json({ error: "A home page (index.html) is required" }, 400);
+      // Point any direct links to the business's own images at the HTTPS proxy.
+      const data = await loadLead(env, job.lead_id);
+      const originals = [...new Set((data?.site?.pages ?? []).flatMap((p) => p.sections.flatMap((x) => x.images)))].sort((a, b) => b.length - a.length);
+      for (const p of valid) {
+        for (const u of originals) {
+          const variants = [u, u.replace(/^http:/, "https:"), u.replace(/^https:/, "http:")];
+          for (const v of new Set(variants)) p.html = p.html.split(v).join(proxied(url.origin, u));
+        }
       }
+      await env.DB.batch([
+        env.DB.prepare("DELETE FROM ai_pages WHERE lead_id = ?").bind(job.lead_id),
+        ...valid.slice(0, 25).map((p) => env.DB.prepare("INSERT INTO ai_pages (lead_id, slug, html) VALUES (?, ?, ?)").bind(job.lead_id, p.slug, p.html)),
+      ]);
+      const status = await completeJob(env, jobId, { qa, qaScore, pass, costUsd, pages: valid.length });
+      return json({ ok: true, pages: valid.length, status });
     }
-    await env.DB.batch([
-      env.DB.prepare("DELETE FROM ai_pages WHERE lead_id = ?").bind(job.lead_id),
-      ...valid.slice(0, 20).map((p) => env.DB.prepare("INSERT INTO ai_pages (lead_id, slug, html) VALUES (?, ?, ?)").bind(job.lead_id, p.slug, p.html)),
-    ]);
-    await finish(env, jobId, "done", null);
-    return json({ ok: true, pages: valid.length });
+    // approve | reject | retry | cancel (owner only: runner tokens can't reach these paths)
+    const r = await review(env, jobId, action, body as { notes?: string; requeue?: string }, async (leadId) => {
+      const d = await loadLead(env, leadId);
+      return pickDna(`${leadId}:${Date.now()}`, d?.lead.category ?? "services", await recentStyles(env)).key;
+    });
+    return json(r.body, r.status);
   }
 
   return null;
 }
 
-async function finish(env: Db, id: number, status: string, error: string | null) {
-  await env.DB.prepare("UPDATE redesign_jobs SET status = ?, error = ?, finished_at = datetime('now') WHERE id = ?").bind(status, error, id).run();
-}
-
 async function status(env: Db, id: string, site: SiteSnapshot | null) {
-  const job = await env.DB.prepare(
-    "SELECT id, status, error, style, notes, mode, created_at AS createdAt, started_at AS startedAt, finished_at AS finishedAt FROM redesign_jobs WHERE lead_id = ? ORDER BY id DESC LIMIT 1",
-  ).bind(id).first();
+  const job = await env.DB.prepare("SELECT * FROM redesign_jobs WHERE lead_id = ? ORDER BY id DESC LIMIT 1").bind(id).first<JobRow>();
+  const events = job
+    ? (await env.DB.prepare("SELECT at, stage, level, message FROM job_events WHERE job_id = ? ORDER BY id DESC LIMIT 30").bind(job.id).all()).results
+    : [];
   const { results: ai } = await env.DB.prepare("SELECT slug, created_at AS createdAt FROM ai_pages WHERE lead_id = ?").bind(id).all<{ slug: string; createdAt: string }>();
   const style = await env.DB.prepare("SELECT style FROM sites WHERE id = ?").bind(id).first<{ style: string | null }>();
-  const done = await env.DB.prepare("SELECT style FROM redesign_jobs WHERE lead_id = ? AND status = 'done' ORDER BY id DESC LIMIT 1").bind(id).first<{ style: string | null }>();
+  const done = await env.DB.prepare("SELECT style FROM redesign_jobs WHERE lead_id = ? AND status IN ('done', 'needs_review') ORDER BY id DESC LIMIT 1").bind(id).first<{ style: string | null }>();
   return {
     templateTheme: style?.style ? dnaFromKey(style.style)?.look.id ?? null : null,
     claudeTheme: done?.style ? dnaFromKey(done.style)?.look.id ?? null : null,
     themes: LOOKS.map((l) => ({ id: l.id, name: l.name, dark: l.dark, bg: l.bg, accent: l.accent })),
+    directions: DIRECTIONS.map((d) => ({ id: d.id, name: d.name, concept: d.concept })),
     templateStyle: style?.style ? describeDna(style.style) : null,
-    claudeStyle: (job as { style?: string } | null)?.style ? describeDna((job as { style: string }).style) : null,
+    claudeStyle: job?.style ? describeDna(job.style) : null,
     crawledAt: site?.crawledAt ?? null,
     pages: site?.pages.map((p) => ({ slug: p.slug, label: p.label, url: p.url })) ?? [],
-    job: job ?? null,
+    job: job ? { ...publicJob(job), events } : null,
     claudePages: ai.map((a) => a.slug),
     claudeCreatedAt: ai[0]?.createdAt ?? null,
   };

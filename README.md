@@ -56,19 +56,38 @@ Motion runs on [Motion](https://motion.dev) (`motion` on npm: Framer Motion's en
 pinned jsdelivr URL. Claude redesign jobs also get `uiux.md`: guidance for the business's trade from the
 [UI UX Pro Max](https://uupm.cc) skill (`.claude/skills/ui-ux-pro-max/`; needs `python3` on the runner machine).
 
-**Redesign with Claude** (dashboard → lead → Redesign → *Redesign with Claude*) queues a job. A runner on your
-Mac picks it up and has Claude Code, signed in with your Claude subscription, build a bespoke multi-page site from
-the crawled content following `packages/core/src/redesign/brief.ts`:
+**Redesign with Claude** (dashboard → lead → Redesign, or **Redesign queue** → *Queue next N*) queues jobs. A runner
+on your Mac has Claude Code, signed in with your Claude subscription, work through them as a staged pipeline:
+
+| Stage | What happens | Where |
+|---|---|---|
+| Research | The original site is opened in a real browser (desktop + phone screenshots, measured brand colours, fonts, logo, mobile problems, script errors, load time) behind an SSRF guard | `apps/cli/src/research.ts`, `browser.ts` |
+| UX audit | Findings from the audit score, the crawl and the browser | `packages/core/src/redesign/quality.ts` |
+| Creative direction | One of 12 directions (layout, type, palette, motion, 3D policy) chosen for the trade, the site's material and brand, never the same as the last two redesigns; palette built from the brand accent and contrast-checked | `packages/core/src/redesign/directions.ts` |
+| Build | Claude Code writes every page following `brief.ts` and the `website-redesign` skill (Read/Write/Edit only) | `apps/cli/src/redesign-runner.ts` |
+| QA | Every page rendered at 1440/820/390px under the production CSP: overflow, broken images/links, script errors, CSP blocks, content coverage vs the crawl, placeholders, tap targets, alt text, contrast, stuck animations, LCP | `apps/cli/src/qa.ts` |
+| Refine | Claude reviews the screenshots + QA report, fixes what it finds and scores visual quality, brand fit, originality and UX | `REVIEW_PROMPT` in `brief.ts` |
+| Validate | QA again. A pass (no critical defect, every category ≥ 5, weighted ≥ 7) is published as **done**; anything else is published as **needs review** | `scoreRedesign` in `quality.ts` |
 
 ```bash
 claude            # once: sign in to Claude Code with your Claude account
-RR_URL=https://revamp-radar.amethiyavivek.workers.dev RR_TOKEN=<ADMIN_TOKEN> npm run redesign-runner
+RR_URL=https://revamp-radar.amethiyavivek.workers.dev RR_TOKEN=<RUNNER_TOKEN> npm run redesign-runner -- --concurrency 2
+#   --passes 2  review/refine passes   --budget 6  stop refining at $6 reported Claude cost per job
+#   --once  --keep  --timeout 30  --no-research  --no-qa
 ```
 
-The runner only allows Claude to read and write files in a temporary folder (no shell, no web access).
-Claude-built pages are served with a sandboxed CSP, so they can't touch the dashboard's session.
-A Claude subscription can't be called from Cloudflare directly; to run jobs without your Mac on, the same
-brief can be sent through the Claude API with an API key (billed per use).
+Jobs move through `queued → running (researching, designing, building, qa, refining, uploading) → done | needs_review |
+failed | cancelled`. One active job per lead is enforced by a unique index. Every runner report is a heartbeat; a job
+whose runner goes quiet for 20 minutes is handed back. Technical failures retry with backoff (5, 10, 20 min, max 3
+attempts); an unreachable website or an owner rejection stops for a person. Every step is recorded in `job_events`
+and shown in the portal, with the QA scorecard, duration and the cost Claude Code reports. There is no daily cap on
+redesigns: queue 10 or 100, run more workers to go faster.
+
+Browser research and QA use Google Chrome if installed, else `RR_CHROMIUM=<path to a Chromium>`. The runner only lets
+Claude read and write files in a temporary folder (no shell, no web access). Claude-built pages are served with a
+sandboxed CSP, so they can't touch the dashboard's session. A Claude subscription can't be called from Cloudflare
+directly; to run jobs without your Mac on, the same brief can be sent through the Claude API with an API key (billed
+per use).
 
 ### Outreach (Phase 3)
 
@@ -90,17 +109,20 @@ Modern stacks (Next.js, Webflow, Squarespace, Wix…) subtract points. A lead **
 npx wrangler login
 npx wrangler d1 create revamp-radar        # put database_id into apps/worker/wrangler.jsonc
 npm run db:init -w @rr/worker              # apply schema
-npm run db:migrate -w @rr/worker           # full-site crawl + Claude redesign tables
+npm run db:migrate -w @rr/worker           # full-site crawl + Claude redesign tables + pipeline (0006)
+# existing deployments: npm run db:migrate:pipeline -w @rr/worker
 npx wrangler secret put ADMIN_EMAIL        # (in apps/worker) dashboard sign-in email
 npm run hash-password -w @rr/worker -- '<password>' | npx wrangler secret put ADMIN_PASSWORD_HASH
 openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET
 npx wrangler secret put ADMIN_TOKEN        # bearer token for the CLI / GitHub Action
+npx wrangler secret put RUNNER_TOKEN       # limited token for redesign runners: claim and report on jobs only
 npm run deploy
 ```
 
 The cron (`*/10 * * * *`) refills the queue from one (category, city) slice when it runs low,
 audits 6 sites per run (≤ ~15 subrequests, under the free 50 limit), and stops auditing for the day
-once it reaches 3× `DAILY_TARGET` qualified leads.
+once it reaches `MAX_QUALIFIED_PER_DAY` qualified leads (default 3× `DAILY_TARGET`; `"0"` removes the cap, e.g. on a
+paid plan). This only paces lead discovery; redesigns have no daily limit.
 
 ### Google Sheet sync
 

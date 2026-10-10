@@ -207,3 +207,128 @@ describe("crawler image resolution", () => {
     expect(highestResolution(new URL("https://cdn.shopify.com/s/files/1/shirt_300x.jpg")).pathname).toBe("/s/files/1/shirt.jpg");
   });
 });
+
+describe("creative directions", () => {
+  const sig = (trade: string, extra: Record<string, unknown> = {}) => ({ trade, pages: 4, images: 6, prices: 0, words: 800, hasMenu: false, hasTeam: false, hasBooking: false, hasFaq: false, phone: true, email: true, hours: true, ...extra }) as never;
+
+  it("fits the direction to the business, not one layout for every trade", async () => {
+    const { chooseDirection } = await import("../src");
+    expect(chooseDirection(sig("healthcare")).id).toBe("clinical-calm");
+    expect(["swiss-precision", "bento-modern"]).toContain(chooseDirection(sig("accounting", { images: 2 })).id);
+    expect(chooseDirection(sig("import_export", { images: 1 })).id).toBe("global-trade-3d");
+    expect(chooseDirection(sig("gym")).id).toBe("bold-kinetic");
+    // The restaurant layout is never chosen for a clinic or an accountant.
+    for (const t of ["healthcare", "accounting", "import_export", "gym", "salon"]) {
+      for (const seed of ["a", "b", "c", "d"]) expect(chooseDirection(sig(t), [], seed).id).not.toBe("cinematic-hospitality");
+    }
+  });
+
+  it("never repeats the last two directions and spreads a run of same-trade leads across directions", async () => {
+    const { chooseDirection } = await import("../src");
+    const recent: string[] = [];
+    for (let i = 0; i < 10; i++) {
+      const d = chooseDirection(sig("restaurant", { prices: 12, images: 12 }), recent, `lead-${i}`).id;
+      expect(recent.slice(0, 2)).not.toContain(d);
+      recent.unshift(d);
+    }
+    expect(new Set(recent).size).toBeGreaterThanOrEqual(4);
+  });
+
+  it("avoids photo-led directions when the site has few photos", async () => {
+    const { chooseDirection } = await import("../src");
+    for (const seed of ["1", "2", "3"]) expect(["luxe-minimal", "immersive-showcase"]).not.toContain(chooseDirection(sig("clothing", { images: 1 }), [], seed).id);
+  });
+
+  it("builds the palette from the brand's own accent and keeps every pair readable", async () => {
+    const { directionById, paletteFor, contrast, brandAccent } = await import("../src");
+    expect(brandAccent({ colors: ["#ffffff", "#111111", "#888888", "#741616"], fonts: [] })).toBe("#741616");
+    expect(brandAccent({ colors: ["#ffffff", "#000000"], fonts: [] })).toBeNull();
+    for (const d of ["editorial-magazine", "swiss-precision", "bold-kinetic", "luxe-minimal", "global-trade-3d"]) {
+      for (const accent of ["#741616", "#ffe066", "#1d4ed8", "#22c55e"]) {
+        const p = paletteFor(directionById(d)!, { colors: [accent], fonts: [] }, "seed");
+        expect(p.fromBrand).toBe(true);
+        expect(contrast(p.text, p.bg)).toBeGreaterThanOrEqual(7);
+        expect(contrast(p.muted, p.bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(p.accent, p.bg)).toBeGreaterThanOrEqual(3);
+        expect(contrast(p.onAccent, p.accent)).toBeGreaterThanOrEqual(3);
+      }
+    }
+    // A dark original keeps a dark palette when the direction has one.
+    expect(paletteFor(directionById("swiss-precision")!, { colors: [], background: "#101010", fonts: [] }).dark).toBe(true);
+  });
+
+  it("puts the direction, signals and UX audit in content.json, and offers Three.js only when the direction allows 3D", async () => {
+    const { briefContent, THREE_URL } = await import("../src");
+    const lead = { id: "x.com", name: "Harbor Freight Partners", website: "https://x.com", category: "import_export", city: "Hamburg", country: "DE", contacts: { emails: ["a@x.com"], phones: [] }, audit: { score: 60, reasons: ["No mobile viewport meta tag"], finalUrl: "", https: false }, content: { title: "", description: "", headings: [], paragraphs: [], images: [], navLinks: [] } } as never;
+    const site = { crawledAt: "", pages: [{ slug: "home", url: "https://x.com", label: "Home", title: "Home", description: "", sections: [{ heading: "Shipping", paragraphs: ["Sea and air freight from Hamburg to the world."], items: [], images: [] }] }] };
+    const globe = briefContent(lead, site, undefined, [], { direction: "global-trade-3d" });
+    expect(globe.designDirection.creative.id).toBe("global-trade-3d");
+    expect(globe.libraries).toHaveProperty("three", THREE_URL);
+    expect(globe.designDirection.uxAudit.some((f: { area: string }) => f.area === "mobile")).toBe(true);
+    expect(globe.designDirection.creative.typography.googleFontsUrl).toMatch(/^https:\/\/fonts\.googleapis\.com\/css2\?family=/);
+    const flat = briefContent(lead, site, undefined, [], { direction: "swiss-precision" });
+    expect(flat.libraries).not.toHaveProperty("three");
+    expect(THREE_URL).toMatch(/^https:\/\/cdn\.jsdelivr\.net\/npm\/three@\d+\.\d+\.\d+\//);
+  });
+
+  it("documents every direction for the skill (npm run skill:catalog)", async () => {
+    const { DIRECTIONS } = await import("../src");
+    const { readFileSync } = await import("node:fs");
+    const md = readFileSync(new URL("../../../.claude/skills/website-redesign/references/directions.md", import.meta.url), "utf8");
+    for (const d of DIRECTIONS) {
+      expect(md, `run npm run skill:catalog (${d.id} missing)`).toContain(`\`${d.id}\``);
+      expect(md).toContain(d.hero);
+    }
+  });
+});
+
+describe("redesign QA scorecard", () => {
+  const page = (o: Record<string, unknown> = {}) => ({
+    slug: "home", viewport: "desktop", loaded: true, overflowX: 0, images: 6, brokenImages: 0, consoleErrors: [], failedRequests: [], cspViolations: [],
+    hasBanner: true, hasNoindex: true, hasTitle: true, hasLang: true, h1: 1, brokenLinks: [], htmlLinks: 0, disallowedScripts: [], coverage: 1, missing: [],
+    placeholders: [], smallTapTargets: 0, imagesNoAlt: 0, unnamedControls: 0, lowContrast: 0, stuckHidden: 0, loadMs: 900, lcpMs: 1200, bytes: 900_000, requests: 20, ...o,
+  }) as never;
+  const all = (o: Record<string, unknown> = {}, m: Record<string, unknown> = {}) => [page(o), page({ viewport: "tablet", ...o }), page({ viewport: "mobile", ...o, ...m })];
+  const good = { visual: 8, brand: 8, originality: 8, ux: 8, notes: [] };
+
+  it("passes a clean, well-reviewed redesign", async () => {
+    const { scoreRedesign } = await import("../src");
+    const s = scoreRedesign(all(), ["home"], good);
+    expect(s.critical).toEqual([]);
+    expect(s.pass).toBe(true);
+    expect(s.overall).toBeGreaterThanOrEqual(7);
+  });
+
+  it("never passes without a design review, with a critical defect, or with a missing page, however high the average", async () => {
+    const { scoreRedesign } = await import("../src");
+    expect(scoreRedesign(all(), ["home"], null).pass).toBe(false);
+    const overflow = scoreRedesign(all({}, { overflowX: 120 }), ["home"], { ...good, visual: 10, brand: 10, originality: 10, ux: 10 });
+    expect(overflow.pass).toBe(false);
+    expect(overflow.critical.join(" ")).toMatch(/sideways on phones/);
+    const missing = scoreRedesign(all(), ["home", "menu"], good);
+    expect(missing.pass).toBe(false);
+    expect(missing.critical).toContain('Page "menu" is missing.');
+    const dropped = scoreRedesign(all({ coverage: 0.6, missing: ["Our full wine list"] }), ["home"], good);
+    expect(dropped.critical.join(" ")).toMatch(/missing 40% of the site's text/);
+    const fake = scoreRedesign(all({ placeholders: ["lorem ipsum"] }), ["home"], good);
+    expect(fake.pass).toBe(false);
+  });
+
+  it("writes a report Claude can act on", async () => {
+    const { scoreRedesign, scorecardMarkdown } = await import("../src");
+    const m = all({ consoleErrors: ["TypeError: x is undefined"] });
+    const md = scorecardMarkdown(scoreRedesign(m, ["home"], good), m);
+    expect(md).toContain("NOT READY");
+    expect(md).toContain("Critical defects");
+    expect(md).toContain("TypeError");
+  });
+
+  it("retries technical failures with backoff and sends everything else to a person", async () => {
+    const { retryDelayMinutes, shouldRetry } = await import("../src");
+    expect([1, 2, 3, 4, 5, 9].map(retryDelayMinutes)).toEqual([5, 10, 20, 40, 60, 60]);
+    expect(shouldRetry("technical", 1, 3)).toBe(true);
+    expect(shouldRetry("technical", 3, 3)).toBe(false);
+    expect(shouldRetry("unreachable", 1, 3)).toBe(false);
+    expect(shouldRetry("quality", 1, 3)).toBe(false);
+  });
+});

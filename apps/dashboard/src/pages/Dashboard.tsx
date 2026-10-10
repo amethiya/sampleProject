@@ -3,6 +3,8 @@ import Logo from "../Logo";
 import { api, CATEGORY_LABELS, countryName, REGION_LABELS, Unauthorized } from "../api";
 import { linkProps, navigate, usePath } from "../router";
 import { applyTheme, getTheme, type ThemeChoice } from "../theme";
+import { I, Icon } from "../ui";
+import { JobPanel, QueuePage, type JobInfo } from "./Queue";
 import appsScript from "../../../../integrations/google-apps-script/Code.gs?raw";
 
 interface LeadRow {
@@ -22,7 +24,7 @@ interface LeadRow {
   status: string;
   sheetSynced: boolean;
   crawled: boolean;
-  redesign: "pending" | "template" | "queued" | "running" | "done" | "failed";
+  redesign: "pending" | "template" | "queued" | "running" | "review" | "done" | "failed";
 }
 
 interface Stats {
@@ -71,6 +73,7 @@ const REDESIGN_LABELS: Record<string, string> = {
   template: "Template ready",
   queued: "Claude queued",
   running: "Redesigning…",
+  review: "Needs review",
   done: "Redesigned",
   failed: "Failed",
 };
@@ -86,32 +89,6 @@ const ago = (iso: string) => {
   if (s < 3600) return `${Math.floor(s / 60)} min ago`;
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
   return new Date(iso).toLocaleDateString();
-};
-
-function Icon({ d, size = 18 }: { d: string; size?: number }) {
-  return (
-    <svg className="icon" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true">
-      <path d={d} />
-    </svg>
-  );
-}
-const I = {
-  search: "M11 18a7 7 0 1 0 0-14a7 7 0 0 0 0 14zM20 20l-4-4",
-  radar: "M12 21a9 9 0 1 0 0-18a9 9 0 0 0 0 18zM12 16a4 4 0 1 0 0-8a4 4 0 0 0 0 8zM12 12l6-4",
-  plus: "M12 5v14M5 12h14",
-  sheet: "M4 4h16v16H4zM4 9h16M4 14h16M10 4v16",
-  download: "M12 4v11M7 10l5 5l5-5M5 20h14",
-  external: "M14 4h6v6M20 4l-9 9M18 14v6H4V6h6",
-  back: "M19 12H5M11 6l-6 6l6 6",
-  close: "M6 6l12 12M18 6L6 18",
-  menu: "M4 7h16M4 12h16M4 17h16",
-  leads: "M4 6h16M4 12h16M4 18h10",
-  logout: "M15 4h4v16h-4M10 8l-4 4l4 4M6 12h10",
-  copy: "M8 8h11v11H8zM5 16V5h11",
-  check: "M5 12l5 5L20 7",
-  sun: "M12 17a5 5 0 1 0 0-10a5 5 0 0 0 0 10zM12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4",
-  moon: "M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z",
-  monitor: "M3 4h18v12H3zM8 20h8M12 16v4",
 };
 
 function ThemeSwitch() {
@@ -148,6 +125,7 @@ export default function Dashboard() {
   const [error, setError] = useState("");
   const path = usePath();
   const route = path.match(/^\/app\/leads\/([^/]+)(?:\/(audit|redesign|pitch))?\/?$/);
+  const onQueue = /^\/app\/queue\/?$/.test(path);
   const [panel, setPanel] = useState<"" | "sheet" | "add">("");
   const [menu, setMenu] = useState(false);
 
@@ -238,7 +216,8 @@ export default function Dashboard() {
           <button className="icon-btn side-close" onClick={() => setMenu(false)} aria-label="Close menu"><Icon d={I.close} /></button>
         </div>
         <nav aria-label="Main">
-          <a className="nav-item active" aria-current={route ? undefined : "page"} {...linkProps("/app")} onClickCapture={() => setMenu(false)}><Icon d={I.leads} />Leads</a>
+          <a className={`nav-item${onQueue ? "" : " active"}`} aria-current={route || onQueue ? undefined : "page"} {...linkProps("/app")} onClickCapture={() => setMenu(false)}><Icon d={I.leads} />Leads</a>
+          <a className={`nav-item${onQueue ? " active" : ""}`} aria-current={onQueue ? "page" : undefined} {...linkProps("/app/queue")} onClickCapture={() => setMenu(false)}><Icon d={I.queue} />Redesign queue</a>
           <button className="nav-item" onClick={() => { setPanel("sheet"); setMenu(false); }}><Icon d={I.sheet} />Google Sheet</button>
           <button className="nav-item" onClick={exportCsv}><Icon d={I.download} />Export CSV</button>
           <a className="nav-item" href="/themes" target="_blank" rel="noreferrer"><Icon d={I.external} />Themes</a>
@@ -259,7 +238,9 @@ export default function Dashboard() {
           <button className="icon-btn" onClick={() => setPanel("add")} aria-label="Redesign any website"><Icon d={I.plus} /></button>
         </header>
 
-        {route ? (
+        {onQueue ? (
+          <QueuePage onError={guard} onToast={setToast} />
+        ) : route ? (
           <LeadPage id={decodeURIComponent(route[1])} tab={(route[2] as Tab) ?? "audit"} onStatus={updateStatus} onError={guard} onChanged={load} />
         ) : (
         <div className="content">
@@ -314,6 +295,7 @@ export default function Dashboard() {
               <option value="done">Redesigned by Claude</option>
               <option value="pending">Redesign pending</option>
             </select>
+            <a className="btn btn-sm" {...linkProps("/app/queue")}><Icon d={I.queue} size={15} />Queue redesigns</a>
           </div>
 
           {/* Desktop table */}
@@ -379,7 +361,7 @@ export default function Dashboard() {
         </div>
         )}
 
-        {!route && <div className="mobile-bar">
+        {!route && !onQueue && <div className="mobile-bar">
           <button className="btn btn-primary btn-block" onClick={findLeads} disabled={!!busy}><Icon d={I.radar} />{busy === "find" ? "Finding leads…" : "Find new leads"}</button>
         </div>}
       </div>
@@ -444,6 +426,15 @@ function LeadPage({ id, tab, onStatus, onError, onChanged }: { id: string; tab: 
   const setStatus = async (s: string) => { setLead((l) => (l ? { ...l, status: s } : l)); await onStatus(id, s); };
 
   const back = <a className="back-link" {...linkProps("/app")}><Icon d={I.back} size={16} />All leads</a>;
+  // The next lead still waiting for a redesign, so the owner can move straight on.
+  const nextLead = async () => {
+    try {
+      const list = await api<LeadRow[]>("/api/leads?segment=ready&redesign=pending");
+      const next = list.find((l) => l.id !== id && !["queued", "running"].includes(l.redesign));
+      if (next) navigate(leadPath(next.id, "redesign"));
+      else onError(new Error("No more leads waiting for a redesign. Find new leads or queue them from the Redesign queue."));
+    } catch (e) { onError(e); }
+  };
   if (missing) return <div className="content">{back}<div className="empty"><h2>Lead not found</h2><p className="muted">It may have been removed. Go back to the list to pick another.</p></div></div>;
   if (!lead) return <div className="content">{back}<p className="muted">Loading…</p></div>;
   return (
@@ -459,6 +450,7 @@ function LeadPage({ id, tab, onStatus, onError, onChanged }: { id: string; tab: 
           <RedesignChip state={lead.redesign} />
           <a className="btn btn-sm" href={lead.website} target="_blank" rel="noreferrer">Current site<Icon d={I.external} size={14} /></a>
           <a className="btn btn-sm" href={`/preview/${encodeURIComponent(lead.id)}/`} target="_blank" rel="noreferrer">Open redesign<Icon d={I.external} size={14} /></a>
+          <button className="btn btn-sm btn-primary" onClick={nextLead}>Next lead<Icon d={I.next} size={14} /></button>
         </div>
       </header>
       <nav className="tabs page-tabs" aria-label="Lead sections">
@@ -507,8 +499,9 @@ interface RedesignStatus {
   themes: ThemeInfo[];
   crawledAt: string | null;
   pages: { slug: string; label: string; url: string }[];
-  job: { id: number; status: "queued" | "running" | "done" | "failed"; error: string | null; notes: string | null; mode: string; createdAt: string; startedAt: string | null; finishedAt: string | null } | null;
+  job: JobInfo | null;
   claudePages: string[];
+  directions: { id: string; name: string; concept: string }[];
 }
 
 type View = "original" | "template" | "claude";
@@ -538,6 +531,7 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
   const [notes, setNotes] = useState("");
   const [mode, setMode] = useState<"revise" | "fresh">("revise");
   const [claudeTemplate, setClaudeTemplate] = useState("keep");
+  const [direction, setDirection] = useState("auto");
   const [msg, setMsg] = useState("");
   const base = `/api/leads/${encodeURIComponent(lead.id)}`;
 
@@ -556,7 +550,7 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
       if (next) {
         setSt(next);
         if (next.job?.status !== "queued" && next.job?.status !== "running") { onChanged(); setRev((r) => r + 1); }
-        if (next.job?.status === "done") setView("claude");
+        if (next.job?.status === "done" || next.job?.status === "needs_review") setView("claude");
       }
     }, 10_000);
     return () => clearInterval(t);
@@ -576,9 +570,20 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
     try {
       setSt(await api<RedesignStatus>(`${base}/redesign`, {
         method: "POST",
-        body: JSON.stringify({ notes: notes.trim() || undefined, mode: hasClaude ? mode : "fresh", theme: claudeTemplate === "keep" || claudeTemplate === "auto" ? undefined : claudeTemplate }),
+        body: JSON.stringify({ notes: notes.trim() || undefined, mode: hasClaude ? mode : "fresh", theme: claudeTemplate === "keep" || claudeTemplate === "auto" ? undefined : claudeTemplate, direction: direction === "auto" ? undefined : direction }),
       }));
       setNotes(""); setMsg("Sent. Claude picks it up as soon as your Mac runner or a cloud session is running.");
+      onChanged();
+    } catch (e) { onError(e); }
+    setBusy("");
+  };
+  const jobAction = async (action: string, body?: Record<string, unknown>) => {
+    if (!st?.job) return;
+    setBusy("job"); setMsg("");
+    try {
+      await api(`/api/redesign-jobs/${st.job.id}/${action}`, { method: "POST", body: JSON.stringify(body ?? {}) });
+      setSt(await api<RedesignStatus>(`${base}/redesign`));
+      setMsg(action === "approve" ? "Approved. It's ready to pitch." : action === "retry" ? "Queued again." : action === "cancel" ? "Cancelled." : body?.requeue ? "Rejected; Claude will redo it with your notes." : "Rejected.");
       onChanged();
     } catch (e) { onError(e); }
     setBusy("");
@@ -652,16 +657,8 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
       <section className="callout">
         <div>
           <h3>Claude redesign</h3>
-          <p className="muted small">Claude rebuilds all {st.pages.length} pages using the website-redesign skill. It runs on your Mac (<code>npm run redesign-runner</code>) or a Claude cloud session and takes about 10–15 minutes. You can leave this page while it works.</p>
-          {job && (
-            <div className={`job job-${job.status}`} role="status">
-              {job.status === "queued" && "Queued. Waiting for your Mac runner or a cloud session to pick it up."}
-              {job.status === "running" && `Claude is building the site (started ${new Date(job.startedAt + "Z").toLocaleTimeString()}).`}
-              {job.status === "done" && `Claude version ready: ${st.claudePages.length} pages${st.claudeTheme ? `, ${bpName(st.claudeTheme)}` : ""}.`}
-              {job.status === "failed" && `Last attempt didn't finish: ${job.error ?? "unknown error"}`}
-              {job.notes && <p className="muted small job-notes">Your notes{job.mode === "revise" ? " (improving the previous version)" : ""}: “{job.notes}”</p>}
-            </div>
-          )}
+          <p className="muted small">Claude researches the current site in a browser, picks a creative direction for this business, rebuilds {st.pages.length === 1 ? "the page" : `all ${st.pages.length} pages`}, then checks them at desktop, tablet and phone width and refines them. It runs on your Mac (<code>npm run redesign-runner</code>) or a Claude Code session and takes about 15–25 minutes. You can leave this page while it works.</p>
+          {job && <JobPanel job={job} busy={!!busy} onAction={jobAction} />}
         </div>
         {!active && (
           <>
@@ -676,8 +673,15 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
               <textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={4000}
                 placeholder="For example: darker and more premium, bigger food photos at the top, make the menu easier to read, show opening hours higher up, use the Midnight Navy theme." />
             </label>
-            <ThemeSelect label="Theme" value={claudeTemplate} onChange={setClaudeTemplate} themes={st.themes}
-              first={[...(st.claudePages.length && mode === "revise" ? firstBp(st.claudeTheme) : []), { value: "auto", label: "Choose automatically" }]} />
+            <label className="field">
+              <span>Creative direction</span>
+              <select value={direction} onChange={(e) => setDirection(e.target.value)}>
+                <option value="auto">{st.claudePages.length && mode === "revise" ? "Keep the current direction" : "Choose for this business (recommended)"}</option>
+                <optgroup label="Directions">{st.directions.map((d) => <option key={d.id} value={d.id} title={d.concept}>{d.name}</option>)}</optgroup>
+              </select>
+            </label>
+            <ThemeSelect label="Colours" value={claudeTemplate} onChange={setClaudeTemplate} themes={st.themes}
+              first={[...(st.claudePages.length && mode === "revise" ? firstBp(st.claudeTheme) : []), { value: "auto", label: "From the brand and direction (recommended)" }]} />
           </>
         )}
         <div className="row-actions">
@@ -689,9 +693,9 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
         {msg && <p className="muted small" role="status">{msg}</p>}
       </section>
       <p className="muted small">
-        {st.pages.length} pages read{st.crawledAt ? ` on ${new Date(st.crawledAt).toLocaleDateString()}` : ""}.
+        {st.pages.length} {st.pages.length === 1 ? "page" : "pages"} read{st.crawledAt ? ` on ${new Date(st.crawledAt).toLocaleDateString()}` : ""}.
         {st.templateStyle && ` Instant look: ${st.templateStyle}.`}
-        {st.claudeStyle && ` Claude look: ${st.claudeStyle}.`}
+        {st.job?.directionName && ` Claude direction: ${st.job.directionName}.`}
       </p>
     </div>
   );

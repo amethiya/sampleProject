@@ -9,7 +9,10 @@ export { renderRedesign, renderSitePage, snapshotFromLead, writeStarter, type Re
 export { THEMES } from "./redesign/themes";
 export * from "./outreach";
 export * from "./crawl";
-export { BRIEF, RUNNER_PROMPT, jobBrief, LIBRARIES, SKILL_DIR, briefContent } from "./redesign/brief";
+export { BRIEF, RUNNER_PROMPT, REVIEW_PROMPT, THREE_URL, jobBrief, LIBRARIES, SKILL_DIR, briefContent, designFor, type BriefContent, type DesignChoice } from "./redesign/brief";
+export * from "./redesign/directions";
+export * from "./redesign/quality";
 export { pickDna, dnaFromKey, makeDna, tradeFor, DNA_VERSION, type DesignDna } from "./redesign/styles";
 export { UI_KIT, UI_KIT_CSS, UI_KIT_JS, type KitComponent } from "./redesign/ui-kit";
 export { LOOKS, TRADE_PROMPTS, lookById, pickLook, lookVars, SYSTEM_CSS, SYSTEM_BASE_JS, SYSTEM_MOTION_JS, SYSTEM_LIBRARIES, HEAD_JS, type Look, type TradePrompt } from "./redesign/system";
+export { AI_CSP, TEMPLATE_CSP } from "./redesign/csp";
