@@ -11,7 +11,7 @@
 import { createServer, type Server } from "node:http";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AI_CSP, scoreRedesign, scorecardMarkdown, type DesignReview, type PageMeasure, type Scorecard, type Viewport } from "@rr/core";
+import { AI_CSP, UI_KIT, scoreRedesign, scorecardMarkdown, type DesignReview, type PageMeasure, type Scorecard, type Viewport } from "@rr/core";
 import { safeContext } from "./browser";
 
 const VIEWPORTS: { name: Viewport; width: number; height: number; mobile: boolean }[] = [
@@ -44,7 +44,7 @@ function serve(siteDir: string): Promise<{ server: Server; origin: string }> {
 }
 
 /** Runs in the page after the scroll pass. Self-contained. */
-function inPage(arg: { texts: string[]; slugs: string[]; mobile: boolean; placeholder: string; allowed: string[] }) {
+function inPage(arg: { texts: string[]; slugs: string[]; mobile: boolean; placeholder: string; allowed: string[]; kit: [string, string][] }) {
   const norm = (s: string) => s.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
   const clone = document.body.cloneNode(true) as HTMLElement;
   clone.querySelectorAll("script, style, noscript, template").forEach((e) => e.remove());
@@ -140,7 +140,10 @@ function inPage(arg: { texts: string[]; slugs: string[]; mobile: boolean; placeh
     return false;
   }).length;
 
+  const kit = arg.kit.filter(([, sel]) => document.querySelector(sel)).map(([id]) => id);
+
   return {
+    kit,
     overflowX: document.documentElement.scrollWidth - innerWidth,
     images: imgs.length,
     brokenImages: broken,
@@ -225,6 +228,7 @@ export async function runQa(dir: string, review: DesignReview | null = null, log
             const m = await page.evaluate(inPage, {
               texts: p.sections.flatMap((s) => [s.heading, ...s.paragraphs, ...s.items]).filter(Boolean),
               slugs, mobile: vp.mobile, placeholder: PLACEHOLDER.source, allowed: ALLOWED_SCRIPT_HOSTS,
+              kit: UI_KIT.map((c) => [c.id, c.selector] as [string, string]),
             });
             const lcp = await page.evaluate(() => new Promise<number | null>((res) => {
               try {
@@ -250,7 +254,7 @@ export async function runQa(dir: string, review: DesignReview | null = null, log
               hasBanner: m.hasBanner, hasNoindex: m.hasNoindex, hasTitle: m.hasTitle, hasLang: m.hasLang, h1: m.h1,
               brokenLinks: m.brokenLinks, htmlLinks: m.htmlLinks, disallowedScripts: m.disallowedScripts,
               coverage: m.coverage, missing: m.missing, placeholders: m.placeholders, smallTapTargets: m.smallTapTargets,
-              imagesNoAlt: m.imagesNoAlt, unnamedControls: m.unnamedControls, lowContrast: m.lowContrast, stuckHidden: m.stuckHidden,
+              imagesNoAlt: m.imagesNoAlt, unnamedControls: m.unnamedControls, lowContrast: m.lowContrast, stuckHidden: m.stuckHidden, kit: m.kit,
               loadMs, lcpMs: lcp, bytes, requests,
             });
           } else {

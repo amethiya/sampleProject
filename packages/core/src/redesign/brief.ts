@@ -6,6 +6,7 @@ import { uxAudit } from "./quality";
 import { makeDna, tradeFor, type DesignDna } from "./styles";
 import { SYSTEM_LIBRARIES, TRADE_PROMPTS, pickLook, type Look } from "./system";
 import { THEMES, photoUrl } from "./themes";
+import { UI_KIT } from "./ui-kit";
 
 /** Three.js, pinned; offered to Claude only when the creative direction allows 3D. Loaded as an ES module. */
 export const THREE_URL = "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js";
@@ -73,7 +74,7 @@ export function briefContent(lead: Lead, site: SiteSnapshot, dna?: DesignDna, av
     designDirection: {
       creative,
       signals,
-      uxAudit: uxAudit(lead.audit.reasons, signals),
+      uxAudit: uxAudit(lead.audit?.reasons ?? [], signals),
       /** The instant renderer's theme (used by the starter pages); the creative palette above wins. */
       starterTheme: {
         id: l.id, name: l.name, dark: l.dark,
@@ -86,6 +87,11 @@ export function briefContent(lead: Lead, site: SiteSnapshot, dna?: DesignDna, av
       fallbackPhotos: t.photos.map((id) => photoUrl(id, 1920)),
     },
     libraries: creative.threeD === "none" ? LIBRARIES : { ...LIBRARIES, three: THREE_URL },
+    uiKit: {
+      reference: "skill/references/ui-kit.md",
+      libraries: ["Magic UI", "Smooth UI"],
+      components: UI_KIT.map((c) => ({ id: c.id, name: c.name, library: c.library })),
+    },
   };
 }
 
@@ -159,9 +165,11 @@ template with new colours.
   uses it, initialise it lazily when it scrolls into view, cap devicePixelRatio at 2, pause when off-screen, and
   render a static fallback (SVG or image) for reduced motion, phones under 768px and browsers without WebGL. When
   threeD is "none", do not use WebGL.
-- **UI kit:** the starter pages include the Revamp Radar UI kit (skill/references/ui-kit.md: Magic UI and Smooth
-  UI components ported to plain CSS/JS). Copy its <style>/<script> blocks into your pages when you use a component;
-  restyle it with your palette tokens. A few effects per page, where they serve the content.
+- **UI kit (required):** every redesign is built with the Revamp Radar UI kit, the Magic UI and Smooth UI component
+  libraries ported to plain CSS/JS (listed in content.json "uiKit", documented in skill/references/ui-kit.md). Copy
+  the kit's <style> and <script> blocks from a starter page into every page, restyle the components with your
+  palette tokens so they belong to the creative direction, and follow the "UI kit placement" section below. Never
+  load React, Tailwind or the libraries themselves.
 - **Never:** custom cursors, letter-by-letter typing, particle storms, scroll-jacking, autoplaying sound, carousels
   that hide content, arbitrary glassmorphism or gradient blobs, or text over a busy photo without a scrim.
 - **Responsive and accessible:** 360px to 1600px with no horizontal scrolling; a mobile menu when the navigation
@@ -174,6 +182,28 @@ template with new colours.
 - Add <meta name="robots" content="noindex, nofollow">, a <title>, lang on <html>, and a meta description from the
   page's description when present.
 
+## UI kit placement (Magic UI + Smooth UI)
+Use the components from skill/references/ui-kit.md with their exact classes and data attributes. Every home page uses
+at least 8 different components and every inner page at least 5, from both libraries (the browser QA counts them; a
+page below the minimum is not published as done). Place them by what the content is, in whatever layout the creative
+direction gives it:
+- Every page: scroll progress bar right after <body>; the primary call to action as a shimmer + magnetic button
+  (first screen and closing call to action); small section labels as shiny text or shimmer sweep.
+- The story or opening statement: its strongest paragraph as a scroll-reveal paragraph; a number already in the
+  text (a founding year, years in business) as a number ticker.
+- The practical box (hours, booking, contact or key facts): border beam (one per page) or shine border.
+- Repeated items (services, menu categories, team, projects, other pages): spotlight (magic card) on each item, plus
+  glow hover on the group or tilt on photo items.
+- The business's own photos: a marquee strip when there are four or more; galleries and content blocks arrive with
+  blur fade (staggered with data-delay); scroll media expansion for one hero-grade photo when the direction is
+  photo-led.
+- Plain section headings: mask reveal up. A dot pattern or background paths behind one quiet section.
+Rules: the kit serves the creative direction, it does not replace it: restyle it with the palette, match the
+direction's motion language (fewer, slower effects for calm directions such as Clinical Calm or Luxe Minimal; bolder
+ones for Bold Kinetic). Effects decorate the site's own content and never replace, reword or invent it (the ticker
+only animates a number that is already there); never put a kit effect on an element your own Motion code already
+animates; everything stays visible with scripts blocked and still under reduced motion.
+
 ## Allowed external resources
 - Scripts: only the URLs in "libraries" (Motion; Three.js only when the direction allows 3D), plus inline JavaScript.
 - Fonts: fonts.googleapis.com / fonts.gstatic.com.
@@ -182,8 +212,8 @@ template with new colours.
 - No forms that submit anywhere, no analytics, no tracking, no fetch/XHR calls.
 
 ## Before you finish
-Re-read each page file and check it against content.json: every section's text is present, every link works, and
-the HTML is valid. Then reply with one line listing the files you wrote. An automated browser QA (desktop, tablet
+Re-read each page file and check it against content.json: every section's text is present, every link works, the
+UI kit placement above is met (count the components per page), and the HTML is valid. Then reply with one line listing the files you wrote. An automated browser QA (desktop, tablet
 and phone; content coverage, overflow, broken assets, script errors, accessibility) runs after you; if it finds
 problems you will be asked to fix them.
 `;
@@ -216,7 +246,7 @@ all of the site's own text and images and invent nothing.\n`;
 }
 
 export const RUNNER_PROMPT =
-  "Use the website-redesign skill: first read skill/SKILL.md and skill/references/directions.md. Then read BRIEF.md (including any owner's notes and, for a revision, the previous pages in ./previous/), content.json (designDirection.creative is the creative direction to build), research/research.md and the screenshots in research/ (when present), uiux.md (when present) and the starter pages in ./starter/ in the current directory, and build the redesign exactly as the skill and BRIEF.md describe, writing the files into ./site/. Run the skill's QA checklist before you finish.";
+  "Use the website-redesign skill: first read skill/SKILL.md and skill/references/directions.md. Then read BRIEF.md (including any owner's notes and, for a revision, the previous pages in ./previous/), content.json (designDirection.creative is the creative direction to build), research/research.md and the screenshots in research/ (when present), uiux.md (when present) and the starter pages in ./starter/ in the current directory, and build the redesign exactly as the skill and BRIEF.md describe, using the Magic UI + Smooth UI components from skill/references/ui-kit.md as BRIEF.md's \"UI kit placement\" section requires, writing the files into ./site/. Run the skill's QA checklist before you finish.";
 
 /**
  * The design review and refinement pass: Claude looks at the rendered screenshots of its own pages and the automated

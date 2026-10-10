@@ -135,6 +135,19 @@ describe("design system", () => {
     expect(html).toContain('class="mu-progress"');
     expect(html).toContain("mu-shimmer");
     expect(html).toContain('class="tw-paths"');
+    expect(html).toContain("data-su-scroll-reveal");
+    expect(html).toContain("mu-beam");
+  });
+
+  it("requires the UI kit in every Claude redesign brief", async () => {
+    const { BRIEF, RUNNER_PROMPT, briefContent, UI_KIT } = await import("../src");
+    expect(BRIEF).toContain("## UI kit placement (Magic UI + Smooth UI)");
+    expect(BRIEF).toContain("skill/references/ui-kit.md");
+    expect(RUNNER_PROMPT).toContain("ui-kit.md");
+    const lead = { name: "Kit Cafe", category: "cafe", city: "Austin", country: "US", website: "https://kit.example", contacts: { emails: [], phones: [] } } as never;
+    const c = briefContent(lead, { crawledAt: "", pages: [] } as never);
+    expect(c.uiKit.libraries).toEqual(["Magic UI", "Smooth UI"]);
+    expect(c.uiKit.components.map((k) => k.id)).toEqual(UI_KIT.map((k) => k.id));
   });
 
   it("animates with Motion (Framer Motion's engine), pinned to an exact CDN version, never GSAP", async () => {
@@ -321,6 +334,20 @@ describe("redesign QA scorecard", () => {
     expect(md).toContain("NOT READY");
     expect(md).toContain("Critical defects");
     expect(md).toContain("TypeError");
+  });
+
+  it("holds back a redesign that doesn't use the required UI kit, and finds every component by its selector", async () => {
+    const { scoreRedesign, kitShortfall, UI_KIT } = await import("../src");
+    expect(new Set(UI_KIT.map((c) => c.selector)).size).toBe(UI_KIT.length);
+    const full = ["scroll-progress", "shimmer-button", "magnetic-button", "animated-shiny-text", "scroll-reveal-paragraph", "border-beam", "magic-card", "glow-hover-card", "blur-fade"];
+    expect(kitShortfall({ slug: "home", kit: full })).toBeNull();
+    expect(kitShortfall({ slug: "menu", kit: full.slice(0, 5) })).toBeNull();
+    expect(kitShortfall({ slug: "home", kit: full.slice(0, 5) })).toMatch(/5 of 8/);
+    expect(kitShortfall({ slug: "menu", kit: ["scroll-progress", "shimmer-button", "border-beam", "magic-card", "blur-fade"] })).toMatch(/both Magic UI and Smooth UI/);
+    expect(scoreRedesign(all({ kit: full }), ["home"], good).pass).toBe(true);
+    const thin = scoreRedesign(all({ kit: ["scroll-progress"] }), ["home"], good);
+    expect(thin.pass).toBe(false);
+    expect(thin.warnings.join(" ")).toMatch(/UI kit requirement not met/);
   });
 
   it("retries technical failures with backoff and sends everything else to a person", async () => {

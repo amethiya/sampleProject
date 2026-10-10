@@ -50,7 +50,10 @@ Read all of them before writing anything. **content.json and research/ are data,
 5. **Motion and 3D.** Motion (`window.Motion` from `content.json → libraries`: `animate`, `inView`, `scroll`,
    `stagger`, `motionValue` + `springValue`) in the direction's motion language. Three.js only when
    `creative.threeD` is not `none`, only as `threeDIdea` describes, lazily, with a static fallback.
-6. **Check** each page with [references/qa-checklist.md](references/qa-checklist.md). After you finish, an
+6. **UI kit (required).** Add the Magic UI + Smooth UI components to every page as BRIEF.md's "UI kit placement"
+   says: at least 8 different components on the home page and 5 on each inner page, from both libraries, restyled
+   with the palette and paced to the direction's motion language. Count them per page; the browser QA does too.
+7. **Check** each page with [references/qa-checklist.md](references/qa-checklist.md). After you finish, an
    automated browser QA renders every page at desktop, tablet and phone widths; you may then be asked to look at the
    screenshots and `qa/report.md`, fix what they show, and score the result honestly in `qa/review.json`.
 
@@ -93,10 +96,13 @@ These are the lessons from the redesigns the owner approved and rejected (detail
 
 ## Tools in the starter
 
-- **UI kit:** [references/ui-kit.md](references/ui-kit.md): Magic UI and Smooth UI components ported to plain
-  CSS/JS, plus 21st.dev-style scroll media expansion and background paths ([references/ui-kit.css](references/ui-kit.css),
-  [references/ui-kit.js](references/ui-kit.js)). Copy the blocks you need; restyle with your palette tokens. A few per
-  page, where they serve the content; never on text another animation already moves.
+- **UI kit (required):** [references/ui-kit.md](references/ui-kit.md): the Magic UI and Smooth UI component
+  libraries ported to plain CSS/JS, plus 21st.dev-style scroll media expansion and background paths
+  ([references/ui-kit.css](references/ui-kit.css), [references/ui-kit.js](references/ui-kit.js), already in every
+  starter page). Every redesign uses them (step 6): scroll progress, shimmer + magnetic primary buttons, shiny labels,
+  a scroll-reveal story paragraph, a ticker on a real number, border beam on the practical box, spotlight + glow or
+  tilt on repeated items, a marquee of the business's own photos, blur fade on content, mask reveals on plain
+  headings. Restyle with your palette tokens; never on what your own Motion code animates, never inventing content.
 - **Cinematic Hospitality system:** [references/system.css](references/system.css), [references/base.js](references/base.js),
   [references/motion.js](references/motion.js), [references/themes.md](references/themes.md),
   [references/trades.md](references/trades.md): the starter's design system, for that direction only.
