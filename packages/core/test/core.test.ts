@@ -134,6 +134,19 @@ describe("design system", () => {
     expect(html).toContain(UI_KIT_JS);
     expect(html).toContain('class="mu-progress"');
     expect(html).toContain("mu-shimmer");
+    expect(html).toContain("data-su-scroll-reveal");
+    expect(html).toContain("mu-beam");
+  });
+
+  it("requires the UI kit in every Claude redesign brief", async () => {
+    const { BRIEF, RUNNER_PROMPT, briefContent, UI_KIT } = await import("../src");
+    expect(BRIEF).toContain("## UI kit placement (Magic UI + Smooth UI)");
+    expect(BRIEF).toContain("skill/references/ui-kit.md");
+    expect(RUNNER_PROMPT).toContain("ui-kit.md");
+    const lead = { name: "Kit Cafe", category: "cafe", city: "Austin", country: "US", website: "https://kit.example", contacts: { emails: [], phones: [] } } as never;
+    const c = briefContent(lead, { crawledAt: "", pages: [] } as never);
+    expect(c.uiKit.libraries).toEqual(["Magic UI", "Smooth UI"]);
+    expect(c.uiKit.components.map((k) => k.id)).toEqual(UI_KIT.map((k) => k.id));
   });
 
   it("offers rich themes, navy first for most trades, rotating away from recent ones", async () => {

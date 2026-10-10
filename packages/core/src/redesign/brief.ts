@@ -4,6 +4,7 @@ import type { Lead } from "../types";
 import { makeDna, tradeFor, type DesignDna } from "./styles";
 import { SYSTEM_LIBRARIES, TRADE_PROMPTS, pickLook } from "./system";
 import { THEMES, photoUrl } from "./themes";
+import { UI_KIT } from "./ui-kit";
 
 /** External scripts Claude may load: GSAP + ScrollTrigger (native scrolling, no smooth-scroll library). */
 export const LIBRARIES: Record<string, string> = { gsap: SYSTEM_LIBRARIES[0], scrollTrigger: SYSTEM_LIBRARIES[1] };
@@ -48,6 +49,11 @@ export function briefContent(lead: Lead, site: SiteSnapshot, dna?: DesignDna, av
       fallbackPhotos: t.photos.map((id) => photoUrl(id, 1920)),
     },
     libraries: LIBRARIES,
+    uiKit: {
+      reference: "skill/references/ui-kit.md",
+      libraries: ["Magic UI", "Smooth UI"],
+      components: UI_KIT.map((c) => ({ id: c.id, name: c.name, library: c.library })),
+    },
   };
 }
 
@@ -101,11 +107,10 @@ websites. Build a complete, production-quality concept redesign of the website d
   photo reveals, content in sequence, curtain page transitions). Keep native scrolling: no smooth-scroll library
   and no CSS scroll-behavior: smooth. Starting states are set in script, never CSS-only; respect
   prefers-reduced-motion; never let sessionStorage/localStorage throw (previews are sandboxed).
-- UI kit: the starter also ships the Revamp Radar UI kit (components ported from Magic UI and Smooth UI to plain
-  CSS/JS: marquee, border beam, shine border, shimmer button, spotlight cards, number ticker, blur fade, magnetic
-  buttons, tilt and glow cards, mask reveals, scroll-reveal paragraph, scroll progress). Use it as described in
-  skill/references/ui-kit.md: keep its <style> and <script> blocks, add effects with its classes and data attributes,
-  sparingly and where they serve the content. Never load React, Tailwind or the libraries themselves.
+- UI kit (required): every redesign is built with the Revamp Radar UI kit, the Magic UI and Smooth UI component
+  libraries ported to plain CSS/JS (listed in content.json "uiKit", documented in skill/references/ui-kit.md). The
+  starter already contains its <style> and <script> blocks and some components; keep them and follow the
+  "UI kit placement" section below. Never load React, Tailwind or the libraries themselves.
 - Never: Three.js/WebGL, particles beyond the dust splash, custom cursors, letter-by-letter typing, or anything
   cartoonish.
 - Responsive from 360px to 1600px wide with no horizontal scrolling; a mobile menu when the navigation does not
@@ -116,6 +121,24 @@ websites. Build a complete, production-quality concept redesign of the website d
   a link to the page's "originalUrl".
 - Add <meta name="robots" content="noindex, nofollow">.
 
+## UI kit placement (Magic UI + Smooth UI)
+Use the components from skill/references/ui-kit.md with their exact classes and data attributes. Every home page uses
+at least 8 different components and every inner page at least 5, from both libraries, placed like this where the
+content allows:
+- Every page: scroll progress bar right after <body>; the primary call to action as a shimmer + magnetic button
+  (hero and visit section); the small "Discover"/"Welcome to" labels as shiny text or shimmer sweep.
+- Story: its strongest paragraph as a scroll-reveal paragraph; a number already in the text (a founding year,
+  years in business) as a number ticker.
+- Info strip, opening hours or booking box: border beam (one per page) or shine border.
+- Cards (signature items, services, team, other pages): spotlight (magic card) on each card, plus glow hover on the
+  grid or tilt on photo cards.
+- The business's own photos: a marquee strip when there are four or more; galleries and remaining content blocks
+  arrive with blur fade (staggered with data-delay).
+- Section headings that are not .echo headings: mask reveal up. A dot pattern behind one plain section.
+Rules: effects decorate the site's own content and never replace, reword or invent it (the ticker only animates a
+number that is already there); never on elements the motion script animates (.hero/.page-top content, .echo, .zig,
+.info children, .plate); everything stays visible with scripts blocked and calm under reduced motion.
+
 ## Allowed external resources
 - Scripts: only the URLs in "libraries" (GSAP, ScrollTrigger), plus inline JavaScript.
 - Fonts: fonts.googleapis.com / fonts.gstatic.com.
@@ -124,8 +147,8 @@ websites. Build a complete, production-quality concept redesign of the website d
 - No forms that submit anywhere, no analytics, no tracking, no fetch/XHR calls.
 
 ## Before you finish
-Re-read each page file and check it against content.json: every section's text is present, every link works, and
-the HTML is valid. Then reply with one line listing the files you wrote.
+Re-read each page file and check it against content.json: every section's text is present, every link works, the
+UI kit placement above is met (count the components per page), and the HTML is valid. Then reply with one line listing the files you wrote.
 `;
 
 /**
@@ -156,7 +179,7 @@ all of the site's own text and images and invent nothing.\n`;
 }
 
 export const RUNNER_PROMPT =
-  "Use the website-redesign skill: first read skill/SKILL.md and all files in skill/references/. Then read BRIEF.md (including any owner's notes and, for a revision, the previous pages in ./previous/), content.json and the starter pages in ./starter/ in the current directory and build the redesign exactly as the skill and BRIEF.md describe, writing the files into ./site/. Run the skill's QA checklist before you finish.";
+  "Use the website-redesign skill: first read skill/SKILL.md and all files in skill/references/. Then read BRIEF.md (including any owner's notes and, for a revision, the previous pages in ./previous/), content.json and the starter pages in ./starter/ in the current directory and build the redesign exactly as the skill and BRIEF.md describe, using the Magic UI + Smooth UI components from skill/references/ui-kit.md as BRIEF.md's \"UI kit placement\" section requires, writing the files into ./site/. Run the skill's QA checklist before you finish.";
 
 /** Where the website-redesign skill lives, relative to the repository root. */
 export const SKILL_DIR = ".claude/skills/website-redesign";

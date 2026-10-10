@@ -143,15 +143,15 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
   const lines = (s: SiteSection) => [...s.paragraphs, ...s.items];
 
   const echo = (text: string, tag = "h2", attrs = "") => `<${tag} class="echo"${attrs}>${text}</${tag}>`;
-  const disc = (text: string, center = false) => `<p class="disc"${center ? ' style="justify-content:center"' : ""}>${esc(text)}</p>`;
+  const disc = (text: string, center = false) => `<p class="disc"${center ? ' style="justify-content:center"' : ""}><span class="mu-shiny">${esc(text)}</span></p>`;
   const priceLine = (l: string) => {
     const m = l.match(/^(.*?)[\s.·…-]*((?:[$€£]\s?)?\d{1,4}(?:[.,]\d{2})?\s?(?:¢|€|\$|kr|zł|Kč|CHF)?)$/);
     return m && m[1].length > 1 && m[1].length < 80
       ? `<li><span class="n">${esc(m[1].trim())}</span><span class="p">${esc(m[2])}</span></li>`
       : `<li><span class="n">${esc(l)}</span></li>`;
   };
-  const sectionBody = (s: SiteSection) =>
-    `${s.paragraphs.map((p) => `<p class="muted">${esc(p)}</p>`).join("")}${s.items.length ? `<ul class="price-list${s.items.length > 8 ? " list-cols" : ""}">${s.items.map(priceLine).join("")}</ul>` : ""}`;
+  const sectionBody = (s: SiteSection, story = false) =>
+    `${s.paragraphs.map((p, i) => `<p class="muted"${story && i === 0 ? " data-su-scroll-reveal" : ""}>${esc(p)}</p>`).join("")}${s.items.length ? `<ul class="price-list${s.items.length > 8 ? " list-cols" : ""}">${s.items.map(priceLine).join("")}</ul>` : ""}`;
 
   /** Every remaining section of the page, shaped by its content. */
   const renderRest = () => {
@@ -162,7 +162,7 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
       const head = s.heading ? `${disc("Discover")}${echo(esc(s.heading))}` : "";
       const ls = lines(s);
       if (!ls.length && s.images.length) {
-        return `<section style="padding-top:0"><div class="wrap">${head}<div class="gallery">${s.images.map((u) => `<figure>${imgTag({ src: safeUrl(img(u)), fallback: stock(k) }, s.heading || lead.name)}</figure>`).join("")}</div></div></section>`;
+        return `<section style="padding-top:0"><div class="wrap">${head}<div class="gallery">${s.images.map((u, i) => `<figure data-mu-blur-fade data-delay="${(i % 4) * 0.08}">${imgTag({ src: safeUrl(img(u)), fallback: stock(k) }, s.heading || lead.name)}</figure>`).join("")}</div></div></section>`;
       }
       if (s.images.length) {
         flip = !flip;
@@ -170,15 +170,15 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
         return `<section style="padding-top:0"><div class="wrap"><div class="story"${flip ? ' style="direction:rtl"' : ""}>
   <div style="direction:ltr">${head}${sectionBody(s)}</div>
   <div class="ph" style="direction:ltr">${imgTag({ src: safeUrl(img(first)), fallback: stock(k) }, s.heading || lead.name)}</div>
-</div>${more.length ? `<div class="gallery">${more.map((u) => `<figure>${imgTag({ src: safeUrl(img(u)), fallback: stock(k + 1) }, s.heading || lead.name)}</figure>`).join("")}</div>` : ""}</div></section>`;
+</div>${more.length ? `<div class="gallery">${more.map((u, i) => `<figure data-mu-blur-fade data-delay="${(i % 4) * 0.08}">${imgTag({ src: safeUrl(img(u)), fallback: stock(k + 1) }, s.heading || lead.name)}</figure>`).join("")}</div>` : ""}</div></section>`;
       }
       const long = s.items.length > 5;
-      return `<section style="padding-top:0"><div class="wrap"><div class="${long ? "" : "prose-block"}">${head}${sectionBody(s)}</div></div></section>`;
+      return `<section style="padding-top:0"><div class="wrap"><div class="${long ? "" : "prose-block"}" data-mu-blur-fade>${head}${sectionBody(s)}</div></div></section>`;
     }).join("\n");
   };
 
   // Info strip: the facts a visitor needs, with glowing line icons.
-  const info = `<div class="info">
+  const info = `<div class="info mu-beam">
   <div>${ICON.pin}<div><b>Locate us</b><span><a href="${esc(osm)}" target="_blank" rel="noopener">${esc(where)}</a></span></div></div>
   <div>${ICON.clock}<div><b>Open hours</b><span>${hours.length ? hours.map(esc).join(" · ") : esc(t.label)}</span></div></div>
   <div>${phone ? ICON.phone : ICON.mail}<div><b>${phone ? "Call us" : "Write to us"}</b><span>${phone ? `<a href="tel:${tel}">${esc(phone)}</a>` : ""}${email ? `${phone ? " · " : ""}<a href="mailto:${esc(email)}">${esc(email)}</a>` : ""}</span></div></div>
@@ -192,6 +192,8 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
     const second = others[0];
     const heroPhoto = nextPhoto(0, 1000);
     const revealTitle = sections.find((s) => s.heading && s.heading.length <= 60 && s.heading.toLowerCase() !== lead.name.toLowerCase())?.heading || `${t.label} in ${lead.city}`;
+    // The business's own photos from every page, for the photo marquee.
+    const ownPhotos = [...new Set(site.pages.flatMap((p) => p.sections.flatMap((s) => s.images)))];
     const storySec = take((s) => s.paragraphs.some((p) => p.length >= 80));
     const offers = [0, 1, 2].map(() => take((s) => lines(s).length >= 2)).filter(Boolean) as SiteSection[];
     main += `
@@ -214,7 +216,7 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
 
 <section><div class="wrap">
   <div class="story">
-    <div>${disc("Discover")}${echo(esc(storySec?.heading || "Our story"))}${storySec ? sectionBody(storySec) : lead1 ? `<p class="muted">${esc(lead1)}</p>` : ""}${second ? `<a class="ulink" href="${pageHref(second.slug)}">${esc(second.label)}</a>` : ""}</div>
+    <div>${disc("Discover")}${echo(esc(storySec?.heading || "Our story"))}${storySec ? sectionBody(storySec, true) : lead1 ? `<p class="muted">${esc(lead1)}</p>` : ""}${second ? `<a class="ulink" href="${pageHref(second.slug)}">${esc(second.label)}</a>` : ""}</div>
     <div class="ph">${imgTag(storySec?.images[0] ? { src: safeUrl(img(storySec.images[0])), fallback: stock(2) } : nextPhoto(2), lead.name)}</div>
   </div>
   ${info}
@@ -227,9 +229,12 @@ ${offers.length ? `<section style="padding-top:0"><div class="wrap">
 </div>`).join("")}
 </div></section>` : ""}
 ${renderRest()}
+${ownPhotos.length >= 4 ? `<section style="padding-top:0" aria-label="${esc(lead.name)} photos"><div class="mu-marquee" style="--duration:60s">
+  <div class="mu-marquee-track">${ownPhotos.slice(0, 10).map((u, i) => imgTag({ src: safeUrl(img(u)), fallback: stock(6 + i, 900) }, lead.name)).join("")}</div>
+</div></section>` : ""}
 ${others.length ? `<section style="padding-top:0"><div class="wrap"><div class="framed">
   ${disc("Discover")}${echo("Explore")}
-  <div class="cards">${others.slice(0, 6).map((p, i) => { const ph = p.sections.flatMap((s) => s.images)[0]; const line = p.sections.flatMap((s) => [...s.paragraphs, ...s.items]).find((x) => x.length > 30) ?? p.title; return `<a class="dish-card mu-spotlight" href="${pageHref(p.slug)}" style="text-decoration:none"><div class="ph">${imgTag(ph ? { src: safeUrl(img(ph)), fallback: stock(4 + i, 900) } : { src: stock(4 + i, 900), fallback: stock(4 + i, 900) }, p.label)}</div><div class="row"><h3>${esc(p.label)}</h3><span class="p">${ICON.arrow}</span></div><p>${esc(firstSentences(line, 110))}</p></a>`; }).join("")}</div>
+  <div class="cards" data-su-glow>${others.slice(0, 6).map((p, i) => { const ph = p.sections.flatMap((s) => s.images)[0]; const line = p.sections.flatMap((s) => [...s.paragraphs, ...s.items]).find((x) => x.length > 30) ?? p.title; return `<a class="dish-card mu-spotlight" href="${pageHref(p.slug)}" style="text-decoration:none"><div class="ph">${imgTag(ph ? { src: safeUrl(img(ph)), fallback: stock(4 + i, 900) } : { src: stock(4 + i, 900), fallback: stock(4 + i, 900) }, p.label)}</div><div class="row"><h3>${esc(p.label)}</h3><span class="p">${ICON.arrow}</span></div><p>${esc(firstSentences(line, 110))}</p></a>`; }).join("")}</div>
 </div></div></section>` : ""}`;
   } else {
     const side = nextPhoto(1, 900);
@@ -246,7 +251,7 @@ ${renderRest()}`;
   ${disc("Visit us", true)}
   ${echo(name)}
   <p class="muted">${esc(where)}${hours.length ? ` · ${hours.map(esc).join(" · ")}` : ""}</p>
-  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap"><a class="btn gold" href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a><a class="btn" href="${esc(osm)}" target="_blank" rel="noopener">Directions</a>${email ? `<a class="btn" href="mailto:${esc(email)}">${esc(email)}</a>` : ""}</div>
+  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap"><a class="btn gold mu-shimmer" data-su-magnetic href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a><a class="btn" href="${esc(osm)}" target="_blank" rel="noopener">Directions</a>${email ? `<a class="btn" href="mailto:${esc(email)}">${esc(email)}</a>` : ""}</div>
 </div></section>`;
 
   const half = Math.ceil(site.pages.length / 2);

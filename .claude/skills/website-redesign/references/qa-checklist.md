@@ -13,6 +13,15 @@
       cards, remaining content, visit CTA over a photo, four-column footer. Inner pages open with page-top.
 - [ ] It looks better than the starter page, never worse. It would make a client say "wow".
 
+## UI kit (Magic UI + Smooth UI)
+- [ ] The ui-kit `<style>` and `<script>` from the starter are kept, and nothing else loads React, Tailwind or the
+      libraries.
+- [ ] Home uses at least 8 different kit components, each inner page at least 5, from both libraries, placed as in
+      BRIEF.md's "UI kit placement" (scroll progress, shimmer + magnetic primary buttons, card spotlight/glow/tilt,
+      scroll-reveal story paragraph, photo marquee when there are 4+ own photos, blur fade on content...).
+- [ ] No kit effect on elements the motion script animates; no number ticker on a number that isn't in the text.
+- [ ] With reduced motion and with scripts blocked, all text is visible and the page still reads well.
+
 ## Structure
 - [ ] Concept banner at the top linking to this page's `originalUrl`.
 - [ ] Navigation lists every page (main pages in the header, all pages in the mobile menu and footer).
