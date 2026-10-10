@@ -54,3 +54,24 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## UI UX Pro Max — https://github.com/nextlevelbuilder/ui-ux-pro-max-skill
+
+`.claude/skills/ui-ux-pro-max/` is a copy of the skill (commit 50d8a7d, tests removed; script paths in SKILL.md
+point at this folder). Its licence is included there as `LICENSE`:
+
+```
+MIT License
+
+Copyright (c) 2024 Next Level Builder
+```
+
+## Motion — https://github.com/motiondivision/motion
+
+Redesign pages load `motion` (MIT, Copyright (c) 2024 Motion B.V.) from cdn.jsdelivr.net at runtime; no Motion code
+is copied into this repository.
+
+## 21st.dev community components — https://21st.dev/community/components
+
+The "Scroll Media Expansion" and "Background Paths" effects in `ui-kit.ts` are written from the public descriptions
+of the community components of the same names; no code from 21st.dev is used.

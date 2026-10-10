@@ -13,6 +13,7 @@
 import { cp, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
+import { writeUiux } from "./uiux";
 import { SKILL_DIR, briefContent, jobBrief, dnaFromKey, writeStarter, type Lead, type SiteSnapshot } from "@rr/core";
 
 const { values: args, positionals } = parseArgs({
@@ -78,14 +79,17 @@ async function fetchJob() {
   await cp(resolve(process.env.INIT_CWD ?? process.cwd(), SKILL_DIR), join(dir, "skill"), { recursive: true });
   const previous = await writePrevious(dir, next.previous ?? []);
   await writeFile(join(dir, "BRIEF.md"), jobBrief(next.job, previous));
-  await writeFile(join(dir, "content.json"), JSON.stringify(briefContent(next.lead, next.site, dna, next.avoid ?? []), null, 2));
+  const content = briefContent(next.lead, next.site, dna, next.avoid ?? []);
+  await writeFile(join(dir, "content.json"), JSON.stringify(content, null, 2));
+  // UI UX Pro Max guidance for this trade (uiux.md); skipped when python3 is missing.
+  if (!(await writeUiux(resolve(process.env.INIT_CWD ?? process.cwd()), dir, content.designDirection.trade.label, writeFile))) console.log("UI UX Pro Max guidance skipped (needs python3).");
   // The design-system version of every page: Claude starts from it and makes it better.
   await mkdir(join(dir, "starter"), { recursive: true });
   for (const f of writeStarter(next.lead, next.site, dna)) await writeFile(join(dir, "starter", f.file), f.html);
   if (next.job.notes) console.log(`Owner's notes: ${next.job.notes}`);
   await writeFile(join(dir, "job.json"), JSON.stringify({ id: next.job.id, leadId: next.job.leadId, preview: `${base}/preview/${encodeURIComponent(next.job.leadId)}/` }, null, 2));
   console.log(`Job ${next.job.id}: ${next.lead.name}, ${next.site.pages.length} pages${dna ? `, ${dna.look.name} theme` : ""}.`);
-  console.log(`Next: use the website-redesign skill (${dir}/skill/SKILL.md), read BRIEF.md, content.json and the pages in starter/, write the pages into ${dir}/site/, then run`);
+  console.log(`Next: use the website-redesign skill (${dir}/skill/SKILL.md), read BRIEF.md, content.json, uiux.md and the pages in starter/, write the pages into ${dir}/site/, then run`);
   console.log(`  npm run job -- upload jobs/${next.job.id}`);
 }
 

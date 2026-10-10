@@ -48,8 +48,13 @@ paragraph, list and image in order, and renders each page in a professional, pho
 Every page also carries the **UI kit** (`packages/core/src/redesign/ui-kit.ts`): components from
 [Magic UI](https://magicui.design) and [Smooth UI](https://smoothui.dev) (marquee, border beam, shine border, shimmer
 button, spotlight cards, number ticker, blur fade, magnetic buttons, tilt/glow cards, mask reveals, scroll-reveal
-paragraph, scroll progress) ported to plain CSS/JS so they run in the static, CSP-locked previews. The instant
-renderer uses a few; Claude redesigns use the rest via the skill's `references/ui-kit.md`.
+paragraph, scroll progress) ported to plain CSS/JS so they run in the static, CSP-locked previews, plus effects after
+popular [21st.dev](https://21st.dev/community/components) components (scroll media expansion, background paths). The
+instant renderer uses a few; Claude redesigns use the rest via the skill's `references/ui-kit.md`.
+
+Motion runs on [Motion](https://motion.dev) (`motion` on npm: Framer Motion's engine for plain HTML), loaded from a
+pinned jsdelivr URL. Claude redesign jobs also get `uiux.md`: guidance for the business's trade from the
+[UI UX Pro Max](https://uupm.cc) skill (`.claude/skills/ui-ux-pro-max/`; needs `python3` on the runner machine).
 
 **Redesign with Claude** (dashboard → lead → Redesign → *Redesign with Claude*) queues a job. A runner on your
 Mac picks it up and has Claude Code, signed in with your Claude subscription, build a bespoke multi-page site from

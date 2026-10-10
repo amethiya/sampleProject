@@ -3,7 +3,7 @@
 Generated from packages/core/src/redesign/ui-kit.ts by `npm run skill:catalog`. Do not edit by hand.
 
 Components from Magic UI (magicui.design) and Smooth UI (smoothui.dev), both MIT, ported from React + Tailwind
-+ Motion to plain CSS and JavaScript so they run in the static, CSP-locked redesign pages. Every starter page already
++ Motion to plain CSS and JavaScript, plus effects after popular 21st.dev community components, so they run in the static, CSP-locked redesign pages. Every starter page already
 includes ui-kit.css (in its <style>) and ui-kit.js (an inline <script> after the base script): keep both, and add a
 component by putting its class or data attribute on your markup. Never load React, Tailwind or the libraries.
 
@@ -142,5 +142,23 @@ The words of a paragraph light up one by one as you scroll through it. One stron
 
 ```html
 <p data-su-scroll-reveal>...</p>
+```
+
+## 21st.dev
+
+### Scroll Media Expansion (`scroll-expand-media`)
+
+A framed photo opens up to full width as it scrolls into view (after 21st.dev's scroll-expansion hero). One per page, for the business's best wide photo: the dining room, the clinic, the workshop. Not inside .hero or the cloud reveal.
+
+```html
+<div class="tw-expand"><div class="tw-expand-frame"><img src="..." alt="..." loading="lazy" referrerpolicy="no-referrer"></div></div>
+```
+
+### Background Paths (`background-paths`)
+
+Fine lines in the theme's accent that drift slowly behind a calm band (after 21st.dev's background paths): the footer call-to-action band, a quiet intro or quote section. Never behind photos or long text. Option: data-lines (default 18).
+
+```html
+<div class="foot-cta"><div class="tw-paths" aria-hidden="true"></div> ...the band's content... </div>
 ```
 

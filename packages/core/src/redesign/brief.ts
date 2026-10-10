@@ -6,8 +6,8 @@ import { SYSTEM_LIBRARIES, TRADE_PROMPTS, pickLook } from "./system";
 import { THEMES, photoUrl } from "./themes";
 import { UI_KIT } from "./ui-kit";
 
-/** External scripts Claude may load: GSAP + ScrollTrigger (native scrolling, no smooth-scroll library). */
-export const LIBRARIES: Record<string, string> = { gsap: SYSTEM_LIBRARIES[0], scrollTrigger: SYSTEM_LIBRARIES[1] };
+/** External scripts Claude may load: Motion, Framer Motion's vanilla-JS engine (native scrolling, no smooth-scroll library). */
+export const LIBRARIES: Record<string, string> = { motion: SYSTEM_LIBRARIES[0] };
 
 /** The data file handed to Claude: everything it may use, nothing else. */
 export function briefContent(lead: Lead, site: SiteSnapshot, dna?: DesignDna, avoid: string[] = []) {
@@ -69,6 +69,10 @@ redesign. Keep the system (its CSS, base and motion scripts, components and them
 sharper mapping of this business's content onto the sections, the trade prompt in designDirection.trade, the
 best images, round cut-out hero images, menus and services as proper price lists. Never fall below the starter.
 
+**Check against ./uiux.md** when it is present: UI UX Pro Max guidance for this trade (UX, accessibility, mobile,
+images, anti-patterns). Apply what fits; this brief, content.json and the website-redesign skill win where they
+disagree (keep the theme's colours and fonts, add no section the site has no content for, keep native scrolling).
+
 You are the lead designer and front-end developer at Revamp Radar, a studio that rebuilds dated small-business
 websites. Build a complete, production-quality concept redesign of the website described in content.json.
 
@@ -103,10 +107,12 @@ websites. Build a complete, production-quality concept redesign of the website d
 - Photography carries the design: the business's own photos first; "fallbackPhotos" or images.unsplash.com for
   gaps, credited in the footer.
 - Every page of content.json is redesigned completely: no page skipped, no section dropped, nothing added.
-- Motion comes from the starter's motion script (loader counter, echo headings, plates spinning in, cloud reveal,
-  photo reveals, content in sequence, curtain page transitions). Keep native scrolling: no smooth-scroll library
-  and no CSS scroll-behavior: smooth. Starting states are set in script, never CSS-only; respect
-  prefers-reduced-motion; never let sessionStorage/localStorage throw (previews are sandboxed).
+- Motion comes from the starter's motion script, built on Motion (window.Motion: Framer Motion's engine for plain
+  HTML; animate, inView, scroll, stagger, springValue): loader counter, echo headings, plates spinning in, the
+  sticky cloud reveal, photo reveals, content in sequence, curtain page transitions. Add your own effects with the
+  same library and those functions; never load GSAP, React or framer-motion's React build. Keep native scrolling:
+  no smooth-scroll library and no CSS scroll-behavior: smooth. Starting states are set in script, never CSS-only;
+  respect prefers-reduced-motion; never let sessionStorage/localStorage throw (previews are sandboxed).
 - UI kit (required): every redesign is built with the Revamp Radar UI kit, the Magic UI and Smooth UI component
   libraries ported to plain CSS/JS (listed in content.json "uiKit", documented in skill/references/ui-kit.md). The
   starter already contains its <style> and <script> blocks and some components; keep them and follow the
@@ -140,7 +146,7 @@ number that is already there); never on elements the motion script animates (.he
 .info children, .plate); everything stays visible with scripts blocked and calm under reduced motion.
 
 ## Allowed external resources
-- Scripts: only the URLs in "libraries" (GSAP, ScrollTrigger), plus inline JavaScript.
+- Scripts: only the URLs in "libraries" (Motion), plus inline JavaScript.
 - Fonts: fonts.googleapis.com / fonts.gstatic.com.
 - Images: the URLs in content.json and images.unsplash.com.
 - Map: https://www.openstreetmap.org links (an embedded iframe from https://www.openstreetmap.org/export/embed.html is allowed when "map" is set).
@@ -179,7 +185,7 @@ all of the site's own text and images and invent nothing.\n`;
 }
 
 export const RUNNER_PROMPT =
-  "Use the website-redesign skill: first read skill/SKILL.md and all files in skill/references/. Then read BRIEF.md (including any owner's notes and, for a revision, the previous pages in ./previous/), content.json and the starter pages in ./starter/ in the current directory and build the redesign exactly as the skill and BRIEF.md describe, using the Magic UI + Smooth UI components from skill/references/ui-kit.md as BRIEF.md's \"UI kit placement\" section requires, writing the files into ./site/. Run the skill's QA checklist before you finish.";
+  "Use the website-redesign skill: first read skill/SKILL.md and all files in skill/references/. Then read BRIEF.md (including any owner's notes and, for a revision, the previous pages in ./previous/), content.json, uiux.md (when present) and the starter pages in ./starter/ in the current directory and build the redesign exactly as the skill and BRIEF.md describe, using the Magic UI + Smooth UI components from skill/references/ui-kit.md as BRIEF.md's \"UI kit placement\" section requires, writing the files into ./site/. Run the skill's QA checklist before you finish.";
 
 /** Where the website-redesign skill lives, relative to the repository root. */
 export const SKILL_DIR = ".claude/skills/website-redesign";

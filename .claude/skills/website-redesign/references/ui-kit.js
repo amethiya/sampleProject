@@ -203,4 +203,34 @@
     document.addEventListener('pointermove', function(e){ pt = { x: e.clientX, y: e.clientY }; if (!busy){ busy = true; requestAnimationFrame(pull); } }, { passive: true });
     document.documentElement.addEventListener('pointerleave', function(){ mags.forEach(function(m){ m.style.translate = ''; }); });
   }
+
+  // 21st.dev-style: Background Paths (fine accent lines drifting along their curves)
+  $$('.tw-paths').forEach(function(el){
+    if (el.firstChild) return;
+    var host = el.parentElement;
+    if (host && getComputedStyle(host).position === 'static') host.style.position = 'relative';
+    if (host && getComputedStyle(host).overflow === 'visible') host.style.overflow = 'hidden';
+    var n = Math.min(40, Math.max(4, num(el, 'data-lines', 18))), out = '';
+    for (var i = 0; i < n; i++){
+      var y = 30 + i * (340 / n), dash = 260 + (i * 37) % 240;
+      out += '<path pathLength="1000" stroke-width="' + (0.5 + i * 0.04).toFixed(2) + '" stroke-opacity="' + (0.06 + i * 0.012).toFixed(3) + '"'
+        + ' stroke-dasharray="' + dash + ' ' + (1000 - dash) + '" style="--d:' + (18 + (i * 7) % 14) + 's;animation-delay:-' + ((i * 1.7) % 12).toFixed(1) + 's"'
+        + ' d="M-60 ' + y.toFixed(1) + ' C 240 ' + (y - 130 + i * 4).toFixed(1) + ', 620 ' + (y + 150 - i * 3).toFixed(1) + ', 1060 ' + (y - 50).toFixed(1) + '"/>';
+    }
+    el.innerHTML = '<svg viewBox="0 0 1000 400" preserveAspectRatio="none" focusable="false">' + out + '</svg>';
+  });
+
+  // 21st.dev-style: Scroll Media Expansion (the frame opens from an inset, rounded card to full width)
+  var ex = $$('.tw-expand');
+  if (ex.length && !reduce) onScroll(function(){
+    var h = innerHeight;
+    ex.forEach(function(el){
+      var r = el.getBoundingClientRect();
+      if (r.bottom < -h || r.top > h * 2) return;
+      var e = 1 - Math.pow(1 - Math.min(1, Math.max(0, (h - r.top) / (h * 0.9))), 2), q = 1 - e;
+      var f = el.querySelector('.tw-expand-frame'), im = f && f.querySelector('img');
+      if (f) f.style.clipPath = 'inset(' + (q * 12).toFixed(2) + '% ' + (q * 20).toFixed(2) + '% round ' + (q * 28).toFixed(1) + 'px)';
+      if (im) im.style.scale = (1.18 - 0.18 * e).toFixed(4);
+    });
+  });
 })();

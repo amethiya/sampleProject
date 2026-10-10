@@ -17,9 +17,11 @@ import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { writeUiux } from "./uiux";
 import { RUNNER_PROMPT, SKILL_DIR, briefContent, jobBrief, dnaFromKey, writeStarter, type Lead, type SiteSnapshot } from "@rr/core";
 
-const skillSource = resolve(fileURLToPath(import.meta.url), "../../../..", SKILL_DIR);
+const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
+const skillSource = resolve(repoRoot, SKILL_DIR);
 
 const { values: args } = parseArgs({
   options: {
@@ -99,7 +101,7 @@ function runClaude(cwd: string, timeoutMin: number, pageFiles: string[]): Promis
           say(`${first ? "wrote" : "edited"} ${file}  (${written.size}/${pageFiles.length} pages)`);
         } else if (c.name === "Read" && file && !seen.has(file)) {
           seen.add(file);
-          if (/^(BRIEF\.md|content\.json|skill\/SKILL\.md|previous\/)/.test(file)) say(`reading ${file}`);
+          if (/^(BRIEF\.md|content\.json|uiux\.md|skill\/SKILL\.md|previous\/)/.test(file)) say(`reading ${file}`);
         }
       }
     };
@@ -156,7 +158,10 @@ async function processJob({ job, lead, site, avoid = [], previous = [] }: NextJo
     await mkdir(join(dir, "starter"), { recursive: true });
     for (const f of writeStarter(lead, site, dna)) await writeFile(join(dir, "starter", f.file), f.html);
     if (job.notes || previous.length) console.log(`  ${previous.length ? "Revising the previous version" : "New design"}${job.notes ? `; notes: ${job.notes.slice(0, 200)}` : ""}`);
-    await writeFile(join(dir, "content.json"), JSON.stringify(briefContent(lead, site, dna, avoid), null, 2));
+    const content = briefContent(lead, site, dna, avoid);
+    await writeFile(join(dir, "content.json"), JSON.stringify(content, null, 2));
+    // UI UX Pro Max guidance for this trade (uiux.md); Claude has no shell here, so the search runs now.
+    if (!(await writeUiux(repoRoot, dir, content.designDirection.trade.label, writeFile))) console.log("  UI UX Pro Max guidance skipped (needs python3).");
     current = { jobId: job.id, child: null };
     const pageFiles = site.pages.map((p) => (p.slug === "home" ? "index.html" : `${p.slug}.html`));
     console.log(`  Claude is designing ${pageFiles.length} pages; progress appears below (usually 10–15 minutes).`);
