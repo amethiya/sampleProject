@@ -8,7 +8,8 @@
     "deploy": "wrangler deploy",
     "db:init": "wrangler d1 execute revamp-radar --remote --file=schema.sql",
     "db:init:local": "wrangler d1 execute revamp-radar --local --file=schema.sql",
-    "db:migrate": "wrangler d1 execute revamp-radar --remote --file=migrations/0002_redesign.sql && wrangler d1 execute revamp-radar --remote --file=migrations/0003_design_dna.sql && wrangler d1 execute revamp-radar --remote --file=migrations/0004_indexes.sql",
+    "db:migrate": "wrangler d1 execute revamp-radar --remote --file=migrations/0002_redesign.sql && wrangler d1 execute revamp-radar --remote --file=migrations/0003_design_dna.sql && wrangler d1 execute revamp-radar --remote --file=migrations/0004_indexes.sql && wrangler d1 execute revamp-radar --remote --file=migrations/0005_revisions.sql && wrangler d1 execute revamp-radar --remote --file=migrations/0006_pipeline.sql",
+    "db:migrate:pipeline": "wrangler d1 execute revamp-radar --remote --file=migrations/0006_pipeline.sql",
     "hash-password": "node scripts/hash-password.mjs",
     "typecheck": "tsc -p ."
   },

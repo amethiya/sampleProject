@@ -1,6 +1,12 @@
 # Quality bar: what a "wow" redesign looks like
 
-The owner's standard: a client opens the redesign and says "oh wow". Our first attempts at Rise & Shine Biscuit
+The owner's standard: a client opens the redesign and says "oh wow", and it looks made for that business.
+
+The general lessons below (first screen, pacing, craft, motion, contrast, checking every page) apply to every
+creative direction. The specific layout described (dark hero with a round cut-out, cloud reveal, Edem-style footer)
+is the **Cinematic Hospitality** direction: use it only when content.json selects that direction. Applying it to every
+business is exactly what made redesigns look repetitive (a physiotherapy clinic does not want a candle-lit restaurant
+hero). Our first attempts at Rise & Shine Biscuit
 Kitchen failed that test twice: a random palette with text-only boxes read as "you just changed the colours", and a
 brand-correct but flat menu-board layout read as "a little good, not that much". The version that passed did these
 things. Aim for all of them on every site.
