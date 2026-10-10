@@ -1,15 +1,16 @@
 /**
  * Writes the skill's design-system references from packages/core/src/redesign/system.ts: `npm run skill:catalog`.
- * themes.md, trades.md, system.css, base.js and motion.js are generated; never edit them by hand.
+ * themes.md, trades.md, system.css, base.js, motion.js and the ui-kit files are generated; never edit them by hand.
  */
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { LOOKS, SKILL_DIR, SYSTEM_BASE_JS, SYSTEM_CSS, SYSTEM_MOTION_JS, TRADE_PROMPTS, lookVars } from "@rr/core";
+import { LOOKS, SKILL_DIR, SYSTEM_BASE_JS, SYSTEM_CSS, SYSTEM_MOTION_JS, TRADE_PROMPTS, UI_KIT, UI_KIT_CSS, UI_KIT_JS, lookVars } from "@rr/core";
 
 const root = resolve(fileURLToPath(import.meta.url), "../../../..");
 const ref = (f: string) => resolve(root, SKILL_DIR, "references", f);
 const note = "Generated from packages/core/src/redesign/system.ts by `npm run skill:catalog`. Do not edit by hand.";
+const kitNote = "Generated from packages/core/src/redesign/ui-kit.ts by `npm run skill:catalog`. Do not edit by hand.";
 
 let themes = `# Themes\n\n${note}\n\nEvery site gets one theme in \`content.json → designDirection.theme\`. Use its colours and fonts exactly; the\nstarter pages already contain its CSS variables. Navy leads for most trades; themes rotate so neighbours differ.\n\n`;
 themes += "| Theme | Mode | Background | Text | Accent | Fonts |\n|---|---|---|---|---|---|\n";
@@ -26,4 +27,12 @@ writeFileSync(ref("trades.md"), trades);
 writeFileSync(ref("system.css"), `/* ${note} Theme variables (:root) come first; see themes.md. */\n${SYSTEM_CSS}`);
 writeFileSync(ref("base.js"), `// ${note}\n${SYSTEM_BASE_JS}\n`);
 writeFileSync(ref("motion.js"), `// ${note}\n${SYSTEM_MOTION_JS}\n`);
-console.log(`Wrote themes.md (${LOOKS.length} themes), trades.md, system.css, base.js, motion.js to ${SKILL_DIR}/references`);
+let kit = `# UI kit\n\n${kitNote}\n\nComponents from Magic UI (magicui.design) and Smooth UI (smoothui.dev), both MIT, ported from React + Tailwind\n+ Motion to plain CSS and JavaScript so they run in the static, CSP-locked redesign pages. Every starter page already\nincludes ui-kit.css (in its <style>) and ui-kit.js (an inline <script> after the base script): keep both, and add a\ncomponent by putting its class or data attribute on your markup. Never load React, Tailwind or the libraries.\n\nRules: colours come from the theme variables; a few effects per page, where they serve the content; never on text the\nmotion script already animates (.hero / .page-top content, .echo, .zig, .info); never invent content for them (the\nticker only animates a number already in the text). Everything respects prefers-reduced-motion; hover effects only\nrun on fine pointers.\n\n`;
+for (const lib of ["Magic UI", "Smooth UI"] as const) {
+  kit += `## ${lib}\n\n`;
+  for (const c of UI_KIT.filter((k) => k.library === lib)) kit += `### ${c.name} (\`${c.id}\`)\n\n${c.use}\n\n\`\`\`html\n${c.markup}\n\`\`\`\n\n`;
+}
+writeFileSync(ref("ui-kit.md"), kit);
+writeFileSync(ref("ui-kit.css"), `/* ${kitNote} */${UI_KIT_CSS}`);
+writeFileSync(ref("ui-kit.js"), `// ${kitNote}\n${UI_KIT_JS}\n`);
+console.log(`Wrote themes.md (${LOOKS.length} themes), trades.md, system.css, base.js, motion.js, ui-kit.md (${UI_KIT.length} components), ui-kit.css, ui-kit.js to ${SKILL_DIR}/references`);

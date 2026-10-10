@@ -101,6 +101,11 @@ websites. Build a complete, production-quality concept redesign of the website d
   photo reveals, content in sequence, curtain page transitions). Keep native scrolling: no smooth-scroll library
   and no CSS scroll-behavior: smooth. Starting states are set in script, never CSS-only; respect
   prefers-reduced-motion; never let sessionStorage/localStorage throw (previews are sandboxed).
+- UI kit: the starter also ships the Revamp Radar UI kit (components ported from Magic UI and Smooth UI to plain
+  CSS/JS: marquee, border beam, shine border, shimmer button, spotlight cards, number ticker, blur fade, magnetic
+  buttons, tilt and glow cards, mask reveals, scroll-reveal paragraph, scroll progress). Use it as described in
+  skill/references/ui-kit.md: keep its <style> and <script> blocks, add effects with its classes and data attributes,
+  sparingly and where they serve the content. Never load React, Tailwind or the libraries themselves.
 - Never: Three.js/WebGL, particles beyond the dust splash, custom cursors, letter-by-letter typing, or anything
   cartoonish.
 - Responsive from 360px to 1600px wide with no horizontal scrolling; a mobile menu when the navigation does not

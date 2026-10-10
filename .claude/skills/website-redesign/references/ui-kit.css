@@ -1,0 +1,49 @@
+/* Generated from packages/core/src/redesign/ui-kit.ts by `npm run skill:catalog`. Do not edit by hand. */
+/* UI kit: Magic UI + Smooth UI components (MIT), ported to plain CSS/JS */
+/* Magic UI · Marquee */
+.mu-marquee{--gap:2.5rem;--duration:40s;display:flex;gap:var(--gap);overflow:hidden;-webkit-mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent);mask-image:linear-gradient(90deg,transparent,#000 8%,#000 92%,transparent)}
+.mu-marquee-track{display:flex;flex-shrink:0;align-items:center;justify-content:space-around;gap:var(--gap);min-width:100%}
+.mu-marquee-track img{height:clamp(120px,18vw,220px);width:auto;object-fit:cover}
+.mu-marquee.is-ready .mu-marquee-track{animation:mu-marquee var(--duration) linear infinite}
+.mu-marquee[data-reverse] .mu-marquee-track{animation-direction:reverse}
+.mu-marquee:hover .mu-marquee-track{animation-play-state:paused}
+@keyframes mu-marquee{to{transform:translateX(calc(-100% - var(--gap)))}}
+/* Magic UI · Border Beam */
+.mu-beam,.mu-shine{position:relative}
+.mu-beam-ray,.mu-shine-ray{position:absolute;inset:0;border-radius:inherit;pointer-events:none;-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0)}
+.mu-beam-ray{display:none;padding:var(--beam-width,1px)}
+@supports (offset-path:rect(0 auto auto 0)){.mu-beam-ray{display:block}}
+.mu-beam-ray::before{content:"";position:absolute;width:var(--beam-size,90px);aspect-ratio:1;background:linear-gradient(to left,var(--gold-2),var(--gold),transparent);offset-path:rect(0 auto auto 0 round var(--beam-size,90px));animation:mu-beam var(--beam-duration,8s) linear infinite}
+@keyframes mu-beam{from{offset-distance:0%}to{offset-distance:100%}}
+/* Magic UI · Shine Border */
+.mu-shine-ray{padding:var(--shine-width,1px);background-image:radial-gradient(transparent,transparent,var(--gold),var(--gold-2),transparent,transparent);background-size:300% 300%;animation:mu-shine var(--shine-duration,14s) linear infinite}
+@keyframes mu-shine{0%{background-position:0% 0%}50%{background-position:100% 100%}to{background-position:0% 0%}}
+/* Magic UI · Shimmer Button */
+@property --mu-angle{syntax:"<angle>";inherits:false;initial-value:0deg}
+.mu-shimmer{box-shadow:inset 0 -8px 10px rgba(var(--accent2-rgb),.1);transition:color .35s,border-color .35s,box-shadow .3s}
+.mu-shimmer:hover{box-shadow:inset 0 -6px 10px rgba(var(--accent2-rgb),.25)}
+.mu-shimmer::after{content:"";position:absolute;inset:0;padding:1px;pointer-events:none;background:conic-gradient(from var(--mu-angle),transparent 0 290deg,var(--gold-2) 345deg,transparent 360deg);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);animation:mu-spin 3s linear infinite}
+@keyframes mu-spin{to{--mu-angle:360deg}}
+/* Magic UI · Animated Shiny Text */
+.mu-shiny{--shiny-width:120px;color:rgba(var(--ink-rgb),.62);background:linear-gradient(90deg,transparent,rgba(var(--accent2-rgb),.95) 50%,transparent) 0 0/var(--shiny-width) 100% no-repeat;-webkit-background-clip:text;background-clip:text;animation:mu-shiny 8s infinite}
+@keyframes mu-shiny{0%,90%,to{background-position:calc(-100% - var(--shiny-width)) 0}30%,60%{background-position:calc(100% + var(--shiny-width)) 0}}
+/* Magic UI · Magic Card (spotlight) */
+.mu-spot{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .45s;background:radial-gradient(var(--spot-size,260px) circle at var(--mx,-999px) var(--my,-999px),rgba(var(--accent-rgb),.14),transparent 100%)}
+.is-lit>.mu-spot{opacity:1}
+/* Magic UI · Dot Pattern */
+.mu-dots{position:absolute;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(rgba(var(--ink-rgb),.16) 1px,transparent 1.5px);background-size:18px 18px;-webkit-mask-image:radial-gradient(ellipse at center,#000 30%,transparent 75%);mask-image:radial-gradient(ellipse at center,#000 30%,transparent 75%)}
+/* Magic UI · Scroll Progress */
+.mu-progress{position:fixed;inset:0 0 auto;z-index:60;height:2px;transform:scaleX(0);transform-origin:left;background:linear-gradient(90deg,var(--gold),var(--gold-2));pointer-events:none}
+/* Smooth UI · Tilt Card, Glow Hover Cards, Mask Reveal Up, Scroll Reveal Paragraph */
+.su-glare{position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .3s}
+.su-glow-ray{position:absolute;inset:0;border-radius:inherit;pointer-events:none;padding:1px;background:radial-gradient(var(--glow-size,320px) circle at var(--gx,-999px) var(--gy,-999px),rgba(var(--accent2-rgb),.9),transparent 60%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);opacity:var(--glow-on,0);transition:opacity .4s}
+.su-mask{display:block;overflow:hidden;padding-bottom:.08em}
+.su-mask-in{display:block}
+.su-word{transition:opacity .15s linear}
+@media (prefers-reduced-motion:reduce){
+  .mu-beam-ray,.mu-shine-ray{display:none}
+  .mu-shimmer::after{animation:none;opacity:0}
+  .mu-shiny{animation:none;background:none;color:inherit}
+  .mu-marquee{overflow-x:auto}
+  .mu-marquee .mu-marquee-track{animation:none}
+}
