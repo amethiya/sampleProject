@@ -2,7 +2,7 @@
 
 *,*::before,*::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--text);font:var(--body-weight) 16.5px/1.75 var(--body);-webkit-font-smoothing:antialiased;overflow-x:hidden}
+body{margin:0;background:var(--bg);color:var(--text);font:var(--body-weight) 16.5px/1.75 var(--body);-webkit-font-smoothing:antialiased;overflow-x:clip}
 img{max-width:100%;display:block}
 a{color:inherit}
 a:focus-visible,button:focus-visible,summary:focus-visible{outline:1px solid var(--gold);outline-offset:4px}
@@ -241,6 +241,9 @@ footer.site::before{content:"";position:absolute;left:50%;top:0;width:min(900px,
 .curtain .count{font:400 clamp(2.6rem,6vw,4.6rem)/1 var(--display);color:var(--gold-2);font-variant-numeric:tabular-nums;letter-spacing:.04em}
 .curtain .bar-line{width:160px;height:1px;background:rgba(var(--ink-rgb),.15);overflow:hidden}
 .curtain .bar-line i{display:block;height:100%;width:100%;background:var(--gold);transform:scaleX(0);transform-origin:left}
+.cloud-reveal.pinned{height:220vh;min-height:0;overflow:visible}
+.cr-stick{position:sticky;top:0;height:100vh;min-height:560px;overflow:hidden}
+.cr-stick>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:brightness(.62)}
 html:not(.anim) .curtain{display:none}
 html:not(.anim) .clouds{display:none}
 html:not(.anim) .cloud-reveal{height:auto;min-height:0;padding:140px 0}

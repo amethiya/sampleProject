@@ -120,7 +120,7 @@ describe("design system", () => {
   it("ships the Magic UI + Smooth UI kit on every page and documents every component for the skill", async () => {
     const { UI_KIT, UI_KIT_CSS, UI_KIT_JS, renderSitePage, snapshotFromLead } = await import("../src");
     const { readFileSync } = await import("node:fs");
-    expect(new Set(UI_KIT.map((c) => c.library))).toEqual(new Set(["Magic UI", "Smooth UI"]));
+    expect(new Set(UI_KIT.map((c) => c.library))).toEqual(new Set(["Magic UI", "Smooth UI", "21st.dev"]));
     expect(new Set(UI_KIT.map((c) => c.id)).size).toBe(UI_KIT.length);
     // Runs under the preview CSP: no network, no storage, no external hosts, no eval.
     expect(UI_KIT_JS).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|https?:\/\/|eval\(|new Function/);
@@ -134,6 +134,16 @@ describe("design system", () => {
     expect(html).toContain(UI_KIT_JS);
     expect(html).toContain('class="mu-progress"');
     expect(html).toContain("mu-shimmer");
+    expect(html).toContain('class="tw-paths"');
+  });
+
+  it("animates with Motion (Framer Motion's engine), pinned to an exact CDN version, never GSAP", async () => {
+    const { SYSTEM_LIBRARIES, SYSTEM_MOTION_JS, HEAD_JS, LIBRARIES } = await import("../src");
+    expect(SYSTEM_LIBRARIES).toEqual([expect.stringMatching(/^https:\/\/cdn\.jsdelivr\.net\/npm\/motion@\d+\.\d+\.\d+\/dist\/motion\.js$/)]);
+    expect(Object.values(LIBRARIES)).toEqual(SYSTEM_LIBRARIES);
+    expect(SYSTEM_MOTION_JS).toContain("window.Motion");
+    expect(SYSTEM_MOTION_JS + HEAD_JS).not.toMatch(/gsap|ScrollTrigger/);
+    expect(() => new Function(SYSTEM_MOTION_JS)).not.toThrow();
   });
 
   it("offers rich themes, navy first for most trades, rotating away from recent ones", async () => {

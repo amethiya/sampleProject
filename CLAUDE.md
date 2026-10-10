@@ -11,11 +11,17 @@ TypeScript npm-workspaces monorepo. See README.md for the architecture.
 - Design system (`packages/core/src/redesign/system.ts`): 8 themes, trade prompts, shared CSS and motion. Every
   redesign (instant renderer and Claude) is built on it; Claude jobs get the rendered pages in `starter/`. After
   changing it run `npm run skill:catalog` to regenerate the skill references (a test fails if they are stale).
-- UI kit (`packages/core/src/redesign/ui-kit.ts`): Magic UI + Smooth UI components ported to plain CSS/JS (no React
-  or Tailwind; pages are static and CSP-locked). Ships on every page; documented for Claude in the skill's
+  Motion runs on `motion` (Framer Motion's vanilla-JS engine, `window.Motion`) from a pinned jsdelivr URL in
+  `SYSTEM_LIBRARIES`; GSAP is gone. The cloud reveal pins with `position: sticky`, so `body` uses `overflow-x: clip`.
+- UI kit (`packages/core/src/redesign/ui-kit.ts`): Magic UI + Smooth UI components ported to plain CSS/JS, plus
+  21st.dev-style effects written from the components' descriptions (no React or Tailwind; pages are static and
+  CSP-locked). Ships on every page; documented for Claude in the skill's
   `references/ui-kit.md`. After changing it run `npm run skill:catalog`. Licences in THIRD_PARTY_NOTICES.md.
 - Claude redesigns: `packages/core/src/redesign/brief.ts` is the brief Claude follows; the runner is
   `apps/cli/src/redesign-runner.ts`. Pages it uploads are untrusted and served with a `sandbox` CSP.
+- UI UX Pro Max (`.claude/skills/ui-ux-pro-max/`, MIT, vendored from nextlevelbuilder/ui-ux-pro-max-skill): `job fetch`
+  and the runner run its local search (`apps/cli/src/uiux.ts`, needs python3) and write `uiux.md` into each job;
+  the brief and the website-redesign skill take precedence over it.
 
 Commands:
 - `npm test` — vitest for core

@@ -252,7 +252,7 @@ ${renderRest()}`;
   const half = Math.ceil(site.pages.length / 2);
   const footer = `<footer class="site">
   <div class="wrap">
-    <div class="foot-cta">
+    <div class="foot-cta"><div class="tw-paths" aria-hidden="true"></div>
       <div>${disc(hours.length ? "Open hours" : "Get in touch")}<p class="big">${hours.length ? esc(hours.join(" · ")) : name}</p></div>
       <div class="foot-cta-btns"><a class="btn gold" href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a><a class="btn" href="${esc(osm)}" target="_blank" rel="noopener">Directions</a></div>
     </div>
