@@ -16,7 +16,7 @@ Generated for this business's trade by the ui-ux-pro-max skill's search. Use it 
 accessibility, layout and polish of the redesign. **BRIEF.md, content.json and the website-redesign skill win
 wherever they disagree.** In particular:
 
-- Keep the theme's colours and fonts from \`designDirection.theme\`; ignore the palette and fonts suggested below.
+- Keep the palette and fonts from \`designDirection.creative\` in content.json; ignore the palette and fonts suggested below.
 - Never add a section the site has no content for (testimonials, statistics, problem statements, pricing).
 - Keep native scrolling: no smooth-scroll CSS, no scroll-jacking.
 - Motion uses the Motion library in \`content.json → libraries\` (Framer Motion's engine), not GSAP; ignore GSAP snippets.

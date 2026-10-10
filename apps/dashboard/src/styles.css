@@ -319,8 +319,37 @@ a.link-strong { text-decoration: none; }
 .pv-frame iframe { width: 100%; height: 100%; border: 0; display: block; }
 .callout { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 12px; border: 1px solid var(--line); }
 .callout h3 { margin-bottom: 4px !important; }
-.job { margin-top: 8px; font-size: 14px; font-weight: 550; }
-.job-failed { color: var(--danger); }
+.job { margin-top: 8px; font-size: 14px; display: flex; flex-direction: column; gap: 10px; }
+.job-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.danger { color: var(--danger); }
+.stages { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; margin: 0; padding: 0; list-style: none; counter-reset: st; }
+.stages li { font-size: 12px; color: var(--muted); padding-top: 8px; border-top: 3px solid var(--line); counter-increment: st; }
+.stages li.past { color: var(--ink-2); border-top-color: var(--ink-2); }
+.stages li.now { color: var(--ink); font-weight: 650; border-top-color: var(--ink); }
+.stages li.now::after { content: " …"; animation: blink 1.2s ease-in-out infinite; }
+.scorecard { display: flex; flex-direction: column; gap: 8px; }
+table.qa { border-collapse: collapse; width: 100%; max-width: 640px; font-size: 13px; }
+table.qa th { text-align: left; font-weight: 500; padding: 5px 10px 5px 0; white-space: nowrap; }
+table.qa td { padding: 5px 8px; vertical-align: middle; }
+table.qa td:nth-child(3) { width: 40%; }
+table.qa .meter { margin-top: 0; }
+.events summary { cursor: pointer; color: var(--muted); }
+.events ol { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; max-height: 260px; overflow: auto; }
+.events time { font-variant-numeric: tabular-nums; margin-right: 6px; }
+.events .ev-warn { color: var(--ink-2); font-weight: 550; }
+.events .ev-error { color: var(--danger); }
+.reject { gap: 10px; }
+.chip.js-queued { background: var(--subtle); }
+.chip.js-running { background: var(--subtle); color: var(--ink); }
+.chip.js-running::before { opacity: 1; animation: blink 1.2s ease-in-out infinite; }
+.chip.js-needs_review, .chip.rd-review { color: var(--ink); border-color: var(--ink); }
+.chip.js-done { background: var(--inv-bg); color: var(--inv-ink); border-color: var(--inv-bg); }
+.chip.js-failed, .chip.js-cancelled { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); }
+.kpis-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.metrics { margin: -8px 0 4px; }
+.batch .row-actions { align-items: flex-end; }
+.field.inline { width: auto; }
+.field.inline input { width: 96px; }
 .pitch-meta { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 14px; }
 .pitch-meta dt { color: var(--muted); }
 .pitch-meta dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
@@ -348,6 +377,8 @@ a.link-strong { text-decoration: none; }
 
 /* ───────────── Responsive ───────────── */
 @media (max-width: 960px) {
+  .kpis-5 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stages { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .l-hero { grid-template-columns: 1fr; }
   .l-steps ol { grid-template-columns: 1fr 1fr; }
   .l-steps li:nth-child(3) { padding-left: 0; border-left: 0; }
@@ -370,6 +401,10 @@ a.link-strong { text-decoration: none; }
   .kpi:nth-child(n + 3) { border-top: 1px solid var(--line); }
   .toolbar select { flex: 1 1 140px; }
   .table-card { display: none; }
+  .table-card.jobs-card { display: block; }
+  .jobs th:nth-child(3), .jobs td:nth-child(3), .jobs th:nth-child(5), .jobs td:nth-child(5) { display: none; }
+  .jobs td, .jobs th { padding: 10px; }
+  .kpis-5 .kpi:nth-child(5) { grid-column: 1 / -1; border-left: 0; }
   .cards { display: flex; flex-direction: column; gap: 10px; }
   .card { border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
   .card-main { display: flex; flex-direction: column; gap: 3px; width: 100%; padding: 14px 14px 10px; border: 0; background: none; text-align: left; cursor: pointer; }

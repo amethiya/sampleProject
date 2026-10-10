@@ -12,6 +12,8 @@ export interface Env extends AuthEnv {
   DAILY_TARGET: string;
   MIN_SCORE: string;
   BATCH_SIZE: string;
+  /** Qualified leads per day after which the cron stops auditing (free-tier budget). "0" means no cap. Default 3 × DAILY_TARGET. */
+  MAX_QUALIFIED_PER_DAY?: string;
   PUBLIC_URL?: string;
   SENDER_NAME?: string;
   SHEETS_WEBHOOK_URL?: string;
@@ -186,13 +188,14 @@ export async function runCycle(env: Env) {
       .bind(String(cursor + 1)).run();
   }
 
-  // Stop auditing for the day once we're well past the target, to stay inside free-tier limits.
+  // Stop auditing for the day once we're well past the target, to stay inside free-tier limits (configurable; 0 = no cap).
+  const cap = env.MAX_QUALIFIED_PER_DAY !== undefined && env.MAX_QUALIFIED_PER_DAY !== "" ? Number(env.MAX_QUALIFIED_PER_DAY) : target * 3;
   const today = (await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM sites WHERE qualified = 1 AND date(audited_at) = date('now')",
   ).first<{ n: number }>())!.n;
   report.qualifiedToday = today;
 
-  if (today < target * 3) {
+  if (!cap || today < cap) {
     const { results } = await env.DB.prepare(
       "SELECT id, candidate FROM sites WHERE state = 'pending' ORDER BY RANDOM() LIMIT ?",
     ).bind(batchSize).all<{ id: string; candidate: string }>();
@@ -322,6 +325,7 @@ async function stats(env: Env) {
 function redesignState(job: string | null, hasClaude: boolean, crawled: boolean): string {
   if (job === "running") return "running";
   if (job === "queued") return "queued";
+  if (job === "needs_review") return "review";
   if (hasClaude) return "done";
   if (job === "failed") return "failed";
   return crawled ? "template" : "pending";

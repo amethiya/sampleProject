@@ -22,6 +22,8 @@ export interface KitComponent {
   use: string;
   /** Minimal markup. */
   markup: string;
+  /** CSS selector that finds the component in a page (browser QA counts components with it). */
+  selector: string;
 }
 
 export const UI_KIT: KitComponent[] = [
@@ -29,82 +31,98 @@ export const UI_KIT: KitComponent[] = [
   {
     id: "marquee", name: "Marquee", library: "Magic UI",
     use: "An endless, pausable strip of the business's own photos, logos (brands stocked, partners, certifications) or short real labels such as service names. data-reverse flips it; data-repeat (default 4) sets copies. No ids inside the track: it is cloned.",
+    selector: ".mu-marquee",
     markup: `<div class="mu-marquee" style="--duration:40s;--gap:2.5rem"><div class="mu-marquee-track"><img src="..." alt="..."> <img src="..." alt="..."></div></div>`,
   },
   {
     id: "border-beam", name: "Border Beam", library: "Magic UI",
     use: "A spark of light that travels around a box's border: the opening-hours card, a booking box or the main offer. One per page at most. Options: --beam-size, --beam-duration.",
+    selector: ".mu-beam",
     markup: `<div class="mu-beam" style="border-radius:4px">...</div>`,
   },
   {
     id: "shine-border", name: "Shine Border", library: "Magic UI",
     use: "A slow, shimmering gradient border: price cards, the visit box, a featured quote. Options: --shine-width, --shine-duration.",
+    selector: ".mu-shine",
     markup: `<div class="mu-shine">...</div>`,
   },
   {
     id: "shimmer-button", name: "Shimmer Button", library: "Magic UI",
     use: "A light that runs around a button's outline. Only the page's primary call to action (on .btn.gold).",
+    selector: ".mu-shimmer",
     markup: `<a class="btn gold mu-shimmer" href="...">Book a table</a>`,
   },
   {
     id: "animated-shiny-text", name: "Animated Shiny Text", library: "Magic UI",
     use: "A light sweep across a short line: the small \"Discover\" label or a one-line tagline. Never on body text.",
+    selector: ".mu-shiny",
     markup: `<span class="mu-shiny">Welcome to</span>`,
   },
   {
     id: "magic-card", name: "Magic Card (spotlight)", library: "Magic UI",
     use: "A soft accent spotlight that follows the pointer over a card: dish cards, team, service or page cards. Option: --spot-size.",
+    selector: ".mu-spotlight",
     markup: `<a class="dish-card mu-spotlight" href="...">...</a>`,
   },
   {
     id: "number-ticker", name: "Number Ticker", library: "Magic UI",
     use: "Counts up to a number already in the site's text when it scrolls into view (\"Since 1987\", \"25 years\"); the final text is exactly the original. Only on elements with text and no child elements. Never for invented figures. data-start sets the start value (e.g. 1950 for a year), data-duration the seconds.",
+    selector: "[data-mu-ticker]",
     markup: `<span data-mu-ticker data-start="1950">Since 1987</span>`,
   },
   {
     id: "blur-fade", name: "Blur Fade", library: "Magic UI",
     use: "Fades and un-blurs an element in when it scrolls into view. For content the motion script does not already animate (not .hero/.page-top content, .echo, .zig, .info). data-delay (s), data-direction (up|down|left|right), data-offset (px).",
+    selector: "[data-mu-blur-fade]",
     markup: `<div data-mu-blur-fade data-delay="0.1">...</div>`,
   },
   {
     id: "dot-pattern", name: "Dot Pattern", library: "Magic UI",
     use: "A faint dot grid behind a section, fading out towards the edges. Put it first inside a position:relative container.",
+    selector: ".mu-dots",
     markup: `<section style="position:relative"><div class="mu-dots" aria-hidden="true"></div>...</section>`,
   },
   {
     id: "scroll-progress", name: "Scroll Progress", library: "Magic UI",
     use: "A hairline accent bar at the top of the window showing how far down the page you are. Once per page, right after <body>.",
+    selector: ".mu-progress",
     markup: `<div class="mu-progress" aria-hidden="true"></div>`,
   },
   // Smooth UI
   {
     id: "magnetic-button", name: "Magnetic Button", library: "Smooth UI",
     use: "The button leans towards the pointer as it approaches. Hero and call-to-action buttons. data-strength (default 0.25), data-radius (px, default 100). Not on .page-top .btn (the motion script moves those).",
+    selector: "[data-su-magnetic]",
     markup: `<a class="btn gold" data-su-magnetic href="...">Order online</a>`,
   },
   {
     id: "tilt-card", name: "Tilt Card", library: "Smooth UI",
     use: "A card that tilts in 3D towards the pointer with a soft glare. Photo cards and featured items. data-tilt-max (degrees, default 8); children with data-tilt-depth=\"0..1\" float with parallax.",
+    selector: "[data-su-tilt]",
     markup: `<div class="dish-card" data-su-tilt data-tilt-max="6">...</div>`,
   },
   {
     id: "glow-hover-card", name: "Glow Hover Cards", library: "Smooth UI",
     use: "On a grid: every card's border lights up where the pointer is, across the whole grid. Option: --glow-size.",
+    selector: "[data-su-glow]",
     markup: `<div class="cards" data-su-glow><a class="dish-card">...</a><a class="dish-card">...</a></div>`,
   },
   {
     id: "mask-reveal-up", name: "Mask Reveal Up", library: "Smooth UI",
     use: "Each line of a heading rises out of a mask when it scrolls into view; <br> separates lines. Section headings that are not .echo headings, and short statements. data-delay (s), data-stagger (ms, default 90).",
+    selector: "[data-su-mask-reveal]",
     markup: `<h2 data-su-mask-reveal>Fresh every<br>morning</h2>`,
   },
   {
     id: "shimmer-sweep", name: "Shimmer Sweep", library: "Smooth UI",
     use: "A word or short line slides in from the left out of a blur when it scrolls into view. Labels, prices, small captions. data-delay (s).",
+    selector: "[data-su-sweep]",
     markup: `<span data-su-sweep>Discover</span>`,
   },
   {
     id: "scroll-reveal-paragraph", name: "Scroll Reveal Paragraph", library: "Smooth UI",
     use: "The words of a paragraph light up one by one as you scroll through it. One strong paragraph per page (the story); never long lists or menus.",
+    selector: "[data-su-scroll-reveal]",
     markup: `<p data-su-scroll-reveal>...</p>`,
   },
 
@@ -112,11 +130,13 @@ export const UI_KIT: KitComponent[] = [
   {
     id: "scroll-expand-media", name: "Scroll Media Expansion", library: "21st.dev",
     use: "A framed photo opens up to full width as it scrolls into view (after 21st.dev's scroll-expansion hero). One per page, for the business's best wide photo: the dining room, the clinic, the workshop. Not inside .hero or the cloud reveal.",
+    selector: ".tw-expand",
     markup: `<div class="tw-expand"><div class="tw-expand-frame"><img src="..." alt="..." loading="lazy" referrerpolicy="no-referrer"></div></div>`,
   },
   {
     id: "background-paths", name: "Background Paths", library: "21st.dev",
     use: "Fine lines in the theme's accent that drift slowly behind a calm band (after 21st.dev's background paths): the footer call-to-action band, a quiet intro or quote section. Never behind photos or long text. Option: data-lines (default 18).",
+    selector: ".tw-paths",
     markup: `<div class="foot-cta"><div class="tw-paths" aria-hidden="true"></div> ...the band's content... </div>`,
   },
 ];
