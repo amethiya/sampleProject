@@ -4,6 +4,7 @@ import type { CategoryId, Lead } from "../types";
 import { makeDna, tradeFor, type DesignDna } from "./styles";
 import { HEAD_JS, SYSTEM_BASE_JS, SYSTEM_CSS, SYSTEM_LIBRARIES, SYSTEM_MOTION_JS, lookVars, pickLook } from "./system";
 import { THEMES, photoUrl } from "./themes";
+import { UI_KIT_CSS, UI_KIT_JS } from "./ui-kit";
 
 export type RedesignInput = Pick<
   Lead,
@@ -200,7 +201,7 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
     ${echo(h1, "h1", longName ? ' data-long=""' : "")}
     <p class="sub">${esc(t.label)} in ${esc(lead.city)}</p>
     ${lead1 ? `<p class="muted">${esc(firstSentences(lead1, 220))}</p>` : ""}
-    <div class="ctas"><a class="btn gold" href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a>${second ? `<a class="btn" href="${pageHref(second.slug)}">${esc(second.label)}</a>` : `<a class="btn" href="#visit">Visit us</a>`}</div>
+    <div class="ctas"><a class="btn gold mu-shimmer" data-su-magnetic href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a>${second ? `<a class="btn" href="${pageHref(second.slug)}">${esc(second.label)}</a>` : `<a class="btn" href="#visit">Visit us</a>`}</div>
   </div>
   <div class="plate-stage"><div class="dust"></div>${imgTag(heroPhoto, lead.name, "plate round")}</div>
 </div></section>
@@ -228,7 +229,7 @@ ${offers.length ? `<section style="padding-top:0"><div class="wrap">
 ${renderRest()}
 ${others.length ? `<section style="padding-top:0"><div class="wrap"><div class="framed">
   ${disc("Discover")}${echo("Explore")}
-  <div class="cards">${others.slice(0, 6).map((p, i) => { const ph = p.sections.flatMap((s) => s.images)[0]; const line = p.sections.flatMap((s) => [...s.paragraphs, ...s.items]).find((x) => x.length > 30) ?? p.title; return `<a class="dish-card" href="${pageHref(p.slug)}" style="text-decoration:none"><div class="ph">${imgTag(ph ? { src: safeUrl(img(ph)), fallback: stock(4 + i, 900) } : { src: stock(4 + i, 900), fallback: stock(4 + i, 900) }, p.label)}</div><div class="row"><h3>${esc(p.label)}</h3><span class="p">${ICON.arrow}</span></div><p>${esc(firstSentences(line, 110))}</p></a>`; }).join("")}</div>
+  <div class="cards">${others.slice(0, 6).map((p, i) => { const ph = p.sections.flatMap((s) => s.images)[0]; const line = p.sections.flatMap((s) => [...s.paragraphs, ...s.items]).find((x) => x.length > 30) ?? p.title; return `<a class="dish-card mu-spotlight" href="${pageHref(p.slug)}" style="text-decoration:none"><div class="ph">${imgTag(ph ? { src: safeUrl(img(ph)), fallback: stock(4 + i, 900) } : { src: stock(4 + i, 900), fallback: stock(4 + i, 900) }, p.label)}</div><div class="row"><h3>${esc(p.label)}</h3><span class="p">${ICON.arrow}</span></div><p>${esc(firstSentences(line, 110))}</p></a>`; }).join("")}</div>
 </div></div></section>` : ""}`;
   } else {
     const side = nextPhoto(1, 900);
@@ -276,9 +277,10 @@ ${renderRest()}`;
 <title>${isHome ? name : `${esc(page.label)} · ${name}`} · Concept redesign</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?${look.fonts}&display=swap">
-<style>${lookVars(look)}${SYSTEM_CSS}</style>
+<style>${lookVars(look)}${SYSTEM_CSS}${UI_KIT_CSS}</style>
 </head>
 <body id="top" data-look="${look.id}">
+<div class="mu-progress" aria-hidden="true"></div>
 <div class="curtain" aria-hidden="true"><span class="logo-text">${name}</span><span class="count">0</span><span class="bar-line"><i></i></span></div>
 <div class="concept">Concept redesign of ${esc(domain)}, built from its own text and photos. Not the official website. <a href="${safeUrl(page.url)}" target="_blank" rel="noopener nofollow">View the original page</a></div>
 <header class="site">
@@ -295,6 +297,7 @@ ${main}
 </main>
 ${footer}
 <script>${SYSTEM_BASE_JS}</script>
+<script>${UI_KIT_JS}</script>
 ${SYSTEM_LIBRARIES.map((u) => `<script src="${u}"></script>`).join("\n")}
 <script>${SYSTEM_MOTION_JS}</script>
 </body>

@@ -11,6 +11,9 @@ TypeScript npm-workspaces monorepo. See README.md for the architecture.
 - Design system (`packages/core/src/redesign/system.ts`): 8 themes, trade prompts, shared CSS and motion. Every
   redesign (instant renderer and Claude) is built on it; Claude jobs get the rendered pages in `starter/`. After
   changing it run `npm run skill:catalog` to regenerate the skill references (a test fails if they are stale).
+- UI kit (`packages/core/src/redesign/ui-kit.ts`): Magic UI + Smooth UI components ported to plain CSS/JS (no React
+  or Tailwind; pages are static and CSP-locked). Ships on every page; documented for Claude in the skill's
+  `references/ui-kit.md`. After changing it run `npm run skill:catalog`. Licences in THIRD_PARTY_NOTICES.md.
 - Claude redesigns: `packages/core/src/redesign/brief.ts` is the brief Claude follows; the runner is
   `apps/cli/src/redesign-runner.ts`. Pages it uploads are untrusted and served with a `sandbox` CSP.
 

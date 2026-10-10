@@ -45,6 +45,12 @@ Opening a redesign crawls the business's site (home page plus up to 7 linked pag
 paragraph, list and image in order, and renders each page in a professional, photo-led layout:
 `/preview/<domain>/` and `/preview/<domain>/<page>`. Add `?engine=template` or `?engine=claude` to pick a version.
 
+Every page also carries the **UI kit** (`packages/core/src/redesign/ui-kit.ts`): components from
+[Magic UI](https://magicui.design) and [Smooth UI](https://smoothui.dev) (marquee, border beam, shine border, shimmer
+button, spotlight cards, number ticker, blur fade, magnetic buttons, tilt/glow cards, mask reveals, scroll-reveal
+paragraph, scroll progress) ported to plain CSS/JS so they run in the static, CSP-locked previews. The instant
+renderer uses a few; Claude redesigns use the rest via the skill's `references/ui-kit.md`.
+
 **Redesign with Claude** (dashboard → lead → Redesign → *Redesign with Claude*) queues a job. A runner on your
 Mac picks it up and has Claude Code, signed in with your Claude subscription, build a bespoke multi-page site from
 the crawled content following `packages/core/src/redesign/brief.ts`:

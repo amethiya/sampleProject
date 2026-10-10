@@ -117,6 +117,25 @@ describe("design system", () => {
     for (const l of LOOKS) expect(md, `run npm run skill:catalog (${l.id} missing)`).toContain(`\`${l.id}\``);
   });
 
+  it("ships the Magic UI + Smooth UI kit on every page and documents every component for the skill", async () => {
+    const { UI_KIT, UI_KIT_CSS, UI_KIT_JS, renderSitePage, snapshotFromLead } = await import("../src");
+    const { readFileSync } = await import("node:fs");
+    expect(new Set(UI_KIT.map((c) => c.library))).toEqual(new Set(["Magic UI", "Smooth UI"]));
+    expect(new Set(UI_KIT.map((c) => c.id)).size).toBe(UI_KIT.length);
+    // Runs under the preview CSP: no network, no storage, no external hosts, no eval.
+    expect(UI_KIT_JS).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|https?:\/\/|eval\(|new Function/);
+    expect(UI_KIT_CSS).not.toMatch(/https?:\/\/|@import/);
+    expect(() => new Function(UI_KIT_JS)).not.toThrow();
+    const md = readFileSync(new URL("../../../.claude/skills/website-redesign/references/ui-kit.md", import.meta.url), "utf8");
+    for (const c of UI_KIT) expect(md, `run npm run skill:catalog (${c.id} missing)`).toContain(`\`${c.id}\``);
+    expect(readFileSync(new URL("../../../.claude/skills/website-redesign/references/ui-kit.js", import.meta.url), "utf8")).toContain(UI_KIT_JS);
+    const lead = { name: "Kit Cafe", category: "cafe", city: "Austin", country: "US", website: "https://kit.example", contacts: { emails: [], phones: [] }, content: { title: "Kit Cafe", description: "", headings: ["Coffee"], paragraphs: ["Roasting our own beans in Austin since 1987, every single morning."], images: [], navLinks: [] } } as never;
+    const html = renderSitePage(lead, snapshotFromLead(lead), "home");
+    expect(html).toContain(UI_KIT_JS);
+    expect(html).toContain('class="mu-progress"');
+    expect(html).toContain("mu-shimmer");
+  });
+
   it("offers rich themes, navy first for most trades, rotating away from recent ones", async () => {
     const { LOOKS, pickLook } = await import("../src");
     expect(LOOKS.length).toBeGreaterThanOrEqual(8);
