@@ -221,6 +221,10 @@ export function jobBrief(job: { notes?: string | null; mode?: string | null }, p
   if (revise) {
     out += `This is a **revision** of the previous Claude redesign. Its pages are in ./previous/ (${previousFiles.join(", ")}).
 Read them first. Keep the design direction and everything that works; change what the owner's notes below ask for.
+**Keep the previous version's look:** the same fonts (its Google Fonts link), the same colours (its CSS custom
+properties), layout, motion and components. Where content.json's designDirection.creative.palette or typography
+differs from the previous pages, the previous pages win, unless the owner's notes ask for a change (for example a
+new accent colour).
 Still write complete pages for every entry in content.json into ./site/ (not only the changed ones), and still meet
 every rule in this brief and the skill.\n\n`;
   } else {
