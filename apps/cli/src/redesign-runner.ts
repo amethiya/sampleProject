@@ -14,7 +14,7 @@
  *   ... -- --budget 6       stop refining once a job's reported Claude cost reaches this many USD (default 6)
  *   ... -- --once           process one job per worker (if any) and exit
  *   ... -- --interval 30    seconds between checks for new jobs (default 20)
- *   ... -- --timeout 30     minutes per Claude run before it is stopped (default 30)
+ *   ... -- --timeout 60     minutes per Claude run before it is stopped and continued in the same session (default 60)
  *   ... -- --no-research / --no-qa   skip the browser stages (the job then always needs review)
  *   ... -- --keep           keep the working folder for inspection
  *
@@ -40,7 +40,7 @@ const { values: args } = parseArgs({
   options: {
     once: { type: "boolean", default: false },
     interval: { type: "string", default: "20" },
-    timeout: { type: "string", default: "30" },
+    timeout: { type: "string", default: "60" },
     concurrency: { type: "string", default: "1" },
     passes: { type: "string", default: "2" },
     budget: { type: "string", default: "6" },
@@ -72,6 +72,12 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 }
 
 class Stopped extends Error {}
+/** Claude ran past --timeout; the session can be continued instead of starting over. */
+class TimedOut extends Error {
+  constructor(readonly sessionId: string | null) { super("timed out"); }
+}
+/** Sent when a Claude session is continued after a timeout or a usage-limit pause. */
+const CONTINUE_PROMPT = "You were interrupted. Continue the same task exactly where you left off: check what is already in ./site/ (and qa/ if you were reviewing), finish whatever is missing or incomplete, and don't redo finished work. Follow BRIEF.md and the website-redesign skill as before. When done, reply with one line as the task asked.";
 class Unreachable extends Error {}
 
 /** While the Claude subscription is over its usage limit, no worker starts Claude (epoch ms; 0 = not paused). */
@@ -142,13 +148,15 @@ function runClaude(cwd: string, prompt: string, a: Active, opts: { resume?: stri
       }
     });
     child.stderr.on("data", (d) => (err += d));
-    const timer = setTimeout(() => child.kill("SIGTERM"), Number(args.timeout) * 60_000);
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; child.kill("SIGTERM"); }, Number(args.timeout) * 60_000);
     child.on("error", (e) => reject(new Error(`Could not start Claude Code (is it installed and signed in?): ${e.message}`)));
     child.on("close", (code) => {
       clearTimeout(timer);
       a.child = null;
       if (a.stopped) reject(new Stopped("stopped"));
-      else if (isUsageLimit(`${err}\n${out.result}`) && (code !== 0 || out.isError)) reject(limitError(`${err}\n${out.result}`));
+      else if (isUsageLimit(`${err}\n${out.result}`) && (code !== 0 || out.isError)) reject(Object.assign(limitError(`${err}\n${out.result}`), { sessionId: out.sessionId }));
+      else if (timedOut) reject(new TimedOut(out.sessionId));
       else if (code === 0) resolvePromise(out);
       else reject(new Error(`Claude Code exited with ${code}: ${(err || out.result).slice(-800)}`));
     });
@@ -217,14 +225,27 @@ async function processJob(next: NextJob, worker: string) {
         report("building", `Building: wrote ${file}`).catch(() => {});
       } else log(`${first ? "wrote" : "edited"} ${file}`);
     };
-    // A usage limit pauses the job (heartbeats keep its lease) and every worker until the limit resets, then retries.
+    // A usage limit pauses the job (heartbeats keep its lease) and every worker until the limit resets; a run that
+    // passes --timeout is continued. Either way the same Claude session picks up where it stopped, so finished pages
+    // are kept and nothing is redone.
     const claude: typeof runClaude = async (cwd, prompt, act, opts) => {
-      for (let waits = 0; ; waits++) {
+      let next = { prompt, resume: opts.resume ?? null };
+      let continues = 0;
+      for (let waits = 0; ; ) {
         try {
-          return await runClaude(cwd, prompt, act, opts);
+          return await runClaude(cwd, next.prompt, act, { ...opts, resume: next.resume });
         } catch (e) {
+          if (e instanceof TimedOut) {
+            if (!e.sessionId || ++continues > 2) throw new Error(`Claude ran past ${args.timeout} minutes ${continues > 2 ? "three times" : "and its session can't be continued"}.`);
+            await report(beatStage, `Claude has worked for ${args.timeout} minutes; continuing the same session (${continues}/2) so finished pages are kept.`, "warn");
+            next = { prompt: CONTINUE_PROMPT, resume: e.sessionId };
+            continue;
+          }
           if (!(e instanceof UsageLimit)) throw e;
-          if (waits >= 3 || e.resetAt - Date.now() > MAX_LIMIT_WAIT_MS) throw new Error(`Claude usage limit: ${e.message}`);
+          waits++;
+          const sid = (e as UsageLimit & { sessionId?: string | null }).sessionId;
+          if (sid) next = { prompt: CONTINUE_PROMPT, resume: sid };
+          if (waits > 3 || e.resetAt - Date.now() > MAX_LIMIT_WAIT_MS) throw new Error(`Claude usage limit: ${e.message}`);
           pausedUntil = Math.max(pausedUntil, e.resetAt);
           await report(beatStage, `Paused: Claude usage limit (${e.message}). Resuming at ${new Date(pausedUntil).toLocaleTimeString()}; the job keeps its place.`, "warn");
           await sleepUntil(pausedUntil, act);
