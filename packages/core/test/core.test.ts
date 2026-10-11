@@ -139,15 +139,16 @@ describe("design system", () => {
     expect(html).toContain("mu-beam");
   });
 
-  it("requires the UI kit in every Claude redesign brief", async () => {
-    const { BRIEF, RUNNER_PROMPT, briefContent, UI_KIT } = await import("../src");
-    expect(BRIEF).toContain("## UI kit placement (Magic UI + Smooth UI)");
-    expect(BRIEF).toContain("skill/references/ui-kit.md");
-    expect(RUNNER_PROMPT).toContain("ui-kit.md");
+  it("gives each direction its own kit components instead of the same set on every site", async () => {
+    const { BRIEF, RUNNER_PROMPT, briefContent, UI_KIT, DIRECTIONS } = await import("../src");
+    expect(BRIEF).not.toContain("UI kit placement");
+    expect(RUNNER_PROMPT).toContain("motion system");
     const lead = { name: "Kit Cafe", category: "cafe", city: "Austin", country: "US", website: "https://kit.example", contacts: { emails: [], phones: [] } } as never;
-    const c = briefContent(lead, { crawledAt: "", pages: [] } as never);
-    expect(c.uiKit.libraries).toEqual(["Magic UI", "Smooth UI"]);
-    expect(c.uiKit.components.map((k) => k.id)).toEqual(UI_KIT.map((k) => k.id));
+    for (const d of DIRECTIONS) {
+      const c = briefContent(lead, { crawledAt: "", pages: [] } as never, undefined, [], { direction: d.id });
+      expect(c.uiKit.components.map((k) => k.id).sort()).toEqual([...d.kit].sort());
+      expect(c.uiKit.components.length).toBeLessThan(UI_KIT.length / 2);
+    }
   });
 
   it("animates with Motion (Framer Motion's engine), pinned to an exact CDN version, never GSAP", async () => {
@@ -284,6 +285,21 @@ describe("creative directions", () => {
     expect(THREE_URL).toMatch(/^https:\/\/cdn\.jsdelivr\.net\/npm\/three@\d+\.\d+\.\d+\//);
   });
 
+  it("gives every direction its own motion system and kit, and never picks the old Cinematic system on its own", async () => {
+    const { DIRECTIONS, UI_KIT, chooseDirection } = await import("../src");
+    const ids = new Set(UI_KIT.map((c) => c.id));
+    for (const d of DIRECTIONS) for (const k of d.kit) expect(ids, `${d.id}: unknown kit ${k}`).toContain(k);
+    for (const key of ["intro", "transition", "scroll", "hover", "signature"] as const) {
+      const vals = DIRECTIONS.map((d) => d.motionSystem[key]);
+      expect(new Set(vals).size, `${key} repeats across directions`).toBe(vals.length);
+    }
+    expect(new Set(DIRECTIONS.map((d) => [...d.kit].sort().join())).size).toBe(DIRECTIONS.length);
+    // At most a few directions open with a loader-style intro; most have none.
+    expect(DIRECTIONS.filter((d) => d.motionSystem.intro.startsWith("None")).length).toBeGreaterThanOrEqual(8);
+    const s = { trade: "restaurant", pages: 4, images: 12, prices: 20, words: 900, hasMenu: true, hasTeam: false, hasBooking: true, hasFaq: false, phone: true, email: true, hours: true } as never;
+    for (const seed of ["a", "b", "c", "d", "e", "f"]) expect(chooseDirection(s, [], seed).id).not.toBe("cinematic-hospitality");
+  });
+
   it("documents every direction for the skill (npm run skill:catalog)", async () => {
     const { DIRECTIONS } = await import("../src");
     const { readFileSync } = await import("node:fs");
@@ -336,18 +352,16 @@ describe("redesign QA scorecard", () => {
     expect(md).toContain("TypeError");
   });
 
-  it("holds back a redesign that doesn't use the required UI kit, and finds every component by its selector", async () => {
-    const { scoreRedesign, kitShortfall, UI_KIT } = await import("../src");
+  it("rejects a page that borrows the old Cinematic system under another direction, and flags kit from other directions", async () => {
+    const { scoreRedesign, UI_KIT } = await import("../src");
     expect(new Set(UI_KIT.map((c) => c.selector)).size).toBe(UI_KIT.length);
-    const full = ["scroll-progress", "shimmer-button", "magnetic-button", "animated-shiny-text", "scroll-reveal-paragraph", "border-beam", "magic-card", "glow-hover-card", "blur-fade"];
-    expect(kitShortfall({ slug: "home", kit: full })).toBeNull();
-    expect(kitShortfall({ slug: "menu", kit: full.slice(0, 5) })).toBeNull();
-    expect(kitShortfall({ slug: "home", kit: full.slice(0, 5) })).toMatch(/5 of 8/);
-    expect(kitShortfall({ slug: "menu", kit: ["scroll-progress", "shimmer-button", "border-beam", "magic-card", "blur-fade"] })).toMatch(/both Magic UI and Smooth UI/);
-    expect(scoreRedesign(all({ kit: full }), ["home"], good).pass).toBe(true);
-    const thin = scoreRedesign(all({ kit: ["scroll-progress"] }), ["home"], good);
-    expect(thin.pass).toBe(false);
-    expect(thin.warnings.join(" ")).toMatch(/UI kit requirement not met/);
+    const old = all({ borrowed: ["curtain loader", "dust splash"], kit: ["marquee"] });
+    const editorial = scoreRedesign(old, ["home"], good, undefined, { direction: "editorial-magazine", kit: ["mask-reveal-up"] });
+    expect(editorial.pass).toBe(false);
+    expect(editorial.critical.join(" ")).toMatch(/reuses another direction's signature \(curtain loader, dust splash\)/);
+    expect(editorial.warnings.join(" ")).toMatch(/don't belong to this direction: marquee/);
+    // The same pieces are fine for the Cinematic Hospitality direction itself.
+    expect(scoreRedesign(all({ borrowed: ["curtain loader"] }), ["home"], good, undefined, { direction: "cinematic-hospitality" }).pass).toBe(true);
   });
 
   it("retries technical failures with backoff and sends everything else to a person", async () => {
@@ -357,5 +371,34 @@ describe("redesign QA scorecard", () => {
     expect(shouldRetry("technical", 3, 3)).toBe(false);
     expect(shouldRetry("unreachable", 1, 3)).toBe(false);
     expect(shouldRetry("quality", 1, 3)).toBe(false);
+  });
+});
+
+describe("injected spam", () => {
+  it("removes hacked-in gambling spam, including the block between hits, and keeps the business's own text", async () => {
+    const { stripInjectedSpam, briefContent } = await import("../src");
+    const real = ["41 Union Street", "The Union Oyster House, located on the Freedom Trail, enjoys the distinction of being America's oldest restaurant.", "OYSTERS"];
+    const spam = [
+      "Якщо ви цікавитеся сучасними форматами азартних розваг, варто звернути увагу на різні онлайн-платформи та їхні бонуси.",
+      "Enjoy winorama casino with exciting slots and live dealer action.",
+      "Spinsup biedt snelle stortingen en soepel mobiel spelen.",
+      "Just as the restaurant offers seafood, jokabey online casino is where every player wins.",
+    ];
+    const site = { crawledAt: "", pages: [
+      { slug: "home", url: "https://u.example", label: "Home", title: "Home", description: "", sections: [{ heading: "Welcome", paragraphs: [...real, ...spam], items: [], images: [], links: [{ text: "beste betting sider", href: "https://x.example" }, { text: "Menus", href: "https://u.example/menus" }] }] },
+      { slug: "menus", url: "https://u.example/menus", label: "Menus", title: "Menus", description: "", sections: [{ heading: "Chowder", paragraphs: ["Clam chowder, a Boston classic since 1826."], items: ["Cup 8", "Bowl 12"], images: [] }] },
+    ] };
+    const { site: clean, removed } = stripInjectedSpam(site as never);
+    const text = JSON.stringify(clean);
+    expect(text).not.toMatch(/casino|азарт|Spinsup|jokabey|betting/i);
+    for (const r of [...real, "Clam chowder, a Boston classic since 1826.", "Bowl 12"]) expect(text).toContain(r);
+    expect(removed.length).toBe(spam.length + 1);
+    // A genuinely Ukrainian business keeps its Ukrainian text.
+    const ua = { crawledAt: "", pages: [{ slug: "home", url: "https://k.example", label: "Головна", title: "Кав'ярня", description: "", sections: [{ heading: "Про нас", paragraphs: ["Ми варимо каву щоранку для наших гостей у центрі Києва вже десять років."], items: ["Меню", "Контакти"], images: [] }] }] };
+    expect(stripInjectedSpam(ua as never).removed).toEqual([]);
+    const lead = { id: "u.example", name: "Union", category: "restaurant", city: "Boston", country: "US", website: "https://u.example", contacts: { emails: [], phones: [] } } as never;
+    const c = briefContent(lead, site as never);
+    expect(JSON.stringify(c.pages)).not.toMatch(/casino|jokabey/i);
+    expect(c.contentNotes?.injectedSpamRemoved).toBe(spam.length + 1);
   });
 });

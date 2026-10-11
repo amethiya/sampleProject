@@ -19,12 +19,11 @@ them yourself first.
 - [ ] The primary action is on the first screen, repeated after the key content, and one tap away on phones.
 
 ## UI kit (Magic UI + Smooth UI)
-- [ ] The ui-kit `<style>` and `<script>` from the starter are kept, and nothing else loads React, Tailwind or the
-      libraries.
-- [ ] Home uses at least 8 different kit components, each inner page at least 5, from both libraries, placed as in
-      BRIEF.md's "UI kit placement" (scroll progress, shimmer + magnetic primary buttons, card spotlight/glow/tilt,
-      scroll-reveal story paragraph, photo marquee when there are 4+ own photos, blur fade on content...).
-- [ ] The kit is restyled with the palette and paced to the direction's motion language.
+- [ ] Only the kit components listed for this direction (content.json `uiKit`), restyled with the palette; nothing
+      loads React, Tailwind or the libraries.
+- [ ] The direction's own motion system is built (intro or none, transition, scroll, hover, signature effect), and
+      nothing from another direction: no counter loader, curtain, echo headings, round plates, dust or cloud reveal
+      outside Cinematic Hospitality.
 - [ ] No kit effect on elements your own Motion code animates; no number ticker on a number that isn't in the text.
 - [ ] With reduced motion and with scripts blocked, all text is visible and the page still reads well.
 
