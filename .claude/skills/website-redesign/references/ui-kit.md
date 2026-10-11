@@ -3,7 +3,7 @@
 Generated from packages/core/src/redesign/ui-kit.ts by `npm run skill:catalog`. Do not edit by hand.
 
 Components from Magic UI (magicui.design) and Smooth UI (smoothui.dev), both MIT, ported from React + Tailwind
-+ Motion to plain CSS and JavaScript, plus effects after popular 21st.dev community components, so they run in the static, CSP-locked redesign pages. Every starter page already
++ Motion to plain CSS and JavaScript, plus effects after popular 21st.dev community components and blocks from Bencho (bencho.dev, MIT), so they run in the static, CSP-locked redesign pages. Every starter page already
 includes ui-kit.css (in its <style>) and ui-kit.js (an inline <script> after the base script): keep both, and add a
 component by putting its class or data attribute on your markup. Never load React, Tailwind or the libraries.
 
@@ -160,5 +160,23 @@ Fine lines in the theme's accent that drift slowly behind a calm band (after 21s
 
 ```html
 <div class="foot-cta"><div class="tw-paths" aria-hidden="true"></div> ...the band's content... </div>
+```
+
+## Bencho
+
+### Image Accordion (`image-accordion`)
+
+A row of the business's own photos cropped to slivers; the one you point at (or focus, or tap) opens on a spring while its neighbours give up the width. Good for a gallery, dishes, rooms or projects. 3-7 items; figcaption is optional and must be real text. Stacks into a column on phones.
+
+```html
+<div class="bn-accordion" data-open="50" data-reach="35"><figure><img src="..." alt="..."><figcaption>Real caption</figcaption></figure><figure><img src="..." alt="..."></figure><figure><img src="..." alt="..."></figure></div>
+```
+
+### Image Compare (`image-compare`)
+
+Two images of the same thing and a line to drag across them (before/after, old site/new, raw/finished). Drag, flick (it glides to the edge) or use the arrow keys. Only with two real images of the same subject; data-labels names both sides.
+
+```html
+<div class="bn-compare" data-labels="Before|After"><img src="before.jpg" alt="..."><img src="after.jpg" alt="..."></div>
 ```
 

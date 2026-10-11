@@ -8,6 +8,7 @@
     "redesign-runner": "tsx src/redesign-runner.ts",
     "typecheck": "tsc -p .",
     "job": "tsx src/job.ts",
+    "concepts": "tsx src/concepts.ts",
     "skill:catalog": "tsx src/skill-catalog.ts"
   },
   "dependencies": {

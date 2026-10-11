@@ -176,7 +176,8 @@ export interface QaRun {
 }
 
 /** Measure every page of ./site against content.json, write qa/report.md + screenshots, and score it. */
-export async function runQa(dir: string, review: DesignReview | null = null, log: (m: string) => void = () => {}): Promise<QaRun> {
+/** `only` limits the measured pages (e.g. ["home"] for a design concept); links are still checked against every page. */
+export async function runQa(dir: string, review: DesignReview | null = null, log: (m: string) => void = () => {}, only?: string[]): Promise<QaRun> {
   const content = JSON.parse(await readFile(join(dir, "content.json"), "utf8")) as { pages: ContentPage[]; designDirection?: { creative?: { id?: string; kit?: string[] } } };
   const qaDir = join(dir, "qa");
   await mkdir(qaDir, { recursive: true });
@@ -194,6 +195,7 @@ export async function runQa(dir: string, review: DesignReview | null = null, log
         for (const [i, p] of content.pages.entries()) {
           if (!files.has(p.file)) continue;
           const slug = slugs[i];
+          if (only && !only.includes(slug)) continue;
           const page = await ctx.newPage();
           const errors: string[] = [], csp: string[] = [], failed: string[] = [];
           let bytes = 0, requests = 0;
@@ -274,7 +276,7 @@ export async function runQa(dir: string, review: DesignReview | null = null, log
     server.close();
   }
   const creative = content.designDirection?.creative;
-  const scorecard = scoreRedesign(measures, slugs, review, undefined, { direction: creative?.id, kit: creative?.kit });
+  const scorecard = scoreRedesign(measures, only ?? slugs, review, undefined, { direction: creative?.id, kit: creative?.kit });
   await writeFile(join(qaDir, "report.md"), scorecardMarkdown(scorecard, measures) + `\nScreenshots: ${screenshots.map((s) => s.slice(qaDir.length + 1)).join(", ")}\n`);
   await writeFile(join(qaDir, "scorecard.json"), JSON.stringify(scorecard, null, 2));
   return { scorecard, measures, screenshots };
