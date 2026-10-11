@@ -270,6 +270,16 @@ async function processJob(next: NextJob, worker: string) {
     let session = build.sessionId;
     const allowed = new Set(site.pages.map((p) => p.slug));
     if (!(await collectPages(dir, allowed)).some((p) => p.slug === "home")) throw new Error(`No site/index.html was written. Claude said: ${build.result.slice(-300)}`);
+    // A revision should touch only the pages its notes concern: say which ones it changed.
+    const revisionDiff = async () => {
+      if (!next.previous?.length) return null;
+      const before = new Map(next.previous.map((p) => [p.slug, p.html]));
+      const pages = await collectPages(dir, allowed);
+      const changed = pages.filter((p) => before.get(p.slug) !== p.html).map((p) => p.slug);
+      return `Revision changed ${changed.length} of ${pages.length} pages${changed.length ? ` (${changed.join(", ")})` : ""}; the rest are exactly as before.`;
+    };
+    const built = await revisionDiff();
+    if (built) await report("building", built);
 
     let scorecard: Scorecard | null = null;
     if (!args["no-qa"]) {
@@ -303,7 +313,8 @@ async function processJob(next: NextJob, worker: string) {
     }
 
     beatStage = "uploading";
-    await report("uploading", "Uploading pages…");
+    const finalDiff = await revisionDiff();
+    await report("uploading", finalDiff ? `Uploading pages. ${finalDiff}` : "Uploading pages…");
     const pages = await collectPages(dir, allowed);
     const res = await call<{ pages: number; status: string }>(`/api/redesign-jobs/${job.id}/complete`, {
       pages, qa: scorecard, qaScore: scorecard?.overall, pass: scorecard?.pass ?? false, costUsd: usage,

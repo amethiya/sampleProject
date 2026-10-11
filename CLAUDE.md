@@ -55,7 +55,8 @@ the design standard for every Revamp Radar redesign; the steps below only cover 
 When asked to "redesign <site>" or "process the next redesign job", you are the designer. Steps:
 1. `npm run job -- fetch --url <site> --category <restaurant|gym|healthcare|accounting|import_export>`
    (or `--lead <domain>` for an existing lead, or no flags for the oldest queued job). It prints `jobs/<id>`.
-   Add `--notes "<what to change>"`, `--revise` (improve the last Claude version, written to `jobs/<id>/previous/`)
+   Add `--notes "<what to change>"`, `--revise` (improve the last Claude version: its pages are in `jobs/<id>/previous/` and already copied into `site/`;
+   edit only the pages the notes concern)
    `--theme <theme-id>` (colours) or `--direction <direction-id>` (see the skill's references/directions.md) when the user asks for changes. Jobs queued from the admin portal carry their own
    notes; they appear in BRIEF.md under "This version".
 2. Load the `website-redesign` skill (also copied to `jobs/<id>/skill/`), then read `jobs/<id>/BRIEF.md` and
