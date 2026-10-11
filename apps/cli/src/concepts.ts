@@ -130,11 +130,10 @@ ${built.map((r, i) => `<section class="c"><header><h2>Option ${i + 1}: ${esc(r.n
     const m = path.match(/^\/([a-z0-9-]+)\/(?:(qa\/[a-z0-9-]+\.jpg)|([a-z0-9_-]*))\/?$/i);
     if (!m || !meta.results.some((r) => r.direction === m[1])) return res.writeHead(404).end("Not found");
     const file = m[2] ? join(outRoot, m[1], m[2]) : join(outRoot, m[1], "site", `${m[3] ? m[3] : "index"}.html`);
-    try {
-      res.writeHead(200, { "content-type": types[file.split(".").pop()!] ?? "application/octet-stream" }).end(await readFile(file));
-    } catch {
-      res.writeHead(404, { "content-type": types.html }).end("<p>Only the home page exists in a concept. The other pages are built after you choose a direction.</p>");
-    }
+    // Read first, then answer: writing the 200 before the read failed crashed the server on a missing inner page.
+    const body = await readFile(file).catch(() => null);
+    if (body) res.writeHead(200, { "content-type": types[file.split(".").pop()!] ?? "application/octet-stream" }).end(body);
+    else res.writeHead(404, { "content-type": types.html }).end("<p>Only the home page exists in a concept. The other pages are built after you choose a direction. <a href=\"/\">Back to the concepts</a></p>");
   }).listen(Number(args.port), "127.0.0.1", () => console.log(`Concepts for ${meta.lead}: http://localhost:${args.port}/  (Ctrl+C to stop)`));
 }
 
