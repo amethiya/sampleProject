@@ -61,6 +61,17 @@ export async function prepareJob(repoRoot: string, dir: string, next: Required<P
     recentDirections: next.recentDirections ?? [],
     seed: `${job.leadId}:${job.id}`,
   });
+  // A revision keeps its look: carry the previous version's fonts into content.json so nothing points Claude elsewhere.
+  if (previous.length) {
+    const home = previous.find((p) => p.slug === "home") ?? previous[0];
+    const fonts = home.html.match(/https:\/\/fonts\.googleapis\.com\/css2\?[^"'\s)]+/)?.[0]?.replace(/&amp;/g, "&");
+    if (fonts) {
+      const families = [...fonts.matchAll(/family=([^:&]+)/g)].map((m) => decodeURIComponent(m[1].replace(/\+/g, " ")));
+      const t = content.designDirection.creative.typography;
+      content.designDirection.creative.typography = { ...t, googleFontsUrl: fonts, query: fonts.split("?")[1], display: families[0] ?? t.display, body: families[1] ?? families[0] ?? t.body, note: "Kept from the previous version (this is a revision)." };
+    }
+    content.designDirection.creative.palette = { ...content.designDirection.creative.palette, name: `${content.designDirection.creative.palette.name} (a revision: keep the previous version's colours unless the notes change them)` };
+  }
   await writeFile(join(dir, "content.json"), JSON.stringify(content, null, 2));
 
   // UI UX Pro Max guidance for this trade (uiux.md); skipped when python3 is missing.
