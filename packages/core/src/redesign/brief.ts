@@ -1,5 +1,5 @@
 import { countryName } from "../categories";
-import { stripInjectedSpam } from "../spam";
+import { cleanMarkup, stripInjectedSpam } from "../spam";
 import type { SiteSnapshot } from "../crawl";
 import type { Lead } from "../types";
 import { chooseDirection, creativeBrief, directionById, siteSignals, type BrandSignals, type CreativeBrief } from "./directions";
@@ -45,7 +45,8 @@ export function designFor(lead: Lead, site: SiteSnapshot, trade: Lead["category"
 /** The data file handed to Claude: everything it may use, nothing else. */
 export function briefContent(lead: Lead, rawSite: SiteSnapshot, dna?: DesignDna, avoid: string[] = [], choice: DesignChoice = {}) {
   // Hacked sites carry hidden gambling/pharma spam: it is not the business's content, so Claude never sees it.
-  const { site, removed } = stripInjectedSpam(rawSite);
+  // Markup fragments from broken HTML aren't content either.
+  const { site, removed } = stripInjectedSpam(cleanMarkup(rawSite));
   const trade = dna?.trade ?? tradeFor(lead.category, lead.name);
   const d = dna ?? makeDna(pickLook(trade), trade);
   const t = THEMES[trade];
@@ -153,7 +154,10 @@ template with new colours.
 - **Creative direction:** build what designDirection.creative describes: its hero composition, section sequence
   (adapted to the content this site really has), grid, type scale, signature components and motion language. Load
   the fonts from designDirection.creative.typography.googleFontsUrl. Use designDirection.creative.palette as the
-  colour tokens (it is already contrast-checked and carries the brand's accent when it had a usable one).
+  colour tokens (it is already contrast-checked and carries the brand's accent when it had a usable one): "accent" is
+  the brand's true colour for buttons, badges and other fills, with "onAccent" text on it; "accentText" is the shade
+  to use when the accent is text, a link or a thin line on the background; when "accentNeedsEdge" is true, give
+  accent-filled shapes a 2px outline (or a solid shadow) in the text colour so they stand out from the background.
 - **Conversion:** the primary action (designDirection.primaryCallToAction, or the site's own booking/order link)
   is visible on the first screen, repeated after the key content and, on phones, reachable without scrolling back
   up. Phone numbers are tel: links, emails mailto: links. No fake forms: there is no backend, so link to the

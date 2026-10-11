@@ -261,10 +261,13 @@ describe("creative directions", () => {
       for (const accent of ["#741616", "#ffe066", "#1d4ed8", "#22c55e"]) {
         const p = paletteFor(directionById(d)!, { colors: [accent], fonts: [] }, "seed");
         expect(p.fromBrand).toBe(true);
+        // The brand's true colour stays the fill colour (bright yellow is not darkened to olive).
+        expect(p.accent).toBe(accent);
         expect(contrast(p.text, p.bg)).toBeGreaterThanOrEqual(7);
         expect(contrast(p.muted, p.bg)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(p.accent, p.bg)).toBeGreaterThanOrEqual(3);
-        expect(contrast(p.onAccent, p.accent)).toBeGreaterThanOrEqual(3);
+        expect(contrast(p.accentText!, p.bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(p.onAccent, p.accent)).toBeGreaterThanOrEqual(4.5);
+        expect(p.accentNeedsEdge).toBe(contrast(p.accent, p.bg) < 3);
       }
     }
     // A dark original keeps a dark palette when the direction has one.
@@ -400,5 +403,19 @@ describe("injected spam", () => {
     const c = briefContent(lead, site as never);
     expect(JSON.stringify(c.pages)).not.toMatch(/casino|jokabey/i);
     expect(c.contentNotes?.injectedSpamRemoved).toBe(spam.length + 1);
+  });
+});
+
+describe("markup fragments", () => {
+  it("strips tag fragments that broken HTML leaks into crawled text, and leaves ordinary < and > alone", async () => {
+    const { stripMarkup, cleanMarkup } = await import("../src");
+    expect(stripMarkup('<class="bottomnav">GIFT SHOP')).toBe("GIFT SHOP");
+    expect(stripMarkup("Open daily</td> until 10pm")).toBe("Open daily until 10pm");
+    expect(stripMarkup("&lt;div class=&quot;x&quot;&gt;Lobster roll 29")).toBe("Lobster roll 29");
+    expect(stripMarkup("Fresh oysters <span")).toBe("Fresh oysters");
+    for (const t of ["Kids < 12 eat free", "Mains > $20 include a side", "We <3 Boston", "2 < 3"]) expect(stripMarkup(t)).toBe(t);
+    const site = cleanMarkup({ crawledAt: "", pages: [{ slug: "store", url: "", label: "Store", title: "Store", description: "", sections: [{ heading: "", paragraphs: ["<br/>"], items: ['<class="bottomnav">GIFT SHOP', "Mugs 12"], images: [] }] }] } as never);
+    expect(site.pages[0].sections[0].items).toEqual(["GIFT SHOP", "Mugs 12"]);
+    expect(site.pages[0].sections[0].paragraphs).toEqual([]);
   });
 });

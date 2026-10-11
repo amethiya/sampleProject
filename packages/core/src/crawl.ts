@@ -1,5 +1,6 @@
 import { parse, type HTMLElement, type Node } from "node-html-parser";
 import { fetchPage } from "./http";
+import { stripMarkup } from "./spam";
 
 /** One block of a page: a heading followed by the text, list items and images under it, in page order. */
 export interface SiteSection {
@@ -299,7 +300,8 @@ export function highestResolution(u: URL): URL {
 }
 
 function clean(s: string): string {
-  return s.replace(/[ \t\r\f\v ]+/g, " ").replace(/\s*\n\s*/g, " ").trim();
+  const text = s.replace(/[ \t\r\f\v ]+/g, " ").replace(/\s*\n\s*/g, " ").trim();
+  return /[<>]|&lt;|&gt;/.test(text) ? stripMarkup(text) : text;
 }
 
 function titleCase(s: string): string {

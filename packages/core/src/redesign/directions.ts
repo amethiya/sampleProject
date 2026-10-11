@@ -21,11 +21,16 @@ export interface Palette {
   surface: string;
   text: string;
   muted: string;
+  /** The accent as a fill (buttons, badges, highlights): the brand's true colour when it has one. */
   accent: string;
   /** Text colour on accent-filled buttons. */
   onAccent: string;
   /** A second, quieter colour for details (eyebrows, rules, tints). */
   support: string;
+  /** The accent when it is itself text, links or thin lines on the background (adjusted to stay readable). */
+  accentText?: string;
+  /** True when accent-filled shapes need an outline to stand out from the background (e.g. bright yellow on cream). */
+  accentNeedsEdge?: boolean;
 }
 
 export interface FontPairing {
@@ -666,8 +671,12 @@ export function paletteFor(d: CreativeDirection, brand?: BrandSignals | null, se
   if (accent) p.accent = accent;
   p.text = ensureContrast(p.text, p.bg, 7);
   p.muted = ensureContrast(p.muted, p.bg, 4.5);
-  p.accent = ensureContrast(p.accent, p.bg, 3);
-  p.onAccent = contrast("#ffffff", p.accent) >= contrast("#111111", p.accent) ? "#ffffff" : "#111111";
+  // Keep the brand's true colour for fills (darkening bright yellow to pass text contrast turned BeeFit's bee-yellow
+  // olive); a separate, adjusted shade carries the accent when it is text or a thin line on the background.
+  p.accentText = ensureContrast(p.accent, p.bg, 4.5);
+  p.accentNeedsEdge = contrast(p.accent, p.bg) < 3;
+  p.onAccent = contrast(p.text, p.accent) >= 4.5 && contrast(p.text, p.accent) >= contrast("#ffffff", p.accent) ? p.text
+    : contrast("#ffffff", p.accent) >= contrast("#111111", p.accent) ? "#ffffff" : "#111111";
   return { ...p, name: accent ? `${base.name}, brand accent ${accent}` : base.name, fromBrand: !!accent };
 }
 
