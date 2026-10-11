@@ -6,6 +6,31 @@
  */
 import type { SiteSnapshot } from "./crawl";
 
+/**
+ * Broken HTML on old sites leaks into crawled text as tag fragments ('<class="bottomnav">GIFT SHOP'). They are not
+ * content: strip them so Claude doesn't have to choose between pasting markup and "missing" text in QA.
+ */
+const TAG = /<\/?[a-z!?][^<>]{0,200}>|<[a-z!?][^<>\s]*(?:\s[^<>]*)?$|&lt;\/?[a-z][\s\S]{0,200}?&gt;/gi;
+
+export function stripMarkup(text: string): string {
+  return text.replace(TAG, " ").replace(/\s{2,}/g, " ").trim();
+}
+
+/** A copy of the snapshot with markup fragments removed from every text (texts left empty are dropped). */
+export function cleanMarkup(site: SiteSnapshot): SiteSnapshot {
+  const fix = (t: string) => (/[<>]|&lt;|&gt;/.test(t) ? stripMarkup(t) : t);
+  return {
+    ...site,
+    pages: site.pages.map((p) => ({
+      ...p,
+      title: fix(p.title),
+      sections: p.sections
+        .map((s) => ({ ...s, heading: fix(s.heading), paragraphs: s.paragraphs.map(fix).filter(Boolean), items: s.items.map(fix).filter(Boolean), links: s.links?.map((l) => ({ ...l, text: fix(l.text) })) }))
+        .filter((s) => s.heading || s.paragraphs.length || s.items.length || s.images.length),
+    })),
+  };
+}
+
 const SPAM = /casino|казино|азарт|ставк[аи]|букмекер|\bbetting\b|\bbet\s*sites?\b|\bslots?\s+(?:online|machine|game)|\bpokies\b|\bjackpot|\bpoker\s+(?:online|room)|\bbookmaker|\bfree\s+spins|\bno\s+deposit\s+bonus|\bgamstop\b|\bviagra\b|\bcialis\b|\blevitra\b|\bpayday\s+loans?\b|\bescort\s+service|\bjokabey\b|\.bet\b|\bspins\b|\blive[- ]dealer/i;
 const CYRILLIC = /[Ѐ-ӿ]/g;
 const LETTERS = /\p{L}/gu;

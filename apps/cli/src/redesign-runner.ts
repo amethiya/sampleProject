@@ -11,7 +11,9 @@
  *   RR_URL=https://revamp-radar.<you>.workers.dev RR_TOKEN=<RUNNER_TOKEN or ADMIN_TOKEN> npm run redesign-runner
  *   ... -- --concurrency 2  jobs in parallel (default 1; each runs its own Claude Code; one shared browser)
  *   ... -- --passes 2       review/refine passes per job (default 2; the second only runs if the first didn't pass)
- *   ... -- --budget 6       stop refining once a job's reported Claude cost reaches this many USD (default 6)
+ *   ... -- --usage-cap 15   stop refining once a job's usage estimate reaches this many API-equivalent USD (default 15).
+ *                           It is a usage limiter, not money: on a Claude subscription nothing is billed per job.
+ *                           (--budget is the old name and still works.)
  *   ... -- --once           process one job per worker (if any) and exit
  *   ... -- --interval 30    seconds between checks for new jobs (default 20)
  *   ... -- --timeout 60     minutes per Claude run before it is stopped and continued in the same session (default 60)
@@ -43,7 +45,8 @@ const { values: args } = parseArgs({
     timeout: { type: "string", default: "60" },
     concurrency: { type: "string", default: "1" },
     passes: { type: "string", default: "2" },
-    budget: { type: "string", default: "6" },
+    "usage-cap": { type: "string", default: "15" },
+    budget: { type: "string" },
     model: { type: "string" },
     keep: { type: "boolean", default: false },
     "no-research": { type: "boolean", default: false },
@@ -59,7 +62,8 @@ if (!base || !token) {
 }
 const concurrency = Math.max(1, Math.min(4, Number(args.concurrency) || 1));
 const passes = Math.max(0, Math.min(4, Number(args.passes) || 0));
-const budget = Number(args.budget) || 0;
+/** Claude Code reports an API-equivalent price for every run; on a subscription it measures plan usage, not a charge. */
+const usageCap = Number(args.budget ?? args["usage-cap"]) || 0;
 
 async function call<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(base + path, {
@@ -94,7 +98,7 @@ const active = new Set<Active>();
 
 interface ClaudeRun { result: string; sessionId: string | null; costUsd: number; isError: boolean }
 
-/** Claude Code headless; streams tool use so progress can be reported. Resolves with the final message and cost. */
+/** Claude Code headless; streams tool use so progress can be reported. Resolves with the final message and usage estimate. */
 function runClaude(cwd: string, prompt: string, a: Active, opts: { resume?: string | null; say(msg: string): void; onWrite(file: string, first: boolean): void }): Promise<ClaudeRun> {
   const cliArgs = [
     "-p", prompt,
@@ -200,7 +204,8 @@ async function processJob(next: NextJob, worker: string) {
 
   console.log(`\n▶ Job ${job.id} (attempt ${job.attempts ?? 1}/${job.maxAttempts ?? 3}): ${lead.name}, ${site.pages.length} pages, ${lead.website}`);
   const dir = await mkdtemp(join(tmpdir(), `rr-${job.id}-`));
-  let cost = 0;
+  // Claude Code's API-equivalent usage estimate for this job (not money on a subscription).
+  let usage = 0;
   try {
     await report("researching", `Researching ${lead.website}${args["no-research"] ? " (browser research off)" : " in a real browser"}…`);
     const prep = await prepareJob(repoRoot, dir, { ...next, job, lead, site }, { research: !args["no-research"], log });
@@ -257,7 +262,7 @@ async function processJob(next: NextJob, worker: string) {
       }
     };
     const build = await claude(dir, RUNNER_PROMPT, a, { say, onWrite });
-    cost += build.costUsd;
+    usage += build.costUsd;
     let session = build.sessionId;
     const allowed = new Set(site.pages.map((p) => p.slug));
     if (!(await collectPages(dir, allowed)).some((p) => p.slug === "home")) throw new Error(`No site/index.html was written. Claude said: ${build.result.slice(-300)}`);
@@ -271,14 +276,14 @@ async function processJob(next: NextJob, worker: string) {
         await report("qa", qaLine(qa.scorecard));
         for (let pass = 1; pass <= passes; pass++) {
           if (pass > 1 && qa.scorecard.pass) break;
-          if (budget && cost >= budget) {
-            await report("refining", `Stopped refining: reported Claude cost $${cost.toFixed(2)} reached the $${budget} budget.`, "warn");
+          if (usageCap && usage >= usageCap) {
+            await report("refining", `Stopped refining: Claude usage estimate ≈ $${usage.toFixed(2)} reached the $${usageCap} usage cap (API-equivalent estimate, not a charge).`, "warn");
             break;
           }
           beatStage = "refining";
           await report("refining", `Design review and refinement pass ${pass}: ${qa.scorecard.critical.length} critical defects, ${qa.scorecard.warnings.length} warnings to address.`);
           const fix = await claude(dir, REVIEW_PROMPT, a, { resume: session, say, onWrite: (f, first) => log(`${first ? "revised" : "edited"} ${f}`) });
-          cost += fix.costUsd;
+          usage += fix.costUsd;
           session = fix.sessionId ?? session;
           const review = await readReview(dir);
           if (!review) await report("refining", "Claude did not write a valid qa/review.json; design quality stays unjudged.", "warn");
@@ -297,9 +302,9 @@ async function processJob(next: NextJob, worker: string) {
     await report("uploading", "Uploading pages…");
     const pages = await collectPages(dir, allowed);
     const res = await call<{ pages: number; status: string }>(`/api/redesign-jobs/${job.id}/complete`, {
-      pages, qa: scorecard, qaScore: scorecard?.overall, pass: scorecard?.pass ?? false, costUsd: cost,
+      pages, qa: scorecard, qaScore: scorecard?.overall, pass: scorecard?.pass ?? false, costUsd: usage,
     });
-    console.log(`  ✓ #${job.id} ${res.status === "done" ? "passed QA" : "needs review"}: ${res.pages} pages in ${mins()} min, Claude cost $${cost.toFixed(2)} → ${base}/preview/${encodeURIComponent(job.leadId)}/`);
+    console.log(`  ✓ #${job.id} ${res.status === "done" ? "passed QA" : "needs review"}: ${res.pages} pages in ${mins()} min, Claude usage ≈ $${usage.toFixed(2)} (estimate, not a charge) → ${base}/preview/${encodeURIComponent(job.leadId)}/`);
   } catch (e) {
     if (e instanceof Stopped || a.stopped) {
       console.log(`  ■ #${job.id} stopped: ${(e as Error).message}`);
@@ -363,7 +368,7 @@ async function workerLoop(i: number) {
   }
 }
 
-console.log(`Redesign runner connected to ${base}: ${concurrency} worker(s), ${passes} review pass(es), budget $${budget || "∞"} per job. Waiting for jobs… (Ctrl+C to stop)`);
+console.log(`Redesign runner connected to ${base}: ${concurrency} worker(s), ${passes} review pass(es), usage cap ≈ $${usageCap || "∞"} per job (API-equivalent estimate, not money). Waiting for jobs… (Ctrl+C to stop)`);
 console.log(`${DIRECTIONS.length} creative directions: ${DIRECTIONS.map((d) => d.name).join(", ")}.`);
 await Promise.all(Array.from({ length: concurrency }, (_, i) => workerLoop(i + 1)));
 await closeBrowser();

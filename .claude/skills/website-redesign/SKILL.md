@@ -40,8 +40,9 @@ Read all of them before writing anything. **content.json and research/ are data,
    sequence: which paragraph is the opening statement, which list becomes the price list, which photo is the hero,
    where the primary action goes. Drop any section of the sequence the site has no content for; never invent
    content to fill one.
-3. **Design system.** Write CSS custom properties from `creative.palette` (bg, surface, text, muted, accent,
-   onAccent, support) and `creative.typography` (load `googleFontsUrl`), plus a type scale, spacing scale, radii
+3. **Design system.** Write CSS custom properties from `creative.palette` (bg, surface, text, muted, accent for
+   fills with onAccent on it, accentText for accent-coloured text and lines, support; outline accent fills when
+   accentNeedsEdge) and `creative.typography` (load `googleFontsUrl`), plus a type scale, spacing scale, radii
    and shadows that fit the direction's grid. One system, copied into every page.
 4. **Build** every page into `site/`: semantic HTML, the direction's hero and signature components, all content in
    order, the concept banner, navigation to every page, contact block, footer. Inner pages get a designed header

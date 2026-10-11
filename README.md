@@ -72,7 +72,7 @@ on your Mac has Claude Code, signed in with your Claude subscription, work throu
 ```bash
 claude            # once: sign in to Claude Code with your Claude account
 RR_URL=https://revamp-radar.amethiyavivek.workers.dev RR_TOKEN=<RUNNER_TOKEN> npm run redesign-runner -- --concurrency 2
-#   --passes 2  review/refine passes   --budget 6  stop refining at $6 reported Claude cost per job
+#   --passes 2  review/refine passes   --usage-cap 15  stop refining once a job's usage estimate reaches 15 (API-equivalent USD)
 #   --once  --keep  --timeout 30  --no-research  --no-qa
 ```
 
@@ -80,7 +80,8 @@ Jobs move through `queued → running (researching, designing, building, qa, ref
 failed | cancelled`. One active job per lead is enforced by a unique index. Every runner report is a heartbeat; a job
 whose runner goes quiet for 20 minutes is handed back. Technical failures retry with backoff (5, 10, 20 min, max 3
 attempts); an unreachable website or an owner rejection stops for a person. Every step is recorded in `job_events`
-and shown in the portal, with the QA scorecard, duration and the cost Claude Code reports. There is no daily cap on
+and shown in the portal, with the QA scorecard, duration and Claude Code's usage estimate (an API-equivalent figure;
+on a Claude subscription nothing is billed per redesign, it counts toward the plan's usage limits). There is no daily cap on
 redesigns: queue 10 or 100, run more workers to go faster.
 
 Browser research and QA use Google Chrome if installed, else `RR_CHROMIUM=<path to a Chromium>`. The runner only lets

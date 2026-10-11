@@ -72,7 +72,7 @@ export function JobPanel({ job, onAction, busy }: { job: JobInfo; onAction(actio
       <div className="job-head">
         <span className={`chip js-${job.status}`}>{jobLabel(job)}</span>
         {job.directionName && <span className="muted small">Direction: <b>{job.directionName}</b>{job.theme ? ` · theme ${job.theme}` : ""}</span>}
-        <span className="muted small">Attempt {job.attempts}/{job.maxAttempts}{job.durationS != null ? ` · ${dur(job.durationS)}` : job.startedAt && job.status === "running" ? ` · started ${since(job.startedAt)}` : ""}{job.costUsd != null ? ` · Claude cost $${job.costUsd.toFixed(2)}` : ""}</span>
+        <span className="muted small">Attempt {job.attempts}/{job.maxAttempts}{job.durationS != null ? ` · ${dur(job.durationS)}` : job.startedAt && job.status === "running" ? ` · started ${since(job.startedAt)}` : ""}{job.costUsd != null ? ` · Claude usage ≈ $${job.costUsd.toFixed(2)} (estimate, not a charge)` : ""}</span>
       </div>
       {(job.status === "running" || job.status === "queued") && (
         <ol className="stages" aria-label="Pipeline">
@@ -212,7 +212,7 @@ export function QueuePage({ onError, onToast }: { onError(e: unknown): void; onT
       {w && w.finished > 0 && (
         <p className="muted small metrics">
           Last 7 days: {w.finished} finished · {pct(w.done, w.finished)} passed QA first time · {pct(w.needsReview, w.finished)} needed review · {pct(w.failed, w.finished)} failed · {pct(w.retried, w.finished)} retried ·
-          average {dur(w.avgDurationS)} per redesign{w.avgQa != null ? ` · average QA ${w.avgQa.toFixed(1)}/10` : ""}{w.avgCostUsd != null ? ` · Claude cost $${w.avgCostUsd.toFixed(2)} each ($${(w.costUsd ?? 0).toFixed(2)} total, as reported by Claude Code)` : ""}.
+          average {dur(w.avgDurationS)} per redesign{w.avgQa != null ? ` · average QA ${w.avgQa.toFixed(1)}/10` : ""}{w.avgCostUsd != null ? ` · Claude usage ≈ $${w.avgCostUsd.toFixed(2)} per redesign ($${(w.costUsd ?? 0).toFixed(2)} in total). These are Claude Code's API-equivalent estimates of plan usage, not charges: a Claude subscription is not billed per redesign` : ""}.
           {stats.byDirection.length > 0 && ` Directions (30 days): ${stats.byDirection.map((d) => `${name(d.direction)} ${d.n}`).join(", ")}.`}
         </p>
       )}
