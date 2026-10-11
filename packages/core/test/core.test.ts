@@ -418,4 +418,12 @@ describe("markup fragments", () => {
     expect(site.pages[0].sections[0].items).toEqual(["GIFT SHOP", "Mugs 12"]);
     expect(site.pages[0].sections[0].paragraphs).toEqual([]);
   });
+
+  it("drops text that third-party widgets print into a page, and keeps the business's own footer lines", async () => {
+    const { cleanMarkup, isWidgetBoilerplate } = await import("../src");
+    for (const t of ["This jQuery slider was created with the free EasyRotator software from DWUser.com.", "Use WordPress? The free EasyRotator for WordPress plugin lets you create beautiful WordPress sliders in seconds.", "Your browser does not support the video tag.", "Please enable JavaScript to view this page.", "Powered by Wix"]) expect(isWidgetBoilerplate(t), t).toBe(true);
+    for (const t of ["© 2026 Union Oyster House. All rights reserved.", "Designed by our own chef in 1998", "Powered by fresh oysters daily"]) expect(isWidgetBoilerplate(t), t).toBe(false);
+    const site = cleanMarkup({ crawledAt: "", pages: [{ slug: "home", url: "", label: "Home", title: "Home", description: "", sections: [{ heading: "", paragraphs: ["This jQuery slider was created with the free EasyRotator software from DWUser.com.", "America's oldest restaurant."], items: [], images: [] }] }] } as never);
+    expect(site.pages[0].sections[0].paragraphs).toEqual(["America's oldest restaurant."]);
+  });
 });
