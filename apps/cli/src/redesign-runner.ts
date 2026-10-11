@@ -31,6 +31,7 @@ import { parseArgs } from "node:util";
 import { DIRECTIONS, REVIEW_PROMPT, RUNNER_PROMPT, type Scorecard } from "@rr/core";
 import { closeBrowser } from "./browser";
 import { prepareJob, type NextJob } from "./prepare";
+import { limitError, isUsageLimit, UsageLimit } from "./limits";
 import { readReview, runQa } from "./qa";
 
 const repoRoot = resolve(fileURLToPath(import.meta.url), "../../../..");
@@ -72,6 +73,15 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
 
 class Stopped extends Error {}
 class Unreachable extends Error {}
+
+/** While the Claude subscription is over its usage limit, no worker starts Claude (epoch ms; 0 = not paused). */
+let pausedUntil = 0;
+/** The longest single wait for a limit to lift; anything longer is reported as a failure for a person to look at. */
+const MAX_LIMIT_WAIT_MS = 8 * 3600_000;
+
+async function sleepUntil(t: number, a?: Active) {
+  while (Date.now() < t && !stopping && !a?.stopped) await new Promise((r) => setTimeout(r, Math.min(30_000, t - Date.now())));
+}
 
 interface Active { jobId: number; child: ChildProcess | null; stopped: boolean }
 const active = new Set<Active>();
@@ -138,6 +148,7 @@ function runClaude(cwd: string, prompt: string, a: Active, opts: { resume?: stri
       clearTimeout(timer);
       a.child = null;
       if (a.stopped) reject(new Stopped("stopped"));
+      else if (isUsageLimit(`${err}\n${out.result}`) && (code !== 0 || out.isError)) reject(limitError(`${err}\n${out.result}`));
       else if (code === 0) resolvePromise(out);
       else reject(new Error(`Claude Code exited with ${code}: ${(err || out.result).slice(-800)}`));
     });
@@ -206,7 +217,23 @@ async function processJob(next: NextJob, worker: string) {
         report("building", `Building: wrote ${file}`).catch(() => {});
       } else log(`${first ? "wrote" : "edited"} ${file}`);
     };
-    const build = await runClaude(dir, RUNNER_PROMPT, a, { say, onWrite });
+    // A usage limit pauses the job (heartbeats keep its lease) and every worker until the limit resets, then retries.
+    const claude: typeof runClaude = async (cwd, prompt, act, opts) => {
+      for (let waits = 0; ; waits++) {
+        try {
+          return await runClaude(cwd, prompt, act, opts);
+        } catch (e) {
+          if (!(e instanceof UsageLimit)) throw e;
+          if (waits >= 3 || e.resetAt - Date.now() > MAX_LIMIT_WAIT_MS) throw new Error(`Claude usage limit: ${e.message}`);
+          pausedUntil = Math.max(pausedUntil, e.resetAt);
+          await report(beatStage, `Paused: Claude usage limit (${e.message}). Resuming at ${new Date(pausedUntil).toLocaleTimeString()}; the job keeps its place.`, "warn");
+          await sleepUntil(pausedUntil, act);
+          if (act.stopped || stopping) throw new Stopped("stopped while waiting for the usage limit");
+          await report(beatStage, "Usage limit lifted; continuing.");
+        }
+      }
+    };
+    const build = await claude(dir, RUNNER_PROMPT, a, { say, onWrite });
     cost += build.costUsd;
     let session = build.sessionId;
     const allowed = new Set(site.pages.map((p) => p.slug));
@@ -227,7 +254,7 @@ async function processJob(next: NextJob, worker: string) {
           }
           beatStage = "refining";
           await report("refining", `Design review and refinement pass ${pass}: ${qa.scorecard.critical.length} critical defects, ${qa.scorecard.warnings.length} warnings to address.`);
-          const fix = await runClaude(dir, REVIEW_PROMPT, a, { resume: session, say, onWrite: (f, first) => log(`${first ? "revised" : "edited"} ${f}`) });
+          const fix = await claude(dir, REVIEW_PROMPT, a, { resume: session, say, onWrite: (f, first) => log(`${first ? "revised" : "edited"} ${f}`) });
           cost += fix.costUsd;
           session = fix.sessionId ?? session;
           const review = await readReview(dir);
@@ -292,6 +319,12 @@ async function workerLoop(i: number) {
   const name = `${hostname().split(".")[0]}#${process.pid}/w${i}`;
   for (;;) {
     if (stopping) return;
+    // Don't claim new work while the subscription is over its limit.
+    if (pausedUntil > Date.now()) {
+      console.log(`  [w${i}] waiting for the Claude usage limit to lift (${new Date(pausedUntil).toLocaleTimeString()})…`);
+      await sleepUntil(pausedUntil);
+      continue;
+    }
     try {
       const next = await call<NextJob>("/api/redesign-jobs/next", { runner: name });
       if (next.job) {
