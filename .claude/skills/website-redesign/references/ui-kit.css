@@ -58,3 +58,22 @@
   .mu-marquee{overflow-x:auto}
   .mu-marquee .mu-marquee-track{animation:none}
 }
+
+/* Bencho: Image Accordion */
+.bn-accordion{display:flex;gap:var(--bn-gap,8px);height:clamp(280px,42vw,560px);width:100%}
+.bn-accordion>*{flex:1 1 0;min-width:0;margin:0;position:relative;overflow:hidden;border-radius:var(--bn-r,12px);cursor:pointer;outline-offset:3px}
+.bn-accordion img{width:100%;height:100%;object-fit:cover;display:block}
+.bn-accordion figcaption{position:absolute;inset:auto 14px 14px;color:#fff;font-size:.95rem;line-height:1.35;text-shadow:0 1px 10px rgba(0,0,0,.65);opacity:0;transform:translateY(6px);transition:opacity .35s,transform .35s;pointer-events:none}
+.bn-accordion>.is-open figcaption{opacity:1;transform:none}
+@media (max-width:640px){.bn-accordion{flex-direction:column;height:auto}.bn-accordion>*{flex:none!important;height:220px}.bn-accordion figcaption{opacity:1;transform:none}}
+/* Bencho: Image Compare */
+.bn-compare{position:relative;overflow:hidden;touch-action:pan-y;user-select:none;-webkit-user-select:none;border-radius:var(--bn-r,12px);--bn-x:50%}
+.bn-compare img{-webkit-user-drag:none}
+.bn-compare>img{display:block;width:100%;height:auto;pointer-events:none}
+.bn-compare .bn-after{position:absolute;inset:0;clip-path:inset(0 0 0 var(--bn-x))}
+.bn-compare .bn-after img{width:100%;height:100%;object-fit:cover;display:block}
+.bn-compare .bn-line{position:absolute;top:0;bottom:0;left:var(--bn-x);width:2px;margin-left:-1px;background:#fff;box-shadow:0 0 12px rgba(0,0,0,.35);cursor:ew-resize}
+.bn-compare .bn-line::after{content:"";position:absolute;top:50%;left:50%;width:44px;height:44px;margin:-22px;border-radius:50%;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.35)}
+.bn-compare .bn-line:focus-visible::after{outline:2px solid var(--accent,#000);outline-offset:3px}
+.bn-compare .bn-tag{position:absolute;top:12px;padding:4px 10px;border-radius:99px;background:rgba(0,0,0,.55);color:#fff;font-size:.8rem;pointer-events:none}
+.bn-compare .bn-tag.l{left:12px}.bn-compare .bn-tag.r{right:12px}

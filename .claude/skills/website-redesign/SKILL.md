@@ -22,6 +22,8 @@ the business's own content and invents nothing.
   - `trade`, `primaryCallToAction`, `fallbackPhotos`; `starterTheme` (only for the starter pages).
 - `research/` (when present): `original-desktop.jpg`, `original-mobile.jpg` and `research.md`: the real site in a
   browser, its measured colours, fonts and logo, and measured problems. **Look at the screenshots.**
+- `inspiration/` (when present): 3-5 real, well-made websites for this trade and direction (screenshots + DESIGN.md,
+  from Inspo). Calibrate your craft against them; never copy their content, layouts or code.
 - `BRIEF.md`: the output contract (file names, links, banner, allowed hosts), plus any owner's notes.
 - `uiux.md` (when present): UI UX Pro Max guidance for this trade. Apply what fits; this skill, the brief and the
   creative direction win where they disagree. With a shell: `python3 .claude/skills/ui-ux-pro-max/scripts/search.py "<query>" --domain ux`.

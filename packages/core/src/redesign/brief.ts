@@ -123,6 +123,10 @@ template with new colours.
 - **research/** (when present): screenshots of the current site (\`original-desktop.jpg\`, \`original-mobile.jpg\`)
   and research.md: its measured colours, fonts and logo, and a UX audit of what is wrong with it. Look at the
   screenshots. Keep what is recognisably theirs (logo, brand colour, photography), fix what the audit lists.
+- **inspiration/** (when present): screenshots and DESIGN.md notes of 3-5 real, well-made websites picked for this
+  trade and creative direction (inspiration/README.md says why each was chosen). Look at them to calibrate the level
+  of craft: hierarchy, type scale, spacing, image cropping, restraint, how the main action stands out. Never copy
+  their text, images, logos, layouts or code, and never reference them in the pages.
 - **uiux.md** (when present): UI UX Pro Max guidance for this trade. Apply what fits; this brief, content.json and
   the skill win where they disagree.
 - **starter/** (only for the Cinematic Hospitality direction): the pages rendered in that system. Other directions
@@ -242,7 +246,7 @@ all of the site's own text and images and invent nothing.\n`;
 }
 
 export const RUNNER_PROMPT =
-  "Use the website-redesign skill: first read skill/SKILL.md and skill/references/directions.md. Then read BRIEF.md (including any owner's notes and, for a revision, the previous pages in ./previous/), content.json (designDirection.creative is the creative direction to build), research/research.md and the screenshots in research/ (when present), uiux.md (when present) and the starter pages in ./starter/ (only when the direction is cinematic-hospitality) in the current directory, and build the redesign exactly as the skill and BRIEF.md describe, with the direction's own motion system and only the UI kit components listed in content.json, writing the files into ./site/. Run the skill's QA checklist before you finish.";
+  "Use the website-redesign skill: first read skill/SKILL.md and skill/references/directions.md. Then read BRIEF.md (including any owner's notes and, for a revision, the previous pages in ./previous/), content.json (designDirection.creative is the creative direction to build), research/research.md and the screenshots in research/ (when present), inspiration/README.md and its screenshots (when present), uiux.md (when present) and the starter pages in ./starter/ (only when the direction is cinematic-hospitality) in the current directory, and build the redesign exactly as the skill and BRIEF.md describe, with the direction's own motion system and only the UI kit components listed in content.json, writing the files into ./site/. Run the skill's QA checklist before you finish.";
 
 /**
  * The design review and refinement pass: Claude looks at the rendered screenshots of its own pages and the automated

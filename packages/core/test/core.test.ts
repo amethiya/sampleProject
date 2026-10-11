@@ -120,7 +120,7 @@ describe("design system", () => {
   it("ships the Magic UI + Smooth UI kit on every page and documents every component for the skill", async () => {
     const { UI_KIT, UI_KIT_CSS, UI_KIT_JS, renderSitePage, snapshotFromLead } = await import("../src");
     const { readFileSync } = await import("node:fs");
-    expect(new Set(UI_KIT.map((c) => c.library))).toEqual(new Set(["Magic UI", "Smooth UI", "21st.dev"]));
+    expect(new Set(UI_KIT.map((c) => c.library))).toEqual(new Set(["Magic UI", "Smooth UI", "21st.dev", "Bencho"]));
     expect(new Set(UI_KIT.map((c) => c.id)).size).toBe(UI_KIT.length);
     // Runs under the preview CSP: no network, no storage, no external hosts, no eval.
     expect(UI_KIT_JS).not.toMatch(/fetch\(|XMLHttpRequest|localStorage|sessionStorage|https?:\/\/|eval\(|new Function/);

@@ -54,7 +54,7 @@ A printed food or culture magazine: warm paper, very large serif headlines, an a
 - **Signature components:** Numbered chapter headers, Drop cap, Dotted-leader price list in two columns, Asymmetric photo collage with captions, Hairline rules, Pull quote (only the site's own words)
 - **Motion:** Restrained and typographic: lines of the masthead slide up from a mask, rules draw in from left, images unveil with a clip-path wipe, nothing bounces. 400–700ms, ease-out.
 - **Motion system:** intro: None: no loader. The masthead letters rise from a baseline mask in a 30ms stagger; the issue line and the offset photo fade in after. Transition: Page turn: the old page slides 6% left and fades while a paper-coloured panel sweeps in from the right (350ms). Scroll: Chapter numbers stay sticky in the margin while their chapter scrolls; photos unveil with a horizontal clip-path wipe; pull quotes settle from 0.96 scale. Hover: Underlines draw left to right; list items shift 4px right. Signature: A drop cap that inks in, and hairline rules that draw across the page.
-- **UI kit components:** mask-reveal-up, scroll-reveal-paragraph, dot-pattern
+- **UI kit components:** mask-reveal-up, scroll-reveal-paragraph, dot-pattern, image-accordion
 - **3D:** none
 - **Conversion:** A clear 'Reserve' / 'Order' text link in the header and a practical sidebar box repeated before the footer.
 - **Avoid:** Round cut-out plates; Dark-everywhere backgrounds; Card grids; Glassmorphism
@@ -198,7 +198,7 @@ A contemporary product-company feel for a local business: a bento grid of real c
 - **Signature components:** Bento grid, Tilt / spotlight tiles (UI kit), Perspective hero cluster, Pricing table, FAQ accordion
 - **Motion:** Responsive and springy: tiles enter in a grid stagger, tilt follows the pointer (fine pointers only), the hero cluster flattens with scroll progress, buttons get a subtle shimmer.
 - **Motion system:** intro: None: no loader. Bento tiles assemble from a 30px offset on springs in a grid stagger; the hero cluster starts tilted in 3D perspective and flattens. Transition: The clicked tile scales up to fill the screen before the next page loads. Scroll: The hero cluster flattens with scroll progress; tiles reveal row by row. Hover: A spotlight glow follows the pointer inside tiles; tiles tilt toward the pointer. Signature: A bento grid with a pointer-following spotlight.
-- **UI kit components:** magic-card, glow-hover-card, tilt-card, shimmer-button
+- **UI kit components:** magic-card, glow-hover-card, tilt-card, shimmer-button, image-compare
 - **3D:** optional: CSS 3D perspective on the hero bento cluster (no WebGL needed); optionally a small Three.js object representing the trade if it reads instantly.
 - **Conversion:** Primary CTA in the hero and in the contact bento; sticky header button.
 - **Avoid:** Text-only boxes; More than one accent colour; Gradient blobs everywhere
@@ -234,7 +234,7 @@ Let the work speak: full-screen photography, scroll-driven chapters with sticky 
 - **Signature components:** Scroll media expansion (UI kit), Sticky captions, Scroll-linked horizontal gallery, Full-bleed CTA
 - **Motion:** Scroll-driven: media expands with scroll progress, captions crossfade at chapter boundaries, the gallery translates with scroll. Native scrolling only; transforms and opacity only.
 - **Motion system:** intro: None: no loader. The hero photo starts as a small framed image and expands to full screen as the visitor begins to scroll. Transition: The page fades to black, then the next page's hero fades up. Scroll: Full-screen chapters with sticky captions that crossfade; a horizontal gallery translates with the scroll. Hover: Gallery images grow to 1.03 and reveal their captions. Signature: A scroll-driven expanding hero and a horizontal gallery.
-- **UI kit components:** scroll-expand-media, marquee, mask-reveal-up
+- **UI kit components:** scroll-expand-media, marquee, mask-reveal-up, image-accordion
 - **3D:** optional: A subtle WebGL (Three.js) image-plane ripple on the hero photo that follows the pointer on desktop; off on touch and for reduced motion.
 - **Conversion:** A fixed small 'Book / Visit' pill bottom-right after the hero.
 - **Avoid:** Using it when the site has fewer than 5 usable photos; Text over busy image areas without a scrim

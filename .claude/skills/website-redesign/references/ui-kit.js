@@ -233,4 +233,85 @@
       if (im) im.style.scale = (1.18 - 0.18 * e).toFixed(4);
     });
   });
+
+  // Bencho: one spring (frames, not milliseconds; damping raised to dt, so a dropped frame decays the same energy).
+  function bnSpring(tune){ return { k: 0.08 + (tune / 100) * 0.16, d: 0.62 + (tune / 100) * 0.2 }; }
+
+  // Bencho: Image Accordion (open one picture; the rest pay for it on a gaussian falloff)
+  $$('.bn-accordion').forEach(function(row){
+    var items = Array.prototype.slice.call(row.children);
+    if (items.length < 2) return;
+    var open = num(row, 'data-open', 50), reach = num(row, 'data-reach', 35), sp = bnSpring(num(row, 'data-bounce', 10));
+    var lift = 0.4 + (Math.min(100, Math.max(0, open)) / 100) * 2.8;
+    var sig = 0.35 + (Math.min(100, Math.max(0, reach)) / 100) * 0.9;
+    var cur = items.map(function(){ return 1; }), vel = items.map(function(){ return 0; }), target = cur.slice(), raf = 0, prev = 0;
+    function set(h){
+      items.forEach(function(it, i){
+        target[i] = h < 0 ? 1 : 1 + lift * Math.exp(-Math.pow(Math.abs(i - h) / sig, 2));
+        it.classList.toggle('is-open', i === h);
+      });
+      if (reduce){ items.forEach(function(it, i){ cur[i] = target[i]; it.style.flexGrow = cur[i]; }); return; }
+      if (!raf){ prev = 0; raf = requestAnimationFrame(tick); }
+    }
+    function tick(t){
+      var dt = prev ? Math.min(2.5, Math.max(0, (t - prev) / 16.67)) : 1, moving = false;
+      prev = t;
+      items.forEach(function(it, i){
+        vel[i] += (target[i] - cur[i]) * sp.k * dt; vel[i] *= Math.pow(sp.d, dt); cur[i] += vel[i] * dt;
+        if (Math.abs(target[i] - cur[i]) < 0.002 && Math.abs(vel[i]) < 0.002){ cur[i] = target[i]; vel[i] = 0; } else moving = true;
+        it.style.flexGrow = cur[i].toFixed(4);
+      });
+      raf = moving ? requestAnimationFrame(tick) : 0;
+    }
+    items.forEach(function(it, i){
+      if (!it.matches('a,button,[tabindex]')) it.tabIndex = 0;
+      it.addEventListener('pointerenter', function(e){ if (e.pointerType === 'mouse') set(i); });
+      it.addEventListener('focus', function(){ set(i); });
+      it.addEventListener('click', function(){ set(i); });
+    });
+    row.addEventListener('pointerleave', function(e){ if (e.pointerType === 'mouse') set(-1); });
+    row.addEventListener('focusout', function(e){ if (!row.contains(e.relatedTarget)) set(-1); });
+  });
+
+  // Bencho: Image Compare (drag the line; a flick glides it to the edge; arrow keys move it)
+  $$('.bn-compare').forEach(function(box){
+    var imgs = box.querySelectorAll(':scope > img');
+    if (imgs.length < 2) return;
+    // Chrome's native image drag would cancel the pointer stream after the first move.
+    Array.prototype.forEach.call(imgs, function(im){ im.draggable = false; });
+    box.addEventListener('dragstart', function(e){ e.preventDefault(); });
+    var after = document.createElement('div'); after.className = 'bn-after'; after.appendChild(imgs[1]); box.appendChild(after);
+    var line = document.createElement('div'); line.className = 'bn-line'; line.tabIndex = 0;
+    line.setAttribute('role', 'slider'); line.setAttribute('aria-valuemin', '0'); line.setAttribute('aria-valuemax', '100');
+    var labels = (box.getAttribute('data-labels') || '').split('|');
+    line.setAttribute('aria-label', labels[0] && labels[1] ? labels[0] + ' / ' + labels[1] : 'Compare images');
+    box.appendChild(line);
+    if (labels[0]) { var a = document.createElement('span'); a.className = 'bn-tag l'; a.textContent = labels[0]; a.setAttribute('aria-hidden', 'true'); box.appendChild(a); }
+    if (labels[1]) { var b = document.createElement('span'); b.className = 'bn-tag r'; b.textContent = labels[1]; b.setAttribute('aria-hidden', 'true'); box.appendChild(b); }
+    var x = 50, v = 0, raf = 0, dragging = false, lastX = 0, lastT = 0, sp = bnSpring(50);
+    function draw(){ box.style.setProperty('--bn-x', x.toFixed(2) + '%'); line.setAttribute('aria-valuenow', Math.round(x)); }
+    function glide(to){
+      if (reduce){ x = to; draw(); return; }
+      cancelAnimationFrame(raf); var vel = v, prev = 0;
+      (function tick(t){
+        var dt = prev ? Math.min(2.5, (t - prev) / 16.67) : 1; prev = t;
+        vel += (to - x) * sp.k * dt; vel *= Math.pow(sp.d, dt); x += vel * dt;
+        if (Math.abs(to - x) < 0.05 && Math.abs(vel) < 0.05){ x = to; draw(); return; }
+        draw(); raf = requestAnimationFrame(tick);
+      })(performance.now());
+    }
+    function at(e){ var r = box.getBoundingClientRect(); return Math.min(100, Math.max(0, (e.clientX - r.left) / r.width * 100)); }
+    box.addEventListener('pointerdown', function(e){ dragging = true; cancelAnimationFrame(raf); box.setPointerCapture(e.pointerId); x = at(e); v = 0; lastX = x; lastT = e.timeStamp; draw(); });
+    box.addEventListener('pointermove', function(e){ if (!dragging) return; var nx = at(e), dt = Math.max(1, e.timeStamp - lastT); v = (nx - lastX) / dt * 16.67; lastX = nx; lastT = e.timeStamp; x = nx; draw(); });
+    box.addEventListener('pointerup', function(){ if (!dragging) return; dragging = false; if (Math.abs(v) > 2.2) glide(v > 0 ? 100 : 0); });
+    box.addEventListener('pointercancel', function(){ dragging = false; });
+    line.addEventListener('keydown', function(e){
+      var step = e.shiftKey ? 10 : 2;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown'){ x = Math.max(0, x - step); draw(); e.preventDefault(); }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp'){ x = Math.min(100, x + step); draw(); e.preventDefault(); }
+      if (e.key === 'Home'){ v = 0; glide(0); e.preventDefault(); }
+      if (e.key === 'End'){ v = 0; glide(100); e.preventDefault(); }
+    });
+    draw();
+  });
 })();

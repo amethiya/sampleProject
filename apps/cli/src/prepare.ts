@@ -6,6 +6,7 @@
 import { cp, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SKILL_DIR, briefContent, dnaFromKey, jobBrief, lookById, writeStarter, type BriefContent, type Lead, type SiteSnapshot } from "@rr/core";
+import { writeInspiration, type Inspiration } from "./inspiration";
 import { research, type Research } from "./research";
 import { writeUiux } from "./uiux";
 
@@ -22,6 +23,7 @@ export interface Prepared {
   content: BriefContent;
   pageFiles: string[];
   research: Research | null;
+  inspiration: Inspiration | null;
 }
 
 export async function prepareJob(repoRoot: string, dir: string, next: Required<Pick<NextJob, "job" | "lead" | "site">> & NextJob, opts: { research: boolean; log(msg: string): void }): Promise<Prepared> {
@@ -74,6 +76,14 @@ export async function prepareJob(repoRoot: string, dir: string, next: Required<P
   }
   await writeFile(join(dir, "content.json"), JSON.stringify(content, null, 2));
 
+  // Real reference sites for this trade and direction (Inspo); skipped when unreachable.
+  const c = content.designDirection.creative;
+  const inspiration = await writeInspiration(dir, {
+    trade: content.designDirection.trade.id, tradeLabel: content.designDirection.trade.label,
+    direction: { name: c.name, concept: c.concept, dark: c.palette.dark }, city: lead.city,
+    brandColor: c.palette.fromBrand ? c.palette.accent : null, log: opts.log,
+  }).catch(() => null);
+
   // UI UX Pro Max guidance for this trade (uiux.md); skipped when python3 is missing.
   if (!(await writeUiux(repoRoot, dir, content.designDirection.trade.label, writeFile))) opts.log("UI UX Pro Max guidance skipped (needs python3).");
 
@@ -84,5 +94,5 @@ export async function prepareJob(repoRoot: string, dir: string, next: Required<P
     for (const f of writeStarter(lead, site, dna)) await writeFile(join(dir, "starter", f.file), f.html);
   }
 
-  return { content, pageFiles: site.pages.map((p) => (p.slug === "home" ? "index.html" : `${p.slug}.html`)), research: found };
+  return { content, pageFiles: site.pages.map((p) => (p.slug === "home" ? "index.html" : `${p.slug}.html`)), research: found, inspiration };
 }

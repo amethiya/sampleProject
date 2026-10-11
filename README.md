@@ -63,6 +63,7 @@ on your Mac has Claude Code, signed in with your Claude subscription, work throu
 |---|---|---|
 | Research | The original site is opened in a real browser (desktop + phone screenshots, measured brand colours, fonts, logo, mobile problems, script errors, load time) behind an SSRF guard | `apps/cli/src/research.ts`, `browser.ts` |
 | UX audit | Findings from the audit score, the crawl and the browser | `packages/core/src/redesign/quality.ts` |
+| Inspiration | 3-5 real, well-made sites for the trade and direction from [Inspo](https://inspomcp.dev) (screenshots + DESIGN.md), for calibrating craft, never copied | `apps/cli/src/inspiration.ts` |
 | Creative direction | One of 12 directions (layout, type, palette, motion, 3D policy) chosen for the trade, the site's material and brand, never the same as the last two redesigns; palette built from the brand accent and contrast-checked | `packages/core/src/redesign/directions.ts` |
 | Build | Claude Code writes every page following `brief.ts` and the `website-redesign` skill (Read/Write/Edit only) | `apps/cli/src/redesign-runner.ts` |
 | QA | Every page rendered at 1440/820/390px under the production CSP: overflow, broken images/links, script errors, CSP blocks, content coverage vs the crawl, placeholders, tap targets, alt text, contrast, stuck animations, LCP | `apps/cli/src/qa.ts` |

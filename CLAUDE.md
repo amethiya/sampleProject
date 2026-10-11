@@ -28,6 +28,9 @@ TypeScript npm-workspaces monorepo. See README.md for the architecture.
 - QA scorecard and retry policy: `packages/core/src/redesign/quality.ts` (pure); browser measurement in
   `apps/cli/src/qa.ts`, research in `apps/cli/src/research.ts`, both through `apps/cli/src/browser.ts`, which refuses
   private/loopback/metadata addresses (lead websites are untrusted). Needs Chrome or `RR_CHROMIUM`.
+- Inspiration (`apps/cli/src/inspiration.ts`): while a job folder is prepared, 3-5 real reference sites for the trade
+  and direction are fetched from Inspo (inspomcp.dev, free, no key) into `inspiration/` (JPEG captures + DESIGN.md).
+  Claude calibrates craft against them and never copies them. Inspo is also a project MCP server (`.mcp.json`).
 - Job lifecycle (`apps/worker/src/jobs.ts`, migration `0006_pipeline.sql`): leases with heartbeats, retries with
   backoff, failure kinds, one active job per lead (unique index), `job_events`. RUNNER_TOKEN can only claim and report.
 - UI UX Pro Max (`.claude/skills/ui-ux-pro-max/`, MIT, vendored from nextlevelbuilder/ui-ux-pro-max-skill): `job fetch`

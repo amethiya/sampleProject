@@ -221,6 +221,7 @@ async function processJob(next: NextJob, worker: string) {
       await report("researching", `Inspected the original site at desktop and phone width; brand colours ${r.brand?.colors.slice(0, 3).join(", ") || "not found"}, fonts ${r.brand?.fonts.slice(0, 2).join(", ") || "unknown"}; ${r.findings.length} measured problems.`);
     }
 
+    if (prep.inspiration) await report("researching", `Found ${prep.inspiration.count} real reference sites for this trade and direction (Inspo): ${prep.inspiration.slugs.join(", ")}.`);
     const spam = prep.content.contentNotes?.injectedSpamRemoved;
     if (spam) await report("researching", `The live site looks hacked: ${spam} injected spam passages (gambling, pharma or foreign-language ads) were removed and will not appear in the redesign. Worth mentioning in the pitch.`, "warn");
     const c = prep.content.designDirection.creative;
