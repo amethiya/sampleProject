@@ -19,6 +19,8 @@
  *   ... -- --timeout 60     minutes per Claude run before it is stopped and continued in the same session (default 60)
  *   ... -- --no-research / --no-qa   skip the browser stages (the job then always needs review)
  *   ... -- --keep           keep the working folder for inspection
+ *   ... -- --no-keep-awake  let the Mac idle-sleep (by default caffeinate keeps it awake while the runner runs;
+ *                           a sleeping Mac sends no heartbeats and its jobs are handed to another runner)
  *
  * Claude Code runs headless in a fresh temp folder with only Read/Write/Edit/Skill allowed (no shell, no web). Every
  * stage reports progress to the Worker, which doubles as a heartbeat: a runner that disappears has its job handed
@@ -51,6 +53,7 @@ const { values: args } = parseArgs({
     keep: { type: "boolean", default: false },
     "no-research": { type: "boolean", default: false },
     "no-qa": { type: "boolean", default: false },
+    "no-keep-awake": { type: "boolean", default: false },
   },
 });
 
@@ -366,6 +369,15 @@ async function workerLoop(i: number) {
     if (args.once) return;
     await new Promise((r) => setTimeout(r, Number(args.interval) * 1000 + i * 1500));
   }
+}
+
+// A sleeping Mac sends no heartbeats, so the Worker hands its jobs to another runner after 20 minutes (this cost
+// Union Oyster House a whole attempt). Keep the machine from idle-sleeping for as long as the runner runs; closing the
+// lid or a flat battery can still put it to sleep. --no-keep-awake turns this off.
+if (process.platform === "darwin" && !args["no-keep-awake"]) {
+  const keepAwake = spawn("caffeinate", ["-i", "-s", "-w", String(process.pid)], { stdio: "ignore", detached: true });
+  keepAwake.on("error", () => console.log("Could not start caffeinate; the Mac may sleep and jobs could be handed to another runner."));
+  keepAwake.unref();
 }
 
 console.log(`Redesign runner connected to ${base}: ${concurrency} worker(s), ${passes} review pass(es), usage cap ≈ $${usageCap || "∞"} per job (API-equivalent estimate, not money). Waiting for jobs… (Ctrl+C to stop)`);
