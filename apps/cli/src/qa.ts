@@ -127,6 +127,27 @@ function inPage(arg: { texts: string[]; slugs: string[]; mobile: boolean; placeh
     if (ratio < (large ? 3 : 4.5)) low++;
   }
 
+  // Reveal animations also hide content with clip-path ("inset(0 100% 0 0)") or scale(0); opacity alone missed a whole
+  // invisible History timeline on Union Oyster House.
+  const clippedAway = (n: HTMLElement, st: CSSStyleDeclaration) => {
+    const c = st.clipPath;
+    if (!c || c === "none") return false;
+    if (/^(circle|ellipse)\(\s*0(px|%)?[\s)]/.test(c)) return true;
+    const m = c.match(/^inset\(([^)]*?)(?:\s+round[^)]*)?\)/);
+    if (!m) return false;
+    const r = n.getBoundingClientRect();
+    const v = m[1].trim().split(/\s+/).map((x, i) => (x.endsWith("%") ? (parseFloat(x) / 100) * (i % 2 ? r.width : r.height) : parseFloat(x) || 0));
+    const [t, ri, bo, l] = [v[0] ?? 0, v[1] ?? v[0] ?? 0, v[2] ?? v[0] ?? 0, v[3] ?? v[1] ?? v[0] ?? 0];
+    return l + ri >= r.width * 0.95 || t + bo >= r.height * 0.95;
+  };
+  const scaledAway = (st: CSSStyleDeclaration) => {
+    if (st.scale && st.scale !== "none" && st.scale.split(/\s+/).some((x) => Math.abs(parseFloat(x)) < 0.05)) return true;
+    const m = st.transform.match(/^matrix\(([^)]+)\)/);
+    if (!m) return false;
+    const [a, b, c, d] = m[1].split(",").map(Number);
+    return Math.hypot(a, b) < 0.05 || Math.hypot(c, d) < 0.05;
+  };
+
   // Content an entrance animation never revealed (checked after the scroll pass).
   const stuck = Array.from(document.querySelectorAll<HTMLElement>("h1, h2, h3, p, li, img, a.btn, .btn, button")).filter((e) => {
     if (e.closest("[aria-hidden=true], nav, dialog:not([open]), [hidden], details:not([open])")) return false;
@@ -135,7 +156,7 @@ function inPage(arg: { texts: string[]; slugs: string[]; mobile: boolean; placeh
     if ((e.textContent ?? "").trim().length < 12 && e.tagName !== "IMG") return false;
     for (let n: HTMLElement | null = e; n && n !== document.body; n = n.parentElement) {
       const s = getComputedStyle(n);
-      if (parseFloat(s.opacity) < 0.05 || s.visibility === "hidden") return true;
+      if (parseFloat(s.opacity) < 0.05 || s.visibility === "hidden" || clippedAway(n, s) || scaledAway(s)) return true;
     }
     return false;
   }).length;
