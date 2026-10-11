@@ -7,7 +7,6 @@
  * reaches the threshold. A high average never hides a broken page.
  */
 import type { SiteSignals } from "./directions";
-import { UI_KIT } from "./ui-kit";
 
 // ---- UX audit of the original site ---------------------------------------------------------------------------------
 
@@ -71,6 +70,8 @@ export interface PageMeasure {
   stuckHidden: number;
   /** Ids of the UI kit components found on the page (optional for older measurements). */
   kit?: string[];
+  /** Cinematic Hospitality signature pieces found on the page (see CINEMATIC_MARKERS). */
+  borrowed?: string[];
   loadMs: number;
   lcpMs: number | null;
   bytes: number;
@@ -112,24 +113,33 @@ const WEIGHTS: Record<Category["id"], number> = {
 /** Below this, a category blocks a pass even when the weighted score is high. */
 const FLOOR = 5;
 export const PASS_THRESHOLD = 7;
-/** Every redesign uses the Magic UI + Smooth UI kit: distinct components on the home page and on each inner page. */
-export const KIT_MIN_HOME = 8;
-export const KIT_MIN_INNER = 5;
-
-/** What a page lacks to meet the UI kit requirement (null when it meets it or wasn't measured). */
-export function kitShortfall(m: Pick<PageMeasure, "slug" | "kit">): string | null {
-  if (!m.kit) return null;
-  const ids = new Set(m.kit);
-  const min = m.slug === "home" ? KIT_MIN_HOME : KIT_MIN_INNER;
-  const libs = new Set(UI_KIT.filter((c) => ids.has(c.id)).map((c) => c.library));
-  const missing = [ids.size < min && `${ids.size} of ${min} kit components`, (!libs.has("Magic UI") || !libs.has("Smooth UI")) && "both Magic UI and Smooth UI"].filter(Boolean);
-  return missing.length ? `"${m.slug}" uses ${missing.join(" and needs ")}` : null;
-}
-
 const clamp = (n: number) => Math.max(0, Math.min(10, Math.round(n * 10) / 10));
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
-export function scoreRedesign(measures: PageMeasure[], expectedSlugs: string[], review: DesignReview | null, threshold = PASS_THRESHOLD): Scorecard {
+/** The Cinematic Hospitality system's signature pieces, as CSS selectors. Other directions must not use them. */
+export const CINEMATIC_MARKERS: [string, string][] = [
+  ["curtain loader", ".curtain, .loader-count, [data-loader-count]"],
+  ["echo headings", ".echo"],
+  ["round cut-out plates", ".plate, .plate-stage"],
+  ["dust splash", ".dust, canvas.dust, [data-dust]"],
+  ["cloud reveal", ".cloud-reveal, .clouds"],
+];
+
+export interface DesignContext {
+  /** The creative direction the page was built for. */
+  direction?: string;
+  /** The UI kit components that suit that direction. */
+  kit?: string[];
+}
+
+/** Kit components on a page that don't belong to its direction (null when none, or not measured). */
+export function foreignKit(m: Pick<PageMeasure, "slug" | "kit">, allowed: string[] | undefined): string[] | null {
+  if (!m.kit || !allowed) return null;
+  const extra = m.kit.filter((k) => !allowed.includes(k));
+  return extra.length ? extra : null;
+}
+
+export function scoreRedesign(measures: PageMeasure[], expectedSlugs: string[], review: DesignReview | null, threshold = PASS_THRESHOLD, design: DesignContext = {}): Scorecard {
   const critical: string[] = [];
   const warnings: string[] = [];
   const at = (v: Viewport) => measures.filter((m) => m.viewport === v);
@@ -179,8 +189,14 @@ export function scoreRedesign(measures: PageMeasure[], expectedSlugs: string[], 
     - Math.max(0, (avg((m) => m.lcpMs ?? m.loadMs) - 2500) / 600)
     - Math.max(0, (avg((m) => m.bytes) / 1e6 - 3) * 0.8));
 
-  const kitShort = desktop.map(kitShortfall).filter((x): x is string => !!x);
-  for (const k of kitShort) warnings.push(`UI kit requirement not met: ${k} (home ${KIT_MIN_HOME}, inner pages ${KIT_MIN_INNER}, from both libraries; see skill/references/ui-kit.md).`);
+  // Each direction has its own look and motion: borrowing the old system's signature pieces makes sites look alike.
+  if (design.direction && design.direction !== "cinematic-hospitality") {
+    for (const m of desktop) if (m.borrowed?.length) critical.push(`"${m.slug}" reuses another direction's signature (${m.borrowed.join(", ")}); build ${design.direction}'s own motion system instead.`);
+  }
+  for (const m of desktop) {
+    const extra = foreignKit(m, design.kit);
+    if (extra) warnings.push(`"${m.slug}" uses UI kit components that don't belong to this direction: ${extra.join(", ")} (allowed: ${design.kit!.join(", ") || "none"}).`);
+  }
 
   const r = review ? { visual: clamp(review.visual), brand: clamp(review.brand), originality: clamp(review.originality), ux: clamp(review.ux) } : null;
   const navOk = desktop.every((m) => !m.brokenLinks.length);
@@ -204,8 +220,8 @@ export function scoreRedesign(measures: PageMeasure[], expectedSlugs: string[], 
   const overall = clamp(sum(scored.map((c) => (c.score as number) * WEIGHTS[c.id])) / (weight || 1));
   for (const c of scored) if ((c.score as number) < FLOOR) warnings.push(`${c.label} is below ${FLOOR}/10 (${c.score}).`);
   if (!review) warnings.push("No design review: visual quality, brand fit and originality were not judged.");
-  const pass = !critical.length && !!review && !kitShort.length && scored.every((c) => (c.score as number) >= FLOOR) && overall >= threshold;
-  categories.push({ id: "readiness", label: "Overall client readiness", score: pass ? overall : Math.min(overall, threshold - 0.1), source: "mixed", criteria: `No critical defect, UI kit requirement met, every category at least ${FLOOR}, weighted score at least ${threshold}.`, notes: pass ? ["Ready to send."] : [...critical, ...warnings].slice(0, 3) });
+  const pass = !critical.length && !!review && scored.every((c) => (c.score as number) >= FLOOR) && overall >= threshold;
+  categories.push({ id: "readiness", label: "Overall client readiness", score: pass ? overall : Math.min(overall, threshold - 0.1), source: "mixed", criteria: `No critical defect, every category at least ${FLOOR}, weighted score at least ${threshold}.`, notes: pass ? ["Ready to send."] : [...critical, ...warnings].slice(0, 3) });
 
   return { overall, pass, threshold, critical, warnings, categories, pages: desktop.length, measuredAt: new Date().toISOString() };
 }
@@ -236,7 +252,8 @@ export function scorecardMarkdown(s: Scorecard, measures: PageMeasure[]): string
       m.placeholders.length && `placeholders: ${m.placeholders.join(", ")}`,
       !m.hasBanner && "no concept banner",
       !m.hasNoindex && "no robots noindex meta",
-      m.viewport === "desktop" && m.kit && `UI kit: ${m.kit.length ? m.kit.join(", ") : "none"}${kitShortfall(m) ? " (below the requirement)" : ""}`,
+      m.viewport === "desktop" && m.kit?.length && `UI kit: ${m.kit.join(", ")}`,
+      m.viewport === "desktop" && m.borrowed?.length && `borrows: ${m.borrowed.join(", ")}`,
     ].filter(Boolean);
     md += `- **${m.slug} @ ${m.viewport}**: ${issues.length ? issues.join("; ") : "no issues found"}\n`;
   }

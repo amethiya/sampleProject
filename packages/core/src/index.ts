@@ -9,6 +9,7 @@ export { renderRedesign, renderSitePage, snapshotFromLead, writeStarter, type Re
 export { THEMES } from "./redesign/themes";
 export * from "./outreach";
 export * from "./crawl";
+export * from "./spam";
 export { BRIEF, RUNNER_PROMPT, REVIEW_PROMPT, THREE_URL, jobBrief, LIBRARIES, SKILL_DIR, briefContent, designFor, type BriefContent, type DesignChoice } from "./redesign/brief";
 export * from "./redesign/directions";
 export * from "./redesign/quality";

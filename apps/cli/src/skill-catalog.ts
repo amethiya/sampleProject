@@ -30,7 +30,7 @@ dirs += "| Direction | Made for | Also fits | Photos | 3D |\n|---|---|---|---|--
 for (const d of DIRECTIONS) dirs += `| ${d.name} (\`${d.id}\`) | ${d.primary.join(", ")} | ${d.secondary.join(", ")} | ${d.wantsPhotos} | ${d.threeD} |\n`;
 for (const d of DIRECTIONS) {
   dirs += `\n## ${d.name} (\`${d.id}\`)\n\n${d.concept}\n\n- **Hero:** ${d.hero}\n- **Sequence:** ${d.sequence.join(" → ")}\n- **Grid:** ${d.grid}\n- **Type:** ${d.typeScale} Pairings: ${d.fonts.map((f) => `${f.display} + ${f.body} (${f.note})`).join("; ")}\n`;
-  dirs += `- **Palettes:** ${d.palettes.map((p) => `${p.name} (${p.dark ? "dark" : "light"}: bg ${p.bg}, text ${p.text}, accent ${p.accent})`).join("; ")}\n- **Imagery:** ${d.imagery}\n- **Signature components:** ${d.components.join(", ")}\n- **Motion:** ${d.motion}\n`;
+  dirs += `- **Palettes:** ${d.palettes.map((p) => `${p.name} (${p.dark ? "dark" : "light"}: bg ${p.bg}, text ${p.text}, accent ${p.accent})`).join("; ")}\n- **Imagery:** ${d.imagery}\n- **Signature components:** ${d.components.join(", ")}\n- **Motion:** ${d.motion}\n- **Motion system:** intro: ${d.motionSystem.intro} Transition: ${d.motionSystem.transition} Scroll: ${d.motionSystem.scroll} Hover: ${d.motionSystem.hover} Signature: ${d.motionSystem.signature}\n- **UI kit components:** ${d.kit.join(", ")}${d.auto === false ? "\n- **Only when the owner picks it** (never chosen automatically)." : ""}\n`;
   dirs += `- **3D:** ${d.threeD}${d.threeDIdea ? `: ${d.threeDIdea}` : ""}\n- **Conversion:** ${d.conversion}\n- **Avoid:** ${d.avoid.join("; ")}\n`;
 }
 writeFileSync(ref("directions.md"), dirs);

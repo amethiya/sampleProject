@@ -24,7 +24,7 @@ range. Build the direction faithfully: it is what makes each redesign look made 
 
 ## Cinematic Hospitality (`cinematic-hospitality`)
 
-The approved Rise & Shine / Edem system: a dark, candle-lit evening mood, a light classic display face, round cut-out plates floating in a dust splash, a cloud reveal onto a full-screen photo. The starter pages already implement it.
+The original Rise & Shine / Edem system: a dark, candle-lit evening mood, a light classic display face, round cut-out plates floating in a dust splash, a cloud reveal onto a full-screen photo. The starter pages implement it. Only used when the owner picks it: it was applied to every site before and made them look alike.
 
 - **Hero:** Split: label, the business name as an echo heading, one real line and two outline buttons on the left; a round cut-out photo of the signature dish spinning in on a dust splash on the right.
 - **Sequence:** Hero with round cut-out → Sticky cloud reveal onto a full-screen photo with one real line → Story with the info strip (location, hours, phone) → Offerings zigzag with round images and real prices → Signature cards → Remaining content → Visit / call to action over a dark photo → Four-column footer
@@ -34,6 +34,9 @@ The approved Rise & Shine / Edem system: a dark, candle-lit evening mood, a ligh
 - **Imagery:** Warm, appetising close-ups; top-down plates cropped to circles; the dining room at night.
 - **Signature components:** Loader counter + curtain, Echo headings, Round cut-out plates with dust, Sticky cloud reveal, Info strip with glowing line icons, Dotted-leader price lists
 - **Motion:** The starter's motion.js: loader, echo headings collapsing, plates spinning in, cloud reveal, curtain page transitions.
+- **Motion system:** intro: Loader counting 0 to 100 over a thin accent line, then a curtain lifts on the hero. Transition: Curtain wipes between pages. Scroll: Sticky cloud reveal onto a full-screen photo; round plates spin in; zigzag rows slide in from alternate sides. Hover: Thin outline buttons whose fill wipes up from below. Signature: Round cut-out plates floating in a dust splash.
+- **UI kit components:** shimmer-button, magic-card, border-beam, animated-shiny-text
+- **Only when the owner picks it** (never chosen automatically).
 - **3D:** none
 - **Conversion:** Reserve / order card in the hero and a visit band over a dark photo.
 - **Avoid:** Using this direction for non-hospitality trades
@@ -50,6 +53,8 @@ A printed food or culture magazine: warm paper, very large serif headlines, an a
 - **Imagery:** Documentary photographs with captions; mix one full-bleed image with smaller framed ones; black-and-white treatment allowed for archival shots.
 - **Signature components:** Numbered chapter headers, Drop cap, Dotted-leader price list in two columns, Asymmetric photo collage with captions, Hairline rules, Pull quote (only the site's own words)
 - **Motion:** Restrained and typographic: lines of the masthead slide up from a mask, rules draw in from left, images unveil with a clip-path wipe, nothing bounces. 400–700ms, ease-out.
+- **Motion system:** intro: None: no loader. The masthead letters rise from a baseline mask in a 30ms stagger; the issue line and the offset photo fade in after. Transition: Page turn: the old page slides 6% left and fades while a paper-coloured panel sweeps in from the right (350ms). Scroll: Chapter numbers stay sticky in the margin while their chapter scrolls; photos unveil with a horizontal clip-path wipe; pull quotes settle from 0.96 scale. Hover: Underlines draw left to right; list items shift 4px right. Signature: A drop cap that inks in, and hairline rules that draw across the page.
+- **UI kit components:** mask-reveal-up, scroll-reveal-paragraph, dot-pattern
 - **3D:** none
 - **Conversion:** A clear 'Reserve' / 'Order' text link in the header and a practical sidebar box repeated before the footer.
 - **Avoid:** Round cut-out plates; Dark-everywhere backgrounds; Card grids; Glassmorphism
@@ -66,6 +71,8 @@ International Typographic Style: a strict grid, one confident grotesk, large num
 - **Imagery:** Few, carefully cropped photos (duotone or desaturated allowed); diagrams and numbers do the work.
 - **Signature components:** Numbered ruled index, Key-facts column, Tabular price/fee table, Accordion service details, Big numerals
 - **Motion:** Precise and quick: rules draw in, numbers tick up only when the number is in the site's text, rows reveal in a 40ms stagger, accordions spring open. 250–450ms.
+- **Motion system:** intro: None: no loader. Faint 12-column grid lines draw in behind the hero (400ms), then the statement appears line by line through a clip. Transition: No animated transition: fast native navigation; on arrival the page's rules sweep in from the left (250ms). Scroll: Index rows reveal in a 40ms stagger; large numerals count up once to a value already in the text; a 01/05 section counter in the header follows the scroll. Hover: Rows invert to the accent colour in 150ms; arrows translate 6px. Signature: Visible grid logic and big tabular numerals.
+- **UI kit components:** number-ticker, border-beam
 - **3D:** none
 - **Conversion:** A persistent 'Book a consultation' / 'Request a quote' button in the header plus a ruled contact grid; phone as a tel: link.
 - **Avoid:** Decorative gradients; Rounded cards; Stock photos of handshakes; Script fonts
@@ -82,6 +89,8 @@ The friendly local spot: sunny colours, rounded shapes, hand-drawn underlines an
 - **Imagery:** The business's own candid photos in rounded frames with slight rotation; people, counters, products.
 - **Signature components:** Hand-drawn SVG underline, Sticker badge (real facts only), Tilted photo cluster, Tabbed menu, Wavy dividers, Photo marquee
 - **Motion:** Playful but calm springs: photos settle into their tilt, the underline draws itself, tiles lift on hover, stickers rotate slowly. Spring stiffness ~200, damping ~20.
+- **Motion system:** intro: None: no loader. The hand-drawn underline draws itself under the key word; the photo cluster drops in and springs into its tilt; the sticker spins in. Transition: A circle in the accent colour grows from the clicked link to cover the screen, then shrinks away on the new page. Scroll: Tiles pop up on a soft spring; the wavy dividers undulate slowly (SVG path morph); a marquee of the business's own photos. Hover: Tiles lift and tilt 2°; buttons squash slightly when pressed. Signature: Hand-drawn SVG underlines and sticker badges.
+- **UI kit components:** marquee, tilt-card, magnetic-button
 - **3D:** none
 - **Conversion:** Big rounded 'Call us' / 'Order' buttons; on phones a sticky bottom bar with Call and Directions.
 - **Avoid:** Dark luxury palettes; Thin hairline serif; Corporate stock photos
@@ -98,6 +107,8 @@ Reassurance through clarity: airy light layouts, soft tints, large readable type
 - **Imagery:** Bright, real practice photos; people and spaces; avoid scary clinical close-ups and generic stock smiles.
 - **Signature components:** Practical chips, Quick-path tiles, Numbered steps, Hours table, FAQ accordion, Sticky mobile Book / Call bar
 - **Motion:** Gentle and short: fades and 12px rises, 300–400ms, no parallax on text, no looping animation. Reduced motion = no movement at all.
+- **Motion system:** intro: None: no loader and no intro sequence; the hero simply fades in over 300ms. Transition: None: plain, fast navigation. Scroll: Sections fade up 12px once; nothing moves while the visitor reads; the sticky mobile Call bar slides up after the hero. Hover: Tiles gain a soft shadow and their arrow moves 4px. Signature: A floating opening-hours card overlapping the hero photo.
+- **UI kit components:** border-beam, blur-fade
 - **3D:** none
 - **Conversion:** Book / call above the fold, repeated after treatments, and a sticky Call button on phones (tel: link from the site).
 - **Avoid:** Dark backgrounds; Dramatic motion; Tiny grey text; Invented credentials or ratings
@@ -114,6 +125,8 @@ Energy and confidence: condensed oversized type, a high-voltage accent, diagonal
 - **Imagery:** High-contrast action photos, dramatic light, grain; duotone in the accent colour for consistency.
 - **Signature components:** Overflowing condensed headline, Keyword marquee, Pinned swapping panels, Angled dividers, Velocity-skewed images, Oversized footer wordmark
 - **Motion:** Fast and physical: headline lines slam in with a short overshoot, marquee speed follows scroll velocity (springValue), panels pin and crossfade, images skew slightly with velocity. Keep it under 600ms per move.
+- **Motion system:** intro: A full-screen accent panel with the business name in giant condensed type slams in, then splits apart vertically to reveal the hero (700ms in total). Transition: A diagonal accent slash wipes across the screen. Scroll: Marquee speed and skew follow scroll velocity; programme panels pin and swap; images skew up to 4° with velocity. Hover: Buttons fill with a hard-edged accent slide; images go from grayscale to colour and zoom to 1.06. Signature: Oversized condensed type that overflows the screen, and a velocity-driven marquee.
+- **UI kit components:** marquee, magnetic-button, shimmer-button, scroll-progress
 - **3D:** optional: A slowly rotating low-poly kettlebell or product silhouette in the hero (Three.js, flat-shaded in the accent colour), only on desktop and only if it reads instantly.
 - **Conversion:** 'Start / Join / Shop' in the accent colour everywhere it matters; trial or visit details in the CTA block.
 - **Avoid:** Serif body text; Pastel palettes; Gentle fades only
@@ -130,6 +143,8 @@ Quiet luxury: ivory and ink, a fine serif, vast white space, full-bleed photogra
 - **Imagery:** Large, consistent, editorial photos; warm natural light; avoid busy collages.
 - **Signature components:** Full-bleed hero, Narrow statement block, Right-aligned small-caps price list, Horizontal gallery (scroll-driven, native scroll), Thin underline links
 - **Motion:** Slow and silky: 900–1400ms fades, images scale from 1.06 to 1 as they enter, text fades with a 6px rise, no bounce, no stagger longer than 120ms.
+- **Motion system:** intro: A plain veil in the page colour with the business name fading in, letter-spaced; it holds 600ms, then the veil fades slowly (1.4s) onto the full-bleed photo. Transition: A slow crossfade through the page background colour (600ms). Scroll: Photos scale from 1.08 to 1 as they enter; text fades with a 6px rise; a horizontal gallery follows the scroll. Hover: A thin underline grows from the centre; images darken 10% and reveal a caption. Signature: Vast white space around full-bleed photography.
+- **UI kit components:** scroll-expand-media, blur-fade
 - **3D:** none
 - **Conversion:** Understated but always visible 'Book an appointment' link in the header; a full-width booking block near the end.
 - **Avoid:** Bright accent buttons; Icons; Card grids; Busy motion
@@ -142,10 +157,12 @@ Made by hand, here, for years: textured paper, slab and old-style serifs, ledger
 - **Sequence:** Sign-like framed hero → Our craft: the site's story with a photo of hands at work → Ledger price list / product catalogue with ruled lines and categories → Process in 3–4 illustrated steps (only steps the site describes) → Photo wall of the business's own images → Find us: address card like a postcard → Footer with a stamp wordmark
 - **Grid:** 1140px container with framed panels, double rules, subtle paper texture via CSS gradients (no image files), 4px radii.
 - **Type:** Display 3.5–6.5rem slab or old-style serif; body 17px/1.7 serif; small caps for categories. Pairings: Zilla Slab + Libre Franklin (Sturdy slab with a classic sans.); Rokkitt + Lora (Printed-matter feel.); Abril Fatface + Crimson Pro (Poster heritage.)
-- **Palettes:** Kraft & Forest (light: bg #efe6d4, text #23251c, accent #2f5d3a); Parchment & Oxblood (light: bg #f3ead9, text #2a1a14, accent #7b2121); Workshop Navy (dark: bg #16202b, text #f1e9da, accent #d9a441)
+- **Palettes:** Kraft & Forest (light: bg #efe6d4, text #23251c, accent #2f5d3a); Parchment & Oxblood (light: bg #f3ead9, text #2a1a14, accent #7b2121); Workshop Green (dark: bg #17231d, text #f1e9da, accent #c97b4a)
 - **Imagery:** Honest photos of the product and the people who make it; warm tones; slight grain allowed.
 - **Signature components:** Double-ruled frames, Stamp badge (real facts only), Ledger price list, Deckled-edge image mask, Postcard address card
 - **Motion:** Tactile: stamps press in (scale 1.15→1 with a tiny rotation), ledger rows write in from left, photos settle like placed prints. 350–600ms.
+- **Motion system:** intro: None: no loader. The stamp badge presses in (scale 1.3 to 1 with a 4° turn and a tiny shake) while the hero frame's double rules draw around it. Transition: A kraft-paper panel slides up from the bottom like a drawer. Scroll: Ledger rows write in from left to right; photos drop in like placed prints at small random angles. Hover: Labels press down 1px with an inner shadow; price rows get a marker-pen highlight. Signature: Stamp badges, deckled photo edges and ledger price lists.
+- **UI kit components:** tilt-card, dot-pattern
 - **3D:** none
 - **Conversion:** 'Visit the shop' / 'Order' buttons styled as labels; phone and address always one tap away.
 - **Avoid:** Neon accents; Glassmorphism; Futuristic sans
@@ -162,6 +179,8 @@ A business that moves goods across borders: deep ocean tones, a live 3D globe wi
 - **Imagery:** Ports, containers, warehouses and the actual products; desaturated with an accent-coloured overlay for consistency.
 - **Signature components:** Three.js globe with route arcs, Mono labels, Ruled capability grid, Product tabs, Horizontal timeline
 - **Motion:** Measured: the globe fades in and starts rotating, arcs draw along their path, grid cells reveal in a stagger, numbers tick only if in the text.
+- **Motion system:** intro: The Three.js globe fades in and turns to the business's city while route arcs draw out from it. Transition: A fade through deep navy showing the next page's name as a mono label. Scroll: Arcs draw along their paths; capability grid cells reveal in a stagger; the shipping timeline advances with the scroll. Hover: Grid cells light their border in the accent; chips lift. Signature: An interactive 3D globe with the business's routes.
+- **UI kit components:** border-beam, number-ticker, background-paths
 - **3D:** feature: Three.js globe (points sphere from a lat/lon grid, no external textures) with arcs between the business's city and places named on the site; lazy-init via IntersectionObserver; static SVG fallback when WebGL or motion is unavailable.
 - **Conversion:** 'Request a quote' in the hero, header and enquiry block; email and phone as links.
 - **Avoid:** Clip-art ships; Generic stock handshakes; Invented trade volumes or countries
@@ -178,6 +197,8 @@ A contemporary product-company feel for a local business: a bento grid of real c
 - **Imagery:** The business's own photos cropped tightly into tiles; product shots on clean backgrounds.
 - **Signature components:** Bento grid, Tilt / spotlight tiles (UI kit), Perspective hero cluster, Pricing table, FAQ accordion
 - **Motion:** Responsive and springy: tiles enter in a grid stagger, tilt follows the pointer (fine pointers only), the hero cluster flattens with scroll progress, buttons get a subtle shimmer.
+- **Motion system:** intro: None: no loader. Bento tiles assemble from a 30px offset on springs in a grid stagger; the hero cluster starts tilted in 3D perspective and flattens. Transition: The clicked tile scales up to fill the screen before the next page loads. Scroll: The hero cluster flattens with scroll progress; tiles reveal row by row. Hover: A spotlight glow follows the pointer inside tiles; tiles tilt toward the pointer. Signature: A bento grid with a pointer-following spotlight.
+- **UI kit components:** magic-card, glow-hover-card, tilt-card, shimmer-button
 - **3D:** optional: CSS 3D perspective on the hero bento cluster (no WebGL needed); optionally a small Three.js object representing the trade if it reads instantly.
 - **Conversion:** Primary CTA in the hero and in the contact bento; sticky header button.
 - **Avoid:** Text-only boxes; More than one accent colour; Gradient blobs everywhere
@@ -194,6 +215,8 @@ Breathing room: earthy greens and clay, soft organic blob masks on photos, gener
 - **Imagery:** Natural light, plants, textures, hands, calm interiors.
 - **Signature components:** Morphing blob mask, Curved section edges, Soft treatment cards, Line-art SVG accents
 - **Motion:** Breathing: blob masks morph over 8–12s loops (paused for reduced motion), elements fade up slowly (700ms), no snapping.
+- **Motion system:** intro: None: no loader. The blob mask opens from a small circle to reveal the hero photo (1.2s), and a leaf line-drawing draws itself. Transition: A soft blob of the background colour grows and morphs over the page. Scroll: Blob masks breathe in 8–12s loops (paused for reduced motion); sections fade up slowly. Hover: Cards round their corners further and lift slightly; buttons glow softly. Signature: Slowly morphing organic photo masks.
+- **UI kit components:** blur-fade, animated-shiny-text
 - **3D:** none
 - **Conversion:** Calm but clear 'Book' button repeated after treatments and in a sticky mobile bar.
 - **Avoid:** Hard edges everywhere; Neon; Aggressive urgency
@@ -206,10 +229,12 @@ Let the work speak: full-screen photography, scroll-driven chapters with sticky 
 - **Sequence:** Scroll-expanding hero → Chapters: 3–4 full-screen photo sections with sticky captions carrying the site's text → Horizontal gallery of the business's own photos (native scroll, scroll-linked translate) → Offer / menu summary in a clean two-column list → Visit / book over a full-bleed photo → Footer
 - **Grid:** Full-bleed sections; captions in a 5-column sticky column; gallery cards at 60vw on desktop, 85vw on phones.
 - **Type:** Display 4–9rem; captions 1.25rem; body 17px/1.7. Pairings: Syne + Inter (Expressive wide display.); Unbounded + Manrope (Wide, contemporary.); Playfair Display + Inter (Classic contrast.)
-- **Palettes:** Gallery Black (dark: bg #0a0a0a, text #f2f0eb, accent #f0c35a); Gallery White (light: bg #fafaf8, text #111111, accent #111111); Deep Teal (dark: bg #0b1a1c, text #eef3f2, accent #f2a65a)
+- **Palettes:** Gallery Black (dark: bg #0a0a0a, text #f2f0eb, accent #ff5a3c); Gallery White (light: bg #fafaf8, text #111111, accent #111111); Deep Teal (dark: bg #0b1a1c, text #eef3f2, accent #f2a65a)
 - **Imagery:** The business's own best photos at full size; only use stock where the site has none and keep it consistent.
 - **Signature components:** Scroll media expansion (UI kit), Sticky captions, Scroll-linked horizontal gallery, Full-bleed CTA
 - **Motion:** Scroll-driven: media expands with scroll progress, captions crossfade at chapter boundaries, the gallery translates with scroll. Native scrolling only; transforms and opacity only.
+- **Motion system:** intro: None: no loader. The hero photo starts as a small framed image and expands to full screen as the visitor begins to scroll. Transition: The page fades to black, then the next page's hero fades up. Scroll: Full-screen chapters with sticky captions that crossfade; a horizontal gallery translates with the scroll. Hover: Gallery images grow to 1.03 and reveal their captions. Signature: A scroll-driven expanding hero and a horizontal gallery.
+- **UI kit components:** scroll-expand-media, marquee, mask-reveal-up
 - **3D:** optional: A subtle WebGL (Three.js) image-plane ripple on the hero photo that follows the pointer on desktop; off on touch and for reduced motion.
 - **Conversion:** A fixed small 'Book / Visit' pill bottom-right after the hero.
 - **Avoid:** Using it when the site has fewer than 5 usable photos; Text over busy image areas without a scrim

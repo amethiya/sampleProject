@@ -66,9 +66,12 @@ export async function prepareJob(repoRoot: string, dir: string, next: Required<P
   // UI UX Pro Max guidance for this trade (uiux.md); skipped when python3 is missing.
   if (!(await writeUiux(repoRoot, dir, content.designDirection.trade.label, writeFile))) opts.log("UI UX Pro Max guidance skipped (needs python3).");
 
-  // The instant renderer's version of every page: a content map (and the layout, for Cinematic Hospitality).
-  await mkdir(join(dir, "starter"), { recursive: true });
-  for (const f of writeStarter(lead, site, dna)) await writeFile(join(dir, "starter", f.file), f.html);
+  // Starter pages are the Cinematic Hospitality system: only that direction gets them, so other directions don't
+  // copy its loader, plates and dust.
+  if (content.designDirection.creative.id === "cinematic-hospitality") {
+    await mkdir(join(dir, "starter"), { recursive: true });
+    for (const f of writeStarter(lead, site, dna)) await writeFile(join(dir, "starter", f.file), f.html);
+  }
 
   return { content, pageFiles: site.pages.map((p) => (p.slug === "home" ? "index.html" : `${p.slug}.html`)), research: found };
 }

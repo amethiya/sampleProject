@@ -11,7 +11,7 @@
 import { createServer, type Server } from "node:http";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { AI_CSP, UI_KIT, scoreRedesign, scorecardMarkdown, type DesignReview, type PageMeasure, type Scorecard, type Viewport } from "@rr/core";
+import { AI_CSP, CINEMATIC_MARKERS, UI_KIT, scoreRedesign, scorecardMarkdown, type DesignReview, type PageMeasure, type Scorecard, type Viewport } from "@rr/core";
 import { safeContext } from "./browser";
 
 const VIEWPORTS: { name: Viewport; width: number; height: number; mobile: boolean }[] = [
@@ -44,7 +44,7 @@ function serve(siteDir: string): Promise<{ server: Server; origin: string }> {
 }
 
 /** Runs in the page after the scroll pass. Self-contained. */
-function inPage(arg: { texts: string[]; slugs: string[]; mobile: boolean; placeholder: string; allowed: string[]; kit: [string, string][] }) {
+function inPage(arg: { texts: string[]; slugs: string[]; mobile: boolean; placeholder: string; allowed: string[]; kit: [string, string][]; markers: [string, string][] }) {
   const norm = (s: string) => s.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
   const clone = document.body.cloneNode(true) as HTMLElement;
   clone.querySelectorAll("script, style, noscript, template").forEach((e) => e.remove());
@@ -141,9 +141,11 @@ function inPage(arg: { texts: string[]; slugs: string[]; mobile: boolean; placeh
   }).length;
 
   const kit = arg.kit.filter(([, sel]) => document.querySelector(sel)).map(([id]) => id);
+  const borrowed = arg.markers.filter(([, sel]) => document.querySelector(sel)).map(([name]) => name);
 
   return {
     kit,
+    borrowed,
     overflowX: document.documentElement.scrollWidth - innerWidth,
     images: imgs.length,
     brokenImages: broken,
@@ -175,7 +177,7 @@ export interface QaRun {
 
 /** Measure every page of ./site against content.json, write qa/report.md + screenshots, and score it. */
 export async function runQa(dir: string, review: DesignReview | null = null, log: (m: string) => void = () => {}): Promise<QaRun> {
-  const content = JSON.parse(await readFile(join(dir, "content.json"), "utf8")) as { pages: ContentPage[] };
+  const content = JSON.parse(await readFile(join(dir, "content.json"), "utf8")) as { pages: ContentPage[]; designDirection?: { creative?: { id?: string; kit?: string[] } } };
   const qaDir = join(dir, "qa");
   await mkdir(qaDir, { recursive: true });
   const files = new Set((await readdir(join(dir, "site")).catch(() => [] as string[])).filter((f) => f.endsWith(".html")));
@@ -229,6 +231,7 @@ export async function runQa(dir: string, review: DesignReview | null = null, log
               texts: p.sections.flatMap((s) => [s.heading, ...s.paragraphs, ...s.items]).filter(Boolean),
               slugs, mobile: vp.mobile, placeholder: PLACEHOLDER.source, allowed: ALLOWED_SCRIPT_HOSTS,
               kit: UI_KIT.map((c) => [c.id, c.selector] as [string, string]),
+              markers: CINEMATIC_MARKERS,
             });
             const lcp = await page.evaluate(() => new Promise<number | null>((res) => {
               try {
@@ -254,7 +257,7 @@ export async function runQa(dir: string, review: DesignReview | null = null, log
               hasBanner: m.hasBanner, hasNoindex: m.hasNoindex, hasTitle: m.hasTitle, hasLang: m.hasLang, h1: m.h1,
               brokenLinks: m.brokenLinks, htmlLinks: m.htmlLinks, disallowedScripts: m.disallowedScripts,
               coverage: m.coverage, missing: m.missing, placeholders: m.placeholders, smallTapTargets: m.smallTapTargets,
-              imagesNoAlt: m.imagesNoAlt, unnamedControls: m.unnamedControls, lowContrast: m.lowContrast, stuckHidden: m.stuckHidden, kit: m.kit,
+              imagesNoAlt: m.imagesNoAlt, unnamedControls: m.unnamedControls, lowContrast: m.lowContrast, stuckHidden: m.stuckHidden, kit: m.kit, borrowed: m.borrowed,
               loadMs, lcpMs: lcp, bytes, requests,
             });
           } else {
@@ -270,7 +273,8 @@ export async function runQa(dir: string, review: DesignReview | null = null, log
   } finally {
     server.close();
   }
-  const scorecard = scoreRedesign(measures, slugs, review);
+  const creative = content.designDirection?.creative;
+  const scorecard = scoreRedesign(measures, slugs, review, undefined, { direction: creative?.id, kit: creative?.kit });
   await writeFile(join(qaDir, "report.md"), scorecardMarkdown(scorecard, measures) + `\nScreenshots: ${screenshots.map((s) => s.slice(qaDir.length + 1)).join(", ")}\n`);
   await writeFile(join(qaDir, "scorecard.json"), JSON.stringify(scorecard, null, 2));
   return { scorecard, measures, screenshots };

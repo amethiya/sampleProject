@@ -36,6 +36,21 @@ export interface FontPairing {
   note: string;
 }
 
+export interface MotionSystem {
+  /** What happens when the page opens ("none" means no loader and no intro sequence). */
+  intro: string;
+  /** How moving between pages feels. */
+  transition: string;
+  /** What happens as the visitor scrolls. */
+  scroll: string;
+  /** Hover and press feedback. */
+  hover: string;
+  /** The one effect people will remember this site by. */
+  signature: string;
+}
+
+const M = (intro: string, transition: string, scroll: string, hover: string, signature: string): MotionSystem => ({ intro, transition, scroll, hover, signature });
+
 export interface CreativeDirection {
   id: string;
   name: string;
@@ -58,6 +73,12 @@ export interface CreativeDirection {
   threeD: ThreeD;
   threeDIdea?: string;
   conversion: string;
+  /** false: never chosen automatically, only when the owner picks it. */
+  auto?: boolean;
+  /** This direction's own motion system. Nothing in it is shared with another direction. */
+  motionSystem: MotionSystem;
+  /** The UI kit components (ids from ui-kit.ts) that suit this direction; no others are used. */
+  kit: string[];
   avoid: string[];
 }
 
@@ -69,7 +90,7 @@ export const DIRECTIONS: CreativeDirection[] = [
   {
     id: "cinematic-hospitality",
     name: "Cinematic Hospitality",
-    concept: "The approved Rise & Shine / Edem system: a dark, candle-lit evening mood, a light classic display face, round cut-out plates floating in a dust splash, a cloud reveal onto a full-screen photo. The starter pages already implement it.",
+    concept: "The original Rise & Shine / Edem system: a dark, candle-lit evening mood, a light classic display face, round cut-out plates floating in a dust splash, a cloud reveal onto a full-screen photo. The starter pages implement it. Only used when the owner picks it: it was applied to every site before and made them look alike.",
     primary: ["restaurant"], secondary: ["cafe"],
     wantsPhotos: "some", likesPriceLists: true,
     hero: "Split: label, the business name as an echo heading, one real line and two outline buttons on the left; a round cut-out photo of the signature dish spinning in on a dust splash on the right.",
@@ -88,6 +109,15 @@ export const DIRECTIONS: CreativeDirection[] = [
     imagery: "Warm, appetising close-ups; top-down plates cropped to circles; the dining room at night.",
     components: ["Loader counter + curtain", "Echo headings", "Round cut-out plates with dust", "Sticky cloud reveal", "Info strip with glowing line icons", "Dotted-leader price lists"],
     motion: "The starter's motion.js: loader, echo headings collapsing, plates spinning in, cloud reveal, curtain page transitions.",
+    auto: false,
+    motionSystem: M(
+      "Loader counting 0 to 100 over a thin accent line, then a curtain lifts on the hero.",
+      "Curtain wipes between pages.",
+      "Sticky cloud reveal onto a full-screen photo; round plates spin in; zigzag rows slide in from alternate sides.",
+      "Thin outline buttons whose fill wipes up from below.",
+      "Round cut-out plates floating in a dust splash.",
+    ),
+    kit: ["shimmer-button", "magic-card", "border-beam", "animated-shiny-text"],
     threeD: "none",
     conversion: "Reserve / order card in the hero and a visit band over a dark photo.",
     avoid: ["Using this direction for non-hospitality trades"],
@@ -115,6 +145,14 @@ export const DIRECTIONS: CreativeDirection[] = [
     imagery: "Documentary photographs with captions; mix one full-bleed image with smaller framed ones; black-and-white treatment allowed for archival shots.",
     components: ["Numbered chapter headers", "Drop cap", "Dotted-leader price list in two columns", "Asymmetric photo collage with captions", "Hairline rules", "Pull quote (only the site's own words)"],
     motion: "Restrained and typographic: lines of the masthead slide up from a mask, rules draw in from left, images unveil with a clip-path wipe, nothing bounces. 400–700ms, ease-out.",
+    motionSystem: M(
+      "None: no loader. The masthead letters rise from a baseline mask in a 30ms stagger; the issue line and the offset photo fade in after.",
+      "Page turn: the old page slides 6% left and fades while a paper-coloured panel sweeps in from the right (350ms).",
+      "Chapter numbers stay sticky in the margin while their chapter scrolls; photos unveil with a horizontal clip-path wipe; pull quotes settle from 0.96 scale.",
+      "Underlines draw left to right; list items shift 4px right.",
+      "A drop cap that inks in, and hairline rules that draw across the page.",
+    ),
+    kit: ["mask-reveal-up", "scroll-reveal-paragraph", "dot-pattern"],
     threeD: "none",
     conversion: "A clear 'Reserve' / 'Order' text link in the header and a practical sidebar box repeated before the footer.",
     avoid: ["Round cut-out plates", "Dark-everywhere backgrounds", "Card grids", "Glassmorphism"],
@@ -142,6 +180,14 @@ export const DIRECTIONS: CreativeDirection[] = [
     imagery: "Few, carefully cropped photos (duotone or desaturated allowed); diagrams and numbers do the work.",
     components: ["Numbered ruled index", "Key-facts column", "Tabular price/fee table", "Accordion service details", "Big numerals"],
     motion: "Precise and quick: rules draw in, numbers tick up only when the number is in the site's text, rows reveal in a 40ms stagger, accordions spring open. 250–450ms.",
+    motionSystem: M(
+      "None: no loader. Faint 12-column grid lines draw in behind the hero (400ms), then the statement appears line by line through a clip.",
+      "No animated transition: fast native navigation; on arrival the page's rules sweep in from the left (250ms).",
+      "Index rows reveal in a 40ms stagger; large numerals count up once to a value already in the text; a 01/05 section counter in the header follows the scroll.",
+      "Rows invert to the accent colour in 150ms; arrows translate 6px.",
+      "Visible grid logic and big tabular numerals.",
+    ),
+    kit: ["number-ticker", "border-beam"],
     threeD: "none",
     conversion: "A persistent 'Book a consultation' / 'Request a quote' button in the header plus a ruled contact grid; phone as a tel: link.",
     avoid: ["Decorative gradients", "Rounded cards", "Stock photos of handshakes", "Script fonts"],
@@ -169,6 +215,14 @@ export const DIRECTIONS: CreativeDirection[] = [
     imagery: "The business's own candid photos in rounded frames with slight rotation; people, counters, products.",
     components: ["Hand-drawn SVG underline", "Sticker badge (real facts only)", "Tilted photo cluster", "Tabbed menu", "Wavy dividers", "Photo marquee"],
     motion: "Playful but calm springs: photos settle into their tilt, the underline draws itself, tiles lift on hover, stickers rotate slowly. Spring stiffness ~200, damping ~20.",
+    motionSystem: M(
+      "None: no loader. The hand-drawn underline draws itself under the key word; the photo cluster drops in and springs into its tilt; the sticker spins in.",
+      "A circle in the accent colour grows from the clicked link to cover the screen, then shrinks away on the new page.",
+      "Tiles pop up on a soft spring; the wavy dividers undulate slowly (SVG path morph); a marquee of the business's own photos.",
+      "Tiles lift and tilt 2°; buttons squash slightly when pressed.",
+      "Hand-drawn SVG underlines and sticker badges.",
+    ),
+    kit: ["marquee", "tilt-card", "magnetic-button"],
     threeD: "none",
     conversion: "Big rounded 'Call us' / 'Order' buttons; on phones a sticky bottom bar with Call and Directions.",
     avoid: ["Dark luxury palettes", "Thin hairline serif", "Corporate stock photos"],
@@ -196,6 +250,14 @@ export const DIRECTIONS: CreativeDirection[] = [
     imagery: "Bright, real practice photos; people and spaces; avoid scary clinical close-ups and generic stock smiles.",
     components: ["Practical chips", "Quick-path tiles", "Numbered steps", "Hours table", "FAQ accordion", "Sticky mobile Book / Call bar"],
     motion: "Gentle and short: fades and 12px rises, 300–400ms, no parallax on text, no looping animation. Reduced motion = no movement at all.",
+    motionSystem: M(
+      "None: no loader and no intro sequence; the hero simply fades in over 300ms.",
+      "None: plain, fast navigation.",
+      "Sections fade up 12px once; nothing moves while the visitor reads; the sticky mobile Call bar slides up after the hero.",
+      "Tiles gain a soft shadow and their arrow moves 4px.",
+      "A floating opening-hours card overlapping the hero photo.",
+    ),
+    kit: ["border-beam", "blur-fade"],
     threeD: "none",
     conversion: "Book / call above the fold, repeated after treatments, and a sticky Call button on phones (tel: link from the site).",
     avoid: ["Dark backgrounds", "Dramatic motion", "Tiny grey text", "Invented credentials or ratings"],
@@ -223,6 +285,14 @@ export const DIRECTIONS: CreativeDirection[] = [
     imagery: "High-contrast action photos, dramatic light, grain; duotone in the accent colour for consistency.",
     components: ["Overflowing condensed headline", "Keyword marquee", "Pinned swapping panels", "Angled dividers", "Velocity-skewed images", "Oversized footer wordmark"],
     motion: "Fast and physical: headline lines slam in with a short overshoot, marquee speed follows scroll velocity (springValue), panels pin and crossfade, images skew slightly with velocity. Keep it under 600ms per move.",
+    motionSystem: M(
+      "A full-screen accent panel with the business name in giant condensed type slams in, then splits apart vertically to reveal the hero (700ms in total).",
+      "A diagonal accent slash wipes across the screen.",
+      "Marquee speed and skew follow scroll velocity; programme panels pin and swap; images skew up to 4° with velocity.",
+      "Buttons fill with a hard-edged accent slide; images go from grayscale to colour and zoom to 1.06.",
+      "Oversized condensed type that overflows the screen, and a velocity-driven marquee.",
+    ),
+    kit: ["marquee", "magnetic-button", "shimmer-button", "scroll-progress"],
     threeD: "optional",
     threeDIdea: "A slowly rotating low-poly kettlebell or product silhouette in the hero (Three.js, flat-shaded in the accent colour), only on desktop and only if it reads instantly.",
     conversion: "'Start / Join / Shop' in the accent colour everywhere it matters; trial or visit details in the CTA block.",
@@ -251,6 +321,14 @@ export const DIRECTIONS: CreativeDirection[] = [
     imagery: "Large, consistent, editorial photos; warm natural light; avoid busy collages.",
     components: ["Full-bleed hero", "Narrow statement block", "Right-aligned small-caps price list", "Horizontal gallery (scroll-driven, native scroll)", "Thin underline links"],
     motion: "Slow and silky: 900–1400ms fades, images scale from 1.06 to 1 as they enter, text fades with a 6px rise, no bounce, no stagger longer than 120ms.",
+    motionSystem: M(
+      "A plain veil in the page colour with the business name fading in, letter-spaced; it holds 600ms, then the veil fades slowly (1.4s) onto the full-bleed photo.",
+      "A slow crossfade through the page background colour (600ms).",
+      "Photos scale from 1.08 to 1 as they enter; text fades with a 6px rise; a horizontal gallery follows the scroll.",
+      "A thin underline grows from the centre; images darken 10% and reveal a caption.",
+      "Vast white space around full-bleed photography.",
+    ),
+    kit: ["scroll-expand-media", "blur-fade"],
     threeD: "none",
     conversion: "Understated but always visible 'Book an appointment' link in the header; a full-width booking block near the end.",
     avoid: ["Bright accent buttons", "Icons", "Card grids", "Busy motion"],
@@ -273,11 +351,19 @@ export const DIRECTIONS: CreativeDirection[] = [
     palettes: [
       P("Kraft & Forest", false, "#efe6d4", "#f8f2e6", "#23251c", "#5f5a49", "#2f5d3a", "#ffffff", "#c9b48d"),
       P("Parchment & Oxblood", false, "#f3ead9", "#fbf6ec", "#2a1a14", "#6a5547", "#7b2121", "#ffffff", "#d7c09a"),
-      P("Workshop Navy", true, "#16202b", "#1f2b38", "#f1e9da", "#a9a291", "#d9a441", "#16202b", "#2c3a49"),
+      P("Workshop Green", true, "#17231d", "#203028", "#f1e9da", "#a9a291", "#c97b4a", "#17231d", "#2b3d33"),
     ],
     imagery: "Honest photos of the product and the people who make it; warm tones; slight grain allowed.",
     components: ["Double-ruled frames", "Stamp badge (real facts only)", "Ledger price list", "Deckled-edge image mask", "Postcard address card"],
     motion: "Tactile: stamps press in (scale 1.15→1 with a tiny rotation), ledger rows write in from left, photos settle like placed prints. 350–600ms.",
+    motionSystem: M(
+      "None: no loader. The stamp badge presses in (scale 1.3 to 1 with a 4° turn and a tiny shake) while the hero frame's double rules draw around it.",
+      "A kraft-paper panel slides up from the bottom like a drawer.",
+      "Ledger rows write in from left to right; photos drop in like placed prints at small random angles.",
+      "Labels press down 1px with an inner shadow; price rows get a marker-pen highlight.",
+      "Stamp badges, deckled photo edges and ledger price lists.",
+    ),
+    kit: ["tilt-card", "dot-pattern"],
     threeD: "none",
     conversion: "'Visit the shop' / 'Order' buttons styled as labels; phone and address always one tap away.",
     avoid: ["Neon accents", "Glassmorphism", "Futuristic sans"],
@@ -305,6 +391,14 @@ export const DIRECTIONS: CreativeDirection[] = [
     imagery: "Ports, containers, warehouses and the actual products; desaturated with an accent-coloured overlay for consistency.",
     components: ["Three.js globe with route arcs", "Mono labels", "Ruled capability grid", "Product tabs", "Horizontal timeline"],
     motion: "Measured: the globe fades in and starts rotating, arcs draw along their path, grid cells reveal in a stagger, numbers tick only if in the text.",
+    motionSystem: M(
+      "The Three.js globe fades in and turns to the business's city while route arcs draw out from it.",
+      "A fade through deep navy showing the next page's name as a mono label.",
+      "Arcs draw along their paths; capability grid cells reveal in a stagger; the shipping timeline advances with the scroll.",
+      "Grid cells light their border in the accent; chips lift.",
+      "An interactive 3D globe with the business's routes.",
+    ),
+    kit: ["border-beam", "number-ticker", "background-paths"],
     threeD: "feature",
     threeDIdea: "Three.js globe (points sphere from a lat/lon grid, no external textures) with arcs between the business's city and places named on the site; lazy-init via IntersectionObserver; static SVG fallback when WebGL or motion is unavailable.",
     conversion: "'Request a quote' in the hero, header and enquiry block; email and phone as links.",
@@ -333,6 +427,14 @@ export const DIRECTIONS: CreativeDirection[] = [
     imagery: "The business's own photos cropped tightly into tiles; product shots on clean backgrounds.",
     components: ["Bento grid", "Tilt / spotlight tiles (UI kit)", "Perspective hero cluster", "Pricing table", "FAQ accordion"],
     motion: "Responsive and springy: tiles enter in a grid stagger, tilt follows the pointer (fine pointers only), the hero cluster flattens with scroll progress, buttons get a subtle shimmer.",
+    motionSystem: M(
+      "None: no loader. Bento tiles assemble from a 30px offset on springs in a grid stagger; the hero cluster starts tilted in 3D perspective and flattens.",
+      "The clicked tile scales up to fill the screen before the next page loads.",
+      "The hero cluster flattens with scroll progress; tiles reveal row by row.",
+      "A spotlight glow follows the pointer inside tiles; tiles tilt toward the pointer.",
+      "A bento grid with a pointer-following spotlight.",
+    ),
+    kit: ["magic-card", "glow-hover-card", "tilt-card", "shimmer-button"],
     threeD: "optional",
     threeDIdea: "CSS 3D perspective on the hero bento cluster (no WebGL needed); optionally a small Three.js object representing the trade if it reads instantly.",
     conversion: "Primary CTA in the hero and in the contact bento; sticky header button.",
@@ -361,6 +463,14 @@ export const DIRECTIONS: CreativeDirection[] = [
     imagery: "Natural light, plants, textures, hands, calm interiors.",
     components: ["Morphing blob mask", "Curved section edges", "Soft treatment cards", "Line-art SVG accents"],
     motion: "Breathing: blob masks morph over 8–12s loops (paused for reduced motion), elements fade up slowly (700ms), no snapping.",
+    motionSystem: M(
+      "None: no loader. The blob mask opens from a small circle to reveal the hero photo (1.2s), and a leaf line-drawing draws itself.",
+      "A soft blob of the background colour grows and morphs over the page.",
+      "Blob masks breathe in 8–12s loops (paused for reduced motion); sections fade up slowly.",
+      "Cards round their corners further and lift slightly; buttons glow softly.",
+      "Slowly morphing organic photo masks.",
+    ),
+    kit: ["blur-fade", "animated-shiny-text"],
     threeD: "none",
     conversion: "Calm but clear 'Book' button repeated after treatments and in a sticky mobile bar.",
     avoid: ["Hard edges everywhere", "Neon", "Aggressive urgency"],
@@ -381,13 +491,21 @@ export const DIRECTIONS: CreativeDirection[] = [
       F("Playfair Display", "Inter", "family=Playfair+Display:ital,wght@0,600;1,500&family=Inter:wght@400;500", "Classic contrast."),
     ],
     palettes: [
-      P("Gallery Black", true, "#0a0a0a", "#141414", "#f2f0eb", "#9d9a93", "#f0c35a", "#0a0a0a", "#262626"),
+      P("Gallery Black", true, "#0a0a0a", "#141414", "#f2f0eb", "#9d9a93", "#ff5a3c", "#0a0a0a", "#262626"),
       P("Gallery White", false, "#fafaf8", "#ffffff", "#111111", "#5e5e5e", "#111111", "#fafaf8", "#e7e5e0"),
       P("Deep Teal", true, "#0b1a1c", "#122629", "#eef3f2", "#93a8a6", "#f2a65a", "#0b1a1c", "#1d3438"),
     ],
     imagery: "The business's own best photos at full size; only use stock where the site has none and keep it consistent.",
     components: ["Scroll media expansion (UI kit)", "Sticky captions", "Scroll-linked horizontal gallery", "Full-bleed CTA"],
     motion: "Scroll-driven: media expands with scroll progress, captions crossfade at chapter boundaries, the gallery translates with scroll. Native scrolling only; transforms and opacity only.",
+    motionSystem: M(
+      "None: no loader. The hero photo starts as a small framed image and expands to full screen as the visitor begins to scroll.",
+      "The page fades to black, then the next page's hero fades up.",
+      "Full-screen chapters with sticky captions that crossfade; a horizontal gallery translates with the scroll.",
+      "Gallery images grow to 1.03 and reveal their captions.",
+      "A scroll-driven expanding hero and a horizontal gallery.",
+    ),
+    kit: ["scroll-expand-media", "marquee", "mask-reveal-up"],
     threeD: "optional",
     threeDIdea: "A subtle WebGL (Three.js) image-plane ripple on the hero photo that follows the pointer on desktop; off on touch and for reduced motion.",
     conversion: "A fixed small 'Book / Visit' pill bottom-right after the hero.",
@@ -426,7 +544,7 @@ export interface BrandSignals {
 
 /** Recently used direction ids, newest first; the last two are never repeated, the last six are penalised. */
 export function chooseDirection(signals: SiteSignals, recent: string[] = [], seed = ""): CreativeDirection {
-  const scored = DIRECTIONS.map((d) => ({ d, score: scoreDirection(d, signals, recent, seed) }));
+  const scored = DIRECTIONS.filter((d) => d.auto !== false).map((d) => ({ d, score: scoreDirection(d, signals, recent, seed) }));
   scored.sort((a, b) => b.score - a.score);
   return scored[0].d;
 }
@@ -575,6 +693,8 @@ export function creativeBrief(d: CreativeDirection, opts: { brand?: BrandSignals
     imagery: d.imagery,
     signatureComponents: d.components,
     motion: d.motion,
+    motionSystem: d.motionSystem,
+    kit: d.kit,
     threeD: d.threeD,
     threeDIdea: d.threeDIdea ?? null,
     conversion: d.conversion,
