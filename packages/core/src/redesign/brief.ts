@@ -229,8 +229,11 @@ Read them first. Keep the design direction and everything that works; change wha
 properties), layout, motion and components. Where content.json's designDirection.creative.palette or typography
 differs from the previous pages, the previous pages win, unless the owner's notes ask for a change (for example a
 new accent colour).
-Still write complete pages for every entry in content.json into ./site/ (not only the changed ones), and still meet
-every rule in this brief and the skill.\n\n`;
+**Change only what is needed.** ./site/ already holds the previous version's pages (the same files as ./previous/).
+Edit only the pages the owner's notes concern (and any page the notes say to check), with Edit rather than rewriting
+whole files; leave every other page exactly as it is. If content.json lists a page that is missing from ./site/, write
+it in the same design. A revision that rewrites unchanged pages wastes the owner's usage. Still meet every rule in this
+brief and the skill on the pages you touch.\n\n`;
   } else {
     out += "Start a new design from scratch (a previous version, if any, was rejected).\n\n";
   }
@@ -246,14 +249,14 @@ all of the site's own text and images and invent nothing.\n`;
 }
 
 export const RUNNER_PROMPT =
-  "Use the website-redesign skill: first read skill/SKILL.md and skill/references/directions.md. Then read BRIEF.md (including any owner's notes and, for a revision, the previous pages in ./previous/), content.json (designDirection.creative is the creative direction to build), research/research.md and the screenshots in research/ (when present), inspiration/README.md and its screenshots (when present), uiux.md (when present) and the starter pages in ./starter/ (only when the direction is cinematic-hospitality) in the current directory, and build the redesign exactly as the skill and BRIEF.md describe, with the direction's own motion system and only the UI kit components listed in content.json, writing the files into ./site/. Run the skill's QA checklist before you finish.";
+  "Use the website-redesign skill: first read skill/SKILL.md and skill/references/directions.md. Then read BRIEF.md (including any owner's notes and, for a revision, the previous pages in ./previous/), content.json (designDirection.creative is the creative direction to build), research/research.md and the screenshots in research/ (when present), inspiration/README.md and its screenshots (when present), uiux.md (when present) and the starter pages in ./starter/ (only when the direction is cinematic-hospitality) in the current directory, and build the redesign exactly as the skill and BRIEF.md describe, with the direction's own motion system and only the UI kit components listed in content.json, writing the files into ./site/. Run the skill's QA checklist before you finish. For a revision (BRIEF.md says so), ./site/ already holds the previous pages: edit only the pages the owner's notes concern and leave the rest untouched.";
 
 /**
  * The design review and refinement pass: Claude looks at the rendered screenshots of its own pages and the automated
  * QA report, scores the design honestly and fixes what it finds. Its scores are labelled as model-judged.
  */
 export const REVIEW_PROMPT =
-  "Review and refine the redesign in ./site/. Read qa/report.md (automated browser QA of your pages) and look at every screenshot in qa/ (desktop, tablet and phone) and at research/original-desktop.jpg when present. Fix every critical defect and warning in the report by editing the files in ./site/ (keep all content word for word). Then judge the design as a demanding creative director: does it look like premium agency work made for this business, does it follow designDirection.creative in content.json, does it look different from a template? Fix the weakest things you see (hierarchy, spacing, typography, image crops, contrast, mobile layout, missing primary action). Finally write qa/review.json with integer scores 0-10 for the result after your fixes, judged strictly (7 = good professional work, 9 = exceptional): {\"visual\": n, \"brand\": n, \"originality\": n, \"ux\": n, \"notes\": [\"what is still weakest\", ...]}. Reply with one line.";
+  "Review and refine the redesign in ./site/. Read qa/report.md (automated browser QA of your pages) and look at every screenshot in qa/ (desktop, tablet and phone) and at research/original-desktop.jpg when present. Fix every critical defect and warning in the report by editing the files in ./site/ (keep all content word for word). Then judge the design as a demanding creative director: does it look like premium agency work made for this business, does it follow designDirection.creative in content.json, does it look different from a template? Fix the weakest things you see (hierarchy, spacing, typography, image crops, contrast, mobile layout, missing primary action). Finally write qa/review.json with integer scores 0-10 for the result after your fixes, judged strictly (7 = good professional work, 9 = exceptional): {\"visual\": n, \"brand\": n, \"originality\": n, \"ux\": n, \"notes\": [\"what is still weakest\", ...]}. If BRIEF.md says this is a revision, only touch pages that the QA report flags or the owner's notes concern; leave every other page exactly as it is. Reply with one line.";
 
 /** Where the website-redesign skill lives, relative to the repository root. */
 export const SKILL_DIR = ".claude/skills/website-redesign";

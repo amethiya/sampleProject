@@ -208,6 +208,9 @@ describe("job brief", () => {
     expect(fresh).toContain("Start a new design");
     const rev = jobBrief({ notes: "Bigger menu", mode: "revise" }, ["index.html", "menu.html"]);
     expect(rev).toContain("./previous/ (index.html, menu.html)");
+    expect(rev).toContain("./site/ already holds the previous version's pages");
+    expect(rev).toContain("leave every other page exactly as it is");
+    expect(rev).not.toContain("not only the changed ones");
     expect(rev).toContain("never relax the content rules");
     expect(jobBrief({ mode: "revise" }, [])).toBe(BRIEF); // nothing to revise from
   });

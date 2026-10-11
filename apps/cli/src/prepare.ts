@@ -42,6 +42,11 @@ export async function prepareJob(repoRoot: string, dir: string, next: Required<P
   if (previous.length) {
     await mkdir(join(dir, "previous"), { recursive: true });
     await Promise.all(previous.map((p, i) => writeFile(join(dir, "previous", prevFiles[i]), p.html)));
+    // A revision starts with the previous pages already in place, so Claude edits only what the notes concern instead
+    // of rewriting every page (which cost ~$20 of usage to fix one page on Union Oyster House).
+    const current = new Set(site.pages.map((p) => p.slug));
+    await mkdir(join(dir, "site"), { recursive: true });
+    await Promise.all(previous.filter((p) => current.has(p.slug)).map((p) => writeFile(join(dir, "site", p.slug === "home" ? "index.html" : `${p.slug}.html`), p.html)));
   }
   await writeFile(join(dir, "BRIEF.md"), jobBrief(job, prevFiles));
 
