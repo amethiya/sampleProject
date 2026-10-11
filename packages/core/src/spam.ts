@@ -12,13 +12,24 @@ import type { SiteSnapshot } from "./crawl";
  */
 const TAG = /<\/?[a-z!?][^<>]{0,200}>|<[a-z!?][^<>\s]*(?:\s[^<>]*)?$|&lt;\/?[a-z][\s\S]{0,200}?&gt;/gi;
 
+/**
+ * Text that third-party widgets print into a page (slider plugin credits, "enable JavaScript" and Flash fallbacks,
+ * site-builder credits). Not the business's words, so neither Claude nor QA should treat it as content.
+ * Deliberately narrow: a business's own "All rights reserved" or "Designed by" line stays.
+ */
+const WIDGET = /created with the free [\w-]+ software|\beasyrotator\b|wordpress plugin lets you|your browser does not support (?:the )?(?:video|audio|iframe|canvas|html5)|(?:please )?enable javascript|javascript (?:is|must be) (?:disabled|enabled)|requires (?:the )?(?:adobe )?flash|get (?:the latest )?(?:adobe )?flash player|^powered by (?:wordpress|wix|squarespace|godaddy|weebly|jimdo|joomla|webflow)\.?$/i;
+
+export function isWidgetBoilerplate(text: string): boolean {
+  return WIDGET.test(text.trim());
+}
+
 export function stripMarkup(text: string): string {
   return text.replace(TAG, " ").replace(/\s{2,}/g, " ").trim();
 }
 
 /** A copy of the snapshot with markup fragments removed from every text (texts left empty are dropped). */
 export function cleanMarkup(site: SiteSnapshot): SiteSnapshot {
-  const fix = (t: string) => (/[<>]|&lt;|&gt;/.test(t) ? stripMarkup(t) : t);
+  const fix = (t: string) => (isWidgetBoilerplate(t) ? "" : /[<>]|&lt;|&gt;/.test(t) ? stripMarkup(t) : t);
   return {
     ...site,
     pages: site.pages.map((p) => ({
