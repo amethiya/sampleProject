@@ -22,7 +22,7 @@ OpenStreetMap (Overpass)  ──►  Cloudflare Worker (cron every 10 min)  ─�
 | `packages/core` | Shared logic: discovery, outdated-site scoring, contact/content extraction, redesign renderer. Runs in Node and Workers. |
 | `apps/worker` | Cloudflare Worker: cron job, REST API, preview pages, serves the dashboard. D1 schema in `schema.sql`. |
 | `apps/dashboard` | React + Vite: public landing page (before/after slider, live showcase), sign-in, and the leads dashboard with a per-lead drawer (audit, live redesign, pitch email). |
-| `apps/cli` | Local runner: `npm run discover` writes CSV/JSON + preview HTML to `out/`. |
+| `apps/cli` | Local tools: `npm run discover` (CSV/JSON + previews in `out/`) and `npm run job` (redesigns in Claude Code). |
 | `integrations/google-apps-script` | `Code.gs` webhook that appends rows to the Google Sheet. |
 | `docs/PLAN.md` | Phase 1 / 2 / 3 product plan. |
 
@@ -54,42 +54,30 @@ instant renderer uses a few; Claude redesigns use the rest via the skill's `refe
 
 Motion runs on [Motion](https://motion.dev) (`motion` on npm: Framer Motion's engine for plain HTML), loaded from a
 pinned jsdelivr URL. Claude redesign jobs also get `uiux.md`: guidance for the business's trade from the
-[UI UX Pro Max](https://uupm.cc) skill (`.claude/skills/ui-ux-pro-max/`; needs `python3` on the runner machine).
+[UI UX Pro Max](https://uupm.cc) skill (`.claude/skills/ui-ux-pro-max/`; needs `python3` on your Mac).
 
-**Redesign with Claude** (dashboard → lead → Redesign, or **Redesign queue** → *Queue next N*) queues jobs. A runner
-on your Mac has Claude Code, signed in with your Claude subscription, work through them as a staged pipeline:
+**Redesign with Claude** happens in your own Claude Code session; there is no background runner or server.
+Leads are found automatically every night (01:00–07:00 IST, Worker cron). During the day, open Claude Code in this
+folder and say **"show today's leads"** (`npm run job -- list`) and **"pick job 1"** (`npm run job -- fetch --pick 1`).
+The portal's *Redesign* button and *Queue next N* still queue jobs; they appear first in today's list. Each job goes
+through these stages:
 
 | Stage | What happens | Where |
 |---|---|---|
 | Research | The original site is opened in a real browser (desktop + phone screenshots, measured brand colours, fonts, logo, mobile problems, script errors, load time) behind an SSRF guard | `apps/cli/src/research.ts`, `browser.ts` |
 | UX audit | Findings from the audit score, the crawl and the browser | `packages/core/src/redesign/quality.ts` |
-| Inspiration | 3-5 real, well-made sites for the trade and direction from [Inspo](https://inspomcp.dev) (screenshots + DESIGN.md), for calibrating craft, never copied | `apps/cli/src/inspiration.ts` |
-| Creative direction | One of 12 directions (layout, type, palette, motion, 3D policy) chosen for the trade, the site's material and brand, never the same as the last two redesigns; palette built from the brand accent and contrast-checked | `packages/core/src/redesign/directions.ts` |
-| Build | Claude Code writes every page following `brief.ts` and the `website-redesign` skill (Read/Write/Edit only) | `apps/cli/src/redesign-runner.ts` |
-| QA | Every page rendered at 1440/820/390px under the production CSP: overflow, broken images/links, script errors, CSP blocks, content coverage vs the crawl, placeholders, tap targets, alt text, contrast, stuck animations, LCP | `apps/cli/src/qa.ts` |
-| Refine | Claude reviews the screenshots + QA report, fixes what it finds and scores visual quality, brand fit, originality and UX | `REVIEW_PROMPT` in `brief.ts` |
-| Validate | QA again. A pass (no critical defect, every category ≥ 5, weighted ≥ 7) is published as **done**; anything else is published as **needs review** | `scoreRedesign` in `quality.ts` |
+| Inspiration | 3-5 real, well-made sites for the trade from [Inspo](https://inspomcp.dev) (screenshots + DESIGN.md), for calibrating craft, never copied | `apps/cli/src/inspiration.ts` |
+| Design | The house style (House Editorial) in the site's house theme, with all seven themes and the theme picker | `packages/core/src/redesign/directions.ts`, `system.ts` |
+| Build | Claude Code writes every page following `brief.ts` and the `website-redesign` skill | your Claude Code session |
+| QA | Every page rendered at 1440/820/390px under the production CSP: overflow, broken images/links, script errors, CSP blocks, content coverage vs the crawl, placeholders, tap targets, alt text, contrast, stuck animations, LCP | `npm run job -- qa`, `apps/cli/src/qa.ts` |
+| Upload | QA again. A pass (no critical defect, every category ≥ 5, weighted ≥ 7) is published as **done**; anything else as **needs review** | `npm run job -- upload`, `scoreRedesign` in `quality.ts` |
 
-```bash
-claude            # once: sign in to Claude Code with your Claude account
-RR_URL=https://revamp-radar.amethiyavivek.workers.dev RR_TOKEN=<RUNNER_TOKEN> npm run redesign-runner -- --concurrency 2
-#   --passes 2  review/refine passes   --usage-cap 15  stop refining once a job's usage estimate reaches 15 (API-equivalent USD)
-#   --once  --keep  --timeout 30  --no-research  --no-qa
-```
+Jobs move through `queued → running → done | needs_review | failed | cancelled`. One active job per lead is enforced
+by a unique index. A job picked in Claude Code keeps its claim for 6 hours (a redesign takes about an hour); an
+abandoned one is handed back after that. Every step is recorded in `job_events` and shown in the portal.
 
-Jobs move through `queued → running (researching, designing, building, qa, refining, uploading) → done | needs_review |
-failed | cancelled`. One active job per lead is enforced by a unique index. Every runner report is a heartbeat; a job
-whose runner goes quiet for 20 minutes is handed back. Technical failures retry with backoff (5, 10, 20 min, max 3
-attempts); an unreachable website or an owner rejection stops for a person. Every step is recorded in `job_events`
-and shown in the portal, with the QA scorecard, duration and Claude Code's usage estimate (an API-equivalent figure;
-on a Claude subscription nothing is billed per redesign, it counts toward the plan's usage limits). There is no daily cap on
-redesigns: queue 10 or 100, run more workers to go faster.
-
-Browser research and QA use Google Chrome if installed, else `RR_CHROMIUM=<path to a Chromium>`. The runner only lets
-Claude read and write files in a temporary folder (no shell, no web access). Claude-built pages are served with a
-sandboxed CSP, so they can't touch the dashboard's session. A Claude subscription can't be called from Cloudflare
-directly; to run jobs without your Mac on, the same brief can be sent through the Claude API with an API key (billed
-per use).
+Browser research and QA use Google Chrome if installed, else `RR_CHROMIUM=<path to a Chromium>`. Claude-built pages
+are served with a sandboxed CSP, so they can't touch the dashboard's session.
 
 ### Outreach (Phase 3)
 
@@ -117,7 +105,7 @@ npx wrangler secret put ADMIN_EMAIL        # (in apps/worker) dashboard sign-in 
 npm run hash-password -w @rr/worker -- '<password>' | npx wrangler secret put ADMIN_PASSWORD_HASH
 openssl rand -hex 32 | npx wrangler secret put SESSION_SECRET
 npx wrangler secret put ADMIN_TOKEN        # bearer token for the CLI / GitHub Action
-npx wrangler secret put RUNNER_TOKEN       # limited token for redesign runners: claim and report on jobs only
+npx wrangler secret put RUNNER_TOKEN       # limited token for `npm run job`: today's list, claim and report on jobs only
 npm run deploy
 ```
 

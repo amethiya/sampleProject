@@ -3,7 +3,7 @@ import {
   type DesignDna, type Lead, type SiteSnapshot,
   AI_CSP, TEMPLATE_CSP,
 } from "@rr/core";
-import { claimNext, completeJob, failJob, jobDetail, jobStats, listJobs, progress, publicJob, queueBatch, queueJob, review, type JobRow } from "./jobs";
+import { todayList, claimNext, completeJob, failJob, jobDetail, jobStats, listJobs, progress, publicJob, queueBatch, queueJob, review, type JobRow } from "./jobs";
 
 interface Db {
   DB: D1Database;
@@ -246,9 +246,10 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
     return json(r);
   }
   if (path === "/api/redesign-jobs" && m === "GET") return json(await listJobs(env, url));
+  if (path === "/api/redesign-jobs/today" && m === "GET") return json({ items: await todayList(env, Number(url.searchParams.get("limit")) || 20) });
   if (path === "/api/redesign-stats" && m === "GET") return json(await jobStats(env));
 
-  // Runner protocol (used by `npm run redesign-runner` and `npm run job` on a machine signed in to Claude Code).
+  // Job protocol, used by `npm run job` in the owner's Claude Code session.
   if (path === "/api/redesign-jobs/next" && m === "POST") {
     const { leadId, runner } = (await req.json().catch(() => ({}))) as { leadId?: string; runner?: string };
     const claimed = await claimNext(env, {

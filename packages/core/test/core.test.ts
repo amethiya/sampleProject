@@ -143,6 +143,22 @@ describe("buildPitch", () => {
   });
 });
 
+describe("night search window", () => {
+  it("runs 01:00–07:00 IST (19:30–01:30 UTC), across midnight UTC, and counts the night from its start", async () => {
+    const { inWindow, windowStart } = await import("../src");
+    const at = (iso: string) => new Date(iso);
+    expect(inWindow(at("2026-10-12T19:29:00Z"))).toBe(false);
+    expect(inWindow(at("2026-10-12T19:30:00Z"))).toBe(true);
+    expect(inWindow(at("2026-10-12T23:59:00Z"))).toBe(true);
+    expect(inWindow(at("2026-10-13T01:29:00Z"))).toBe(true);
+    expect(inWindow(at("2026-10-13T01:30:00Z"))).toBe(false);
+    expect(inWindow(at("2026-10-13T06:00:00Z"))).toBe(false);
+    expect(windowStart(at("2026-10-13T00:45:00Z")).toISOString()).toBe("2026-10-12T19:30:00.000Z");
+    expect(windowStart(at("2026-10-12T21:00:00Z")).toISOString()).toBe("2026-10-12T19:30:00.000Z");
+    expect(inWindow(at("2026-10-12T10:00:00Z"), "09:00", "17:00")).toBe(true);
+  });
+});
+
 describe("website details", () => {
   afterEach(() => vi.unstubAllGlobals());
 

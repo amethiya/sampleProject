@@ -23,7 +23,8 @@
 ### Full-site redesign (built)
 - Crawls up to 8 pages per site (nav links first), strips repeated site chrome, and renders every page with the
   business's own text and images in order: statements, split image/text sections, menus/price lists, galleries.
-- "Redesign with Claude": a D1 job queue + `npm run redesign-runner`, which runs Claude Code headless with the
+- "Redesign with Claude": a D1 job queue worked through interactively in Claude Code (`npm run job`); the former
+  `npm run redesign-runner`, which ran Claude Code headless with the
   user's subscription and uploads a bespoke multi-page site (served sandboxed).
 
 ## Phase 3: outreach (built)

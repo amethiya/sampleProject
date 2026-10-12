@@ -79,7 +79,7 @@ export function JobPanel({ job, onAction, busy }: { job: JobInfo; onAction(actio
           {STAGES.map(([id, label], i) => <li key={id} className={job.status === "running" && i < at ? "past" : job.status === "running" && i === at ? "now" : ""}>{label}</li>)}
         </ol>
       )}
-      {job.status === "queued" && <p className="small">{job.retryAt && utc(job.retryAt).getTime() > Date.now() ? `Retry ${since(job.retryAt).replace(" ago", "")} (${utc(job.retryAt).toLocaleTimeString()}). Last error: ${job.error ?? "unknown"}` : "Waiting for a runner (npm run redesign-runner on your Mac, or a Claude Code session)."}</p>}
+      {job.status === "queued" && <p className="small">{job.retryAt && utc(job.retryAt).getTime() > Date.now() ? `Retry ${since(job.retryAt).replace(" ago", "")} (${utc(job.retryAt).toLocaleTimeString()}). Last error: ${job.error ?? "unknown"}` : "Waiting for you: in Claude Code, say \"show today's leads\" and pick it."}</p>}
       {job.status === "running" && job.progress && <p className="small">{job.progress}</p>}
       {job.status === "failed" && <p className="small danger">{FAILURE[job.failureKind ?? ""] ?? "Failed"}: {job.error ?? "unknown error"}</p>}
       {job.notes && <p className="muted small job-notes">Your notes{job.mode === "revise" ? " (improving the previous version)" : ""}: “{job.notes}”</p>}
@@ -194,7 +194,7 @@ export function QueuePage({ onError, onToast }: { onError(e: unknown): void; onT
       <div className="page-head">
         <div>
           <h1>Redesign queue</h1>
-          <p className="muted">Every lead's redesign: research, design, build, browser QA and refinement. No daily limit; runners work through the queue one job each (start more with <code>--concurrency</code>).</p>
+          <p className="muted">Every lead's redesign: research, design, build, browser QA and refinement, done in your Claude Code session. Open Claude Code in the project and say "show today's leads", then "pick job 1".</p>
         </div>
       </div>
 
@@ -232,7 +232,7 @@ export function QueuePage({ onError, onToast }: { onError(e: unknown): void; onT
           </label>
           <button className="btn btn-primary" onClick={queue} disabled={!!busy}><Icon d={I.queue} />{busy === "batch" ? "Queueing…" : `Queue next ${count}`}</button>
         </div>
-        {t && t.queued > 0 && t.running === 0 && <p className="small">Jobs are waiting and no runner is working. Start one: <code>npm run redesign-runner -- --concurrency 2</code></p>}
+        {t && t.queued > 0 && t.running === 0 && <p className="small">Jobs are waiting. In Claude Code, say "show today's leads" and "pick job 1" (<code>npm run job -- list</code>, <code>npm run job -- fetch --pick 1</code>).</p>}
       </section>
 
       <div className="segments" role="tablist" aria-label="Job status">
