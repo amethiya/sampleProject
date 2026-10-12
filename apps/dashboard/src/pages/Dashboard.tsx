@@ -74,8 +74,8 @@ interface SheetState {
   last: { at: string; synced?: number; error?: string; skipped?: string } | null;
 }
 
-type Tab = "audit" | "redesign" | "pitch";
-const TABS: Tab[] = ["audit", "redesign", "pitch"];
+type Tab = "audit" | "website" | "redesign" | "pitch";
+const TABS: Tab[] = ["audit", "website", "redesign", "pitch"];
 const leadPath = (id: string, tab: Tab) => `/app/leads/${encodeURIComponent(id)}/${tab}`;
 
 const STATUSES = ["new", "contacted", "replied", "won", "lost", "ignored"];
@@ -478,15 +478,98 @@ function LeadPage({ id, tab, onStatus, onError, onChanged }: { id: string; tab: 
       <nav className="tabs page-tabs" aria-label="Lead sections">
         {TABS.map((t) => (
           <a key={t} {...linkProps(leadPath(lead.id, t))} aria-current={tab === t ? "page" : undefined} className={tab === t ? "on" : ""}>
-            {t === "audit" ? "Audit" : t === "redesign" ? "Redesign" : "Pitch email"}
+            {t === "audit" ? "Audit" : t === "website" ? "Website" : t === "redesign" ? "Redesign" : "Pitch email"}
           </a>
         ))}
       </nav>
       <div className="lead-body">
         {tab === "audit" && <AuditTab lead={lead} />}
+        {tab === "website" && <WebsiteTab key={lead.id} lead={lead} onError={onError} />}
         {tab === "redesign" && <RedesignTab key={lead.id} lead={lead} onError={onError} onChanged={changed} />}
         {tab === "pitch" && <PitchTab lead={lead} onStatus={setStatus} onError={onError} />}
       </div>
+    </div>
+  );
+}
+
+interface SiteInsights {
+  checkedAt: string;
+  live: { up: boolean; status: number | null; finalUrl: string | null; https: boolean; responseMs: number | null; server?: string; error?: string };
+  domain: { name: string; registered?: string; expires?: string; registrar?: string; ageYears?: number; error?: string };
+  archive: { first?: string; last?: string; monthsCaptured: number; url: string; error?: string };
+  popularity: { trancoRank: number | null; trancoDate?: string; error?: string };
+  google: { performance?: number; seo?: number; accessibility?: number; bestPractices?: number; hasRealUserData: boolean | null; lcpMs?: number; cls?: number; inpMs?: number; overall?: string; error?: string };
+  traffic: { level: "high" | "moderate" | "low" | "unknown"; label: string; explanation: string };
+}
+
+function WebsiteTab({ lead, onError }: { lead: LeadRow; onError(e: unknown): void }) {
+  const [d, setD] = useState<SiteInsights | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = async (refresh = false) => {
+    setBusy(true);
+    try { setD(await api<SiteInsights>(`/api/leads/${encodeURIComponent(lead.id)}/insights${refresh ? "?refresh=1" : ""}`)); }
+    catch (e) { onError(e); }
+    finally { setBusy(false); }
+  };
+  useEffect(() => { void load(); }, [lead.id]);
+  if (!d) return <p className="muted">{busy ? "Checking the website (live status, domain, archive, popularity, Google)… this takes up to a minute the first time." : "No details yet."}</p>;
+  const score = (v?: number) => (v === undefined ? "–" : `${v}/100`);
+  const row = (label: string, value: React.ReactNode) => <li><b>{label}:</b> {value}</li>;
+  return (
+    <div className="stack">
+      <div>
+        <h3>Live status</h3>
+        <ul className="list plain">
+          {row("Online", d.live.up ? `Yes (HTTP ${d.live.status})` : `No${d.live.error ? `: ${d.live.error}` : d.live.status ? ` (HTTP ${d.live.status})` : ""}`)}
+          {d.live.responseMs !== null && row("Response time", `${(d.live.responseMs / 1000).toFixed(1)} s`)}
+          {row("Secure (HTTPS)", d.live.https ? "Yes" : "No")}
+          {d.live.server && row("Server", d.live.server)}
+        </ul>
+      </div>
+      <div>
+        <h3>Traffic</h3>
+        <p><b>{d.traffic.label}</b></p>
+        <p className="muted small">{d.traffic.explanation}</p>
+        <p className="muted small">Exact visit numbers are private to the owner (their Google Analytics or Search Console). These are public signals.</p>
+        {d.popularity.error && <p className="muted small">{d.popularity.error}</p>}
+      </div>
+      <div>
+        <h3>Google (PageSpeed, mobile)</h3>
+        {d.google.error ? <p className="muted small">{d.google.error}</p> : (
+          <ul className="list plain">
+            {row("Performance", score(d.google.performance))}
+            {row("SEO", score(d.google.seo))}
+            {row("Accessibility", score(d.google.accessibility))}
+            {row("Best practices", score(d.google.bestPractices))}
+            {row("Google real-user data", d.google.hasRealUserData ? `Yes${d.google.overall ? ` (overall: ${d.google.overall.toLowerCase()})` : ""}` : "No: too few Chrome visitors for Google's public data")}
+            {d.google.lcpMs !== undefined && row("Largest content shown in", `${(d.google.lcpMs / 1000).toFixed(1)} s (real visitors, 75th percentile)`)}
+            {d.google.inpMs !== undefined && row("Response to taps/clicks", `${d.google.inpMs} ms`)}
+            {d.google.cls !== undefined && row("Layout shift", d.google.cls.toFixed(2))}
+          </ul>
+        )}
+      </div>
+      <div>
+        <h3>Domain</h3>
+        {d.domain.error ? <p className="muted small">{d.domain.name}: {d.domain.error}</p> : (
+          <ul className="list plain">
+            {row("Domain", d.domain.name)}
+            {d.domain.registered && row("Registered", `${d.domain.registered}${typeof d.domain.ageYears === "number" ? ` (${d.domain.ageYears} ${d.domain.ageYears === 1 ? "year" : "years"} ago)` : ""}`)}
+            {d.domain.expires && row("Expires", d.domain.expires)}
+            {d.domain.registrar && row("Registrar", d.domain.registrar)}
+          </ul>
+        )}
+      </div>
+      <div>
+        <h3>History (Internet Archive)</h3>
+        <ul className="list plain">
+          {d.archive.first && row("First archived", d.archive.first)}
+          {d.archive.last && row("Last archived", d.archive.last)}
+          {d.archive.monthsCaptured > 0 && row("Months archived", d.archive.monthsCaptured)}
+        </ul>
+        {d.archive.error && <p className="muted small">{d.archive.error}</p>}
+        <a className="text-link" href={d.archive.url} target="_blank" rel="noreferrer">See it in the Wayback Machine</a>
+      </div>
+      <p className="muted small">Checked {ago(d.checkedAt)}. <button className="btn" onClick={() => load(true)} disabled={busy}>{busy ? "Checking…" : "Refresh"}</button></p>
     </div>
   );
 }

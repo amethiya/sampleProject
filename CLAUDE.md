@@ -41,6 +41,12 @@ TypeScript npm-workspaces monorepo. See README.md for the architecture.
   business; old direction ids map onto it. The palette is the job's house theme (no brand recolouring). The retired
   Cinematic Hospitality pieces (counter loader, echo headings, plates, dust, clouds) are rejected by QA
   (`CINEMATIC_MARKERS`). After changing it run `npm run skill:catalog`.
+- Website details (`packages/core/src/insights.ts`, lead page → Website tab, `GET /api/leads/<id>/insights`, cached
+  7 days in `sites.insights`, migration 0008): live check, RDAP domain dates (many EU ccTLDs publish none), Wayback
+  history (often 503: degrade to the first capture), Tranco top-1M rank, Google PageSpeed + real-user data (needs the
+  `GOOGLE_API_KEY` Worker secret; Google refuses keyless calls). Exact visit counts are private to the site owner:
+  label traffic as an estimate from public signals, never as visits. Cloudflare Radar is not used (non-commercial
+  licence).
 - QA scorecard and retry policy: `packages/core/src/redesign/quality.ts` (pure); browser measurement in
   `apps/cli/src/qa.ts`, research in `apps/cli/src/research.ts`, both through `apps/cli/src/browser.ts`, which refuses
   private/loopback/metadata addresses (lead websites are untrusted). Needs Chrome or `RR_CHROMIUM`.
