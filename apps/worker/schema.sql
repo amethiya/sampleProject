@@ -18,7 +18,9 @@ CREATE TABLE IF NOT EXISTS sites (
   email         TEXT,                       -- first public email address
   active        INTEGER,                    -- activity found inside the window (1/0), NULL when not checked
   last_activity TEXT,                       -- latest dated activity evidence (ISO date)
-  reject_reason TEXT                        -- why an audited site did not qualify
+  reject_reason TEXT,                       -- why an audited site did not qualify
+  insights      TEXT,                       -- website details (JSON), fetched when the lead's Website tab opens
+  insights_at   TEXT
 );
 CREATE INDEX IF NOT EXISTS sites_state ON sites(state, created_at);
 CREATE INDEX IF NOT EXISTS sites_qualified ON sites(qualified, audited_at);
