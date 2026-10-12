@@ -12,19 +12,25 @@ them yourself first.
       content.json. No placeholder text (lorem ipsum, TODO, example.com, 123-456-7890).
 - [ ] The business's own images are used where they appear; stock fills gaps and is credited in the footer.
 
-## Creative direction
-- [ ] The page follows designDirection.creative: its hero composition, sequence (adapted to the real content), grid,
-      typography (fonts from its googleFontsUrl) and palette tokens.
-- [ ] It does not read as a template: swapping the business name would not make it fit another business.
-- [ ] The primary action is on the first screen, repeated after the key content, and one tap away on phones.
+## House style
+- [ ] The page follows designDirection.creative (House Editorial, house-style.md): the editorial hero with the
+      expanding photograph, the fact ribbon, the statement, the track, the index, the visit band and the footer,
+      adapted to the real content; fonts from its googleFontsUrl.
+- [ ] `<html data-theme>` is designDirection.theme; the tokens of all seven house themes are in the CSS; the header's
+      theme picker lists all seven, switches without a reload (circular reveal), remembers the choice and works with
+      the keyboard. No colour outside the theme tokens (photo scrims excepted).
+- [ ] It does not read as a template: the photos, words, figures and crops are this business's.
+- [ ] The primary action is on the first screen, repeated in the visit band and footer, and in the header.
 
-## UI kit (Magic UI + Smooth UI)
-- [ ] Only the kit components listed for this direction (content.json `uiKit`), restyled with the palette; nothing
-      loads React, Tailwind or the libraries.
-- [ ] The direction's own motion system is built (intro or none, transition, scroll, hover, signature effect), and
-      nothing from another direction: no counter loader, curtain, echo headings, round plates, dust or cloud reveal
-      outside Cinematic Hospitality.
-- [ ] No kit effect on elements your own Motion code animates; no number ticker on a number that isn't in the text.
+## UI kit and motion
+- [ ] Only the kit components listed in content.json `uiKit`, restyled with the theme tokens; nothing loads React,
+      Tailwind or the libraries.
+- [ ] The house motion system is built: curtain once per session, masked headlines, expanding hero with caption and
+      rolling figures (real numbers only), ribbon, word-by-word statement, horizontal track on desktop, pointer
+      preview, parallax, magnetic primary button. None of the retired system: no counter loader, echo headings, round
+      plates, dust or cloud reveal.
+- [ ] No kit effect on elements the motion script already animates; no rolling figure or ticker on a number that
+      isn't in the text.
 - [ ] With reduced motion and with scripts blocked, all text is visible and the page still reads well.
 
 ## Structure
@@ -40,7 +46,7 @@ them yourself first.
 - [ ] Scroll the whole page once: nothing is left hidden (QA counts elements still invisible after a scroll).
 - [ ] Native scrolling (no smooth-scroll library, no `scroll-behavior: smooth`); wheel, keyboard and touch scroll.
 - [ ] Storage access never throws (the preview is sandboxed); no script errors in the console.
-- [ ] Reduced motion gets no movement. 3D (only if allowed) is lazy, paused off-screen, with a static fallback.
+- [ ] Reduced motion gets no movement and no curtain. No WebGL.
 
 ## Responsive and accessible
 - [ ] 360px to 1600px with no horizontal scrolling; mobile menu; tap targets at least 44px.

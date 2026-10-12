@@ -7,71 +7,71 @@ imagery, how the content maps onto the sections, and tone.
 
 ## restaurant
 
-- **Hero:** A top-down plate of the house speciality, cut out round, spinning in on a flour or spice splash.
-- **Imagery:** Warm, appetising close-ups of dishes and the dining room; plates shot from above for the cut-outs.
-- **Sections:** Story (who they are) → menu zigzag (2–3 categories, each with a round plate and real prices) → signature dishes as cards → services (dine in, catering, events, ordering) → press or reviews from the site → reservation or order CTA → footer with every location.
-- **Tone:** Hospitable, elegant, unhurried.
+- **Hero:** The dining room, the bar or the house speciality as the wide photograph that expands to full screen; the caption names the place and its real year or address.
+- **Imagery:** Warm, appetising: the room, the counter, dishes shot close; the business's own photos first.
+- **Sections:** Hero → fact ribbon → statement + story with two photos → the menus as a horizontal track (or price lists) → signature dishes → rooms / private dining as a bento → honours or press from the site in the inverse band → visit → footer.
+- **Tone:** Hospitable, assured, a little literary.
 
 ## cafe
 
-- **Hero:** A top-down coffee cup or pastry plate, cut out round, with a cocoa or flour dust splash.
-- **Imagery:** Latte art, bakes, the counter in morning light.
-- **Sections:** Story → menu zigzag (drinks, food, bakes) → favourites as cards → services (dine in, takeaway, catering, gift cards) → quotes → visit/order CTA → footer.
-- **Tone:** Warm, cosy, neighbourly.
+- **Hero:** The counter, the coffee or the bakes as the expanding photograph; the caption names the café and its street.
+- **Imagery:** Latte art, bakes, the room in morning light.
+- **Sections:** Hero → ribbon → statement + story → drinks and food as a track → favourites → the room as a bento → visit band → footer.
+- **Tone:** Warm, neighbourly, unhurried.
 
 ## gym
 
-- **Hero:** A round, high-contrast photo of training (kettlebell, rope, athlete) with a chalk-dust splash.
-- **Imagery:** Real training moments, equipment, dramatic light.
-- **Sections:** Story → programmes zigzag (classes, coaching, open gym) → class or membership cards with prices if listed → services (timetable, personal training, trial) → quotes → join CTA → footer.
-- **Tone:** Confident, energetic, but never shouty.
+- **Hero:** Training in the space (rig, platform, a class) as the expanding photograph; the caption names the gym and its real numbers (classes, years) only if the site has them.
+- **Imagery:** Real training moments in strong light.
+- **Sections:** Hero → ribbon → statement + story → programmes or classes as a track with prices if listed → timetable / membership → facilities bento → join band → footer.
+- **Tone:** Confident and clear, never shouty.
 
 ## salon
 
-- **Hero:** A round close-up of the craft (hair, nails, skincare products) with a soft sparkle dust.
+- **Hero:** The craft or the calm interior as the expanding photograph; the caption names the salon and its street.
 - **Imagery:** Results, products, calm interiors.
-- **Sections:** Story → services zigzag with prices → signature treatments as cards → services (booking, gift cards, bridal) → quotes → book CTA → footer.
+- **Sections:** Hero → ribbon → statement + story → services as a track with prices → signature treatments → the space as a bento → booking band → footer.
 - **Tone:** Refined, calm, personal.
 
 ## clothing
 
-- **Hero:** A round crop of a signature piece or fabric detail with a soft thread-like dust.
+- **Hero:** A signature piece or the shop as the expanding photograph; the caption names the label.
 - **Imagery:** Editorial product and lookbook photography.
-- **Sections:** Story → collection zigzag → featured pieces as cards → services (alterations, fittings, gift cards) → quotes → visit/shop CTA → footer.
+- **Sections:** Hero → ribbon → statement + story → collections as a track → featured pieces → lookbook bento → visit band → footer.
 - **Tone:** Editorial, confident.
 
 ## retail
 
-- **Hero:** A round product hero (the shop's best-known item) with a sparkle dust.
+- **Hero:** The shopfront or the best-known product as the expanding photograph.
 - **Imagery:** Products, the shopfront, details.
-- **Sections:** Story → categories zigzag → featured items as cards → services (delivery, gift cards, orders) → quotes → visit CTA → footer.
+- **Sections:** Hero → ribbon → statement + story → categories as a track → featured items → the shop as a bento → visit band → footer.
 - **Tone:** Friendly, curated.
 
 ## healthcare
 
-- **Hero:** A calm round photo (the practice, a caring moment, a clean clinical detail) with a very light, soft dust.
+- **Hero:** The calm, bright practice as the expanding photograph; the caption names the practice and how to book.
 - **Imagery:** Bright, calm, real practice photos.
-- **Sections:** Story → treatments zigzag → team or key treatments as cards → services (booking, insurance, emergencies if listed) → quotes → book/call CTA → footer.
+- **Sections:** Hero → ribbon → statement + story → treatments as a track → team or key treatments → practical details (hours, insurance, emergencies if listed) → booking band → footer.
 - **Tone:** Reassuring, clear, plain language.
 
 ## accounting
 
-- **Hero:** A round photo of a calm desk, documents or the city, with a fine gold dust.
+- **Hero:** The office or the city as the expanding photograph; the caption names the firm and its real years if stated.
 - **Imagery:** Offices, people at work, the city.
-- **Sections:** Story → services zigzag → specialisms as cards → services (consultation, returns, payroll) → quotes → contact CTA → footer.
+- **Sections:** Hero → ribbon → statement + story → services as a track → specialisms → the team or office → contact band → footer.
 - **Tone:** Measured, trustworthy.
 
 ## import export
 
-- **Hero:** A round photo of a port, containers or the products traded, with a fine dust.
-- **Imagery:** Ports, warehouses, products, global feel.
-- **Sections:** Story → products/services zigzag → markets or product lines as cards → services (sourcing, shipping, customs) → quotes → enquiry CTA → footer.
+- **Hero:** Port, warehouse or the products traded as the expanding photograph.
+- **Imagery:** Ports, warehouses, products, a global feel.
+- **Sections:** Hero → ribbon → statement + story → products / services as a track → markets → process → enquiry band → footer.
 - **Tone:** Global, dependable.
 
 ## services
 
-- **Hero:** A round photo of the work itself (tools, a finished project, the studio) with a fine dust.
+- **Hero:** The work itself (a finished project, the workshop, the team on site) as the expanding photograph.
 - **Imagery:** Real work, before/after, the team.
-- **Sections:** Story → services zigzag → projects or packages as cards → services (quotes, area served, guarantees if listed) → quotes → contact CTA → footer.
+- **Sections:** Hero → ribbon → statement + story → services as a track → projects bento → area served / guarantees if listed → contact band → footer.
 - **Tone:** Trustworthy, direct.
 

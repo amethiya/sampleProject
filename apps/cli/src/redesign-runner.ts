@@ -393,6 +393,6 @@ if (process.platform === "darwin" && !args["no-keep-awake"]) {
 }
 
 console.log(`Redesign runner connected to ${base}: ${concurrency} worker(s), ${passes} review pass(es), usage cap ≈ $${usageCap || "∞"} per job (API-equivalent estimate, not money). Waiting for jobs… (Ctrl+C to stop)`);
-console.log(`${DIRECTIONS.length} creative directions: ${DIRECTIONS.map((d) => d.name).join(", ")}.`);
+console.log(`House direction: ${DIRECTIONS.map((d) => d.name).join(", ")}.`);
 await Promise.all(Array.from({ length: concurrency }, (_, i) => workerLoop(i + 1)));
 await closeBrowser();

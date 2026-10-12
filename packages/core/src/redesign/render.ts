@@ -2,7 +2,7 @@ import { countryName } from "../categories";
 import type { SitePage, SiteSection, SiteSnapshot } from "../crawl";
 import type { CategoryId, Lead } from "../types";
 import { makeDna, tradeFor, type DesignDna } from "./styles";
-import { HEAD_JS, SYSTEM_BASE_JS, SYSTEM_CSS, SYSTEM_LIBRARIES, SYSTEM_MOTION_JS, lookVars, pickLook } from "./system";
+import { HEAD_JS, SYSTEM_BASE_JS, SYSTEM_CSS, SYSTEM_LIBRARIES, SYSTEM_MOTION_JS, lookVars, pickLook, themePicker } from "./system";
 import { THEMES, photoUrl } from "./themes";
 import { UI_KIT_CSS, UI_KIT_JS } from "./ui-kit";
 
@@ -34,6 +34,12 @@ function firstSentences(s: string, max: number): string {
   const cut = s.slice(0, max);
   const end = Math.max(cut.lastIndexOf(". "), cut.lastIndexOf("! "), cut.lastIndexOf("? "));
   return end > 60 ? cut.slice(0, end + 1) : cut.slice(0, cut.lastIndexOf(" ")) + "…";
+}
+
+/** The first sentence of a paragraph and the rest (so a statement and its follow-on together keep every word). */
+function splitFirstSentence(p: string): [string, string] {
+  const m = p.match(/^(.{40,260}?[.!?])\s+(.+)$/s);
+  return m ? [m[1], m[2]] : [p, ""];
 }
 
 /** A one-page snapshot from the homepage content captured at audit time (used before a full crawl exists). */
@@ -86,17 +92,22 @@ export function themeCategory(category: CategoryId, dna?: DesignDna): CategoryId
 export interface RenderOptions {
   /** Rewrites the business's own image URLs, e.g. through an HTTPS proxy. */
   image?: (url: string) => string;
-  /** This site's design DNA (look + trade). Picked from the trade when absent. */
+  /** This site's design DNA (theme + trade). Picked from the trade when absent. */
   dna?: DesignDna;
 }
 
 const ICON = {
-  pin: '<svg viewBox="0 0 24 24"><path d="M12 21s-6.5-6.2-6.5-11.2A6.5 6.5 0 0 1 18.5 9.8C18.5 14.8 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.4"/></svg>',
-  clock: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
-  phone: '<svg viewBox="0 0 24 24"><path d="M6.6 3.5h3l1.5 4-2 1.3a10 10 0 0 0 5.1 5.1l1.3-2 4 1.5v3a2 2 0 0 1-2.2 2A15.5 15.5 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2z"/></svg>',
-  mail: '<svg viewBox="0 0 24 24"><rect x="3.5" y="5.5" width="17" height="13" rx="1"/><path d="M4 6.5l8 6 8-6"/></svg>',
-  arrow: '<svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-6.2-6.5-11.2A6.5 6.5 0 0 1 18.5 9.8C18.5 14.8 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.4"/></svg>',
+  clock: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
+  phone: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5h3l1.5 4-2 1.3a10 10 0 0 0 5.1 5.1l1.3-2 4 1.5v3a2 2 0 0 1-2.2 2A15.5 15.5 0 0 1 4.6 5.7a2 2 0 0 1 2-2.2z"/></svg>',
+  mail: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="1"/><path d="M4 6.5l8 6 8-6"/></svg>',
+  arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17L17 7M8 7h9v9"/></svg>',
+  down: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
+  star: '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0 9.6 6.4 16 8 9.6 9.6 8 16 6.4 9.6 0 8 6.4 6.4Z"/></svg>',
 };
+
+const PRICE_LINE = /^(.*?)[\s.·…-]*((?:[$€£]\s?)?\d{1,4}(?:[.,]\d{2})?\s?(?:¢|€|\$|kr|zł|Kč|CHF)?)$/;
+const FOUNDED = /\b(?:since|est\.?|established|founded)\s+(?:in\s+)?((?:1[6-9]|20)\d\d)\b/i;
 
 /** Render one page of the redesigned site from the crawled page's own text and images. */
 export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: string, opts: RenderOptions = {}): string {
@@ -116,8 +127,11 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
   const pagePhotos = page.sections.flatMap((s) => s.images).filter((u) => /^https?:/.test(u)).map((u) => safeUrl(img(u)));
   let photoIdx = 0;
   const nextPhoto = (stockIdx: number, w = 1200) => ({ src: pagePhotos[photoIdx++] || stock(stockIdx, w), fallback: stock(stockIdx, w) });
-  const imgTag = (p: { src: string; fallback: string }, alt: string, cls = "") =>
-    `<img${cls ? ` class="${cls}"` : ""} src="${p.src}" data-fallback="${p.fallback}" alt="${esc(alt)}" loading="lazy" referrerpolicy="no-referrer">`;
+  const own = (u: string, stockIdx: number, w = 1200) => ({ src: safeUrl(img(u)) || stock(stockIdx, w), fallback: stock(stockIdx, w) });
+  const imgTag = (p: { src: string; fallback: string }, alt: string, cls = "", eager = false) =>
+    `<img${cls ? ` class="${cls}"` : ""} src="${p.src}" data-fallback="${p.fallback}" alt="${esc(alt)}"${eager ? ' fetchpriority="high"' : ' loading="lazy"'} referrerpolicy="no-referrer">`;
+  const photo = (p: { src: string; fallback: string }, alt: string, cls = "", amount = 8) =>
+    `<figure class="ph${cls ? ` ${cls}` : ""}" data-parallax="${amount}">${imgTag(p, alt)}</figure>`;
 
   const phone = lead.contacts.phones[0];
   const tel = phone ? esc(phone.replace(/[^\d+]/g, "")) : "";
@@ -130,150 +144,176 @@ export function renderSitePage(lead: RedesignInput, site: SiteSnapshot, slug: st
   const navLink = (p: SitePage) => `<a href="${pageHref(p.slug)}"${p.slug === page.slug ? ' aria-current="page"' : ""}>${esc(p.label)}</a>`;
   const nav = site.pages.map(navLink).join("");
   // The header holds the main pages; everything is in the mobile menu and the footer.
-  const maxTop = lead.name.length > 24 ? 4 : 6;
+  const maxTop = lead.name.length > 24 ? 4 : 5;
   const topNav = (site.pages.length > maxTop + 1 ? [...site.pages.slice(0, maxTop), ...(site.pages.slice(maxTop).some((p) => p.slug === page.slug) ? [page] : [])] : site.pages).map(navLink).join("");
 
   // A lead line must read like a sentence; dish names, prices and addresses don't qualify.
   const sentence = (p: SitePage) => p.sections.flatMap((s) => s.paragraphs).find((x) => x.length >= 60 && /[.!?]/.test(x) && (x.match(/\d/g) ?? []).length / x.length < 0.05) ?? "";
   const lead1 = isHome ? (page.description && page.description.length >= 30 ? page.description : sentence(page)) : sentence(page);
+  const allText = site.pages.flatMap((p) => [p.description, ...p.sections.flatMap((s) => [...s.paragraphs, ...s.items])]).join(" ");
+  const founded = allText.match(FOUNDED)?.[1];
 
   const sections = normalize(page.sections);
   const used = new Set<number>();
   const take = (pred: (s: SiteSection) => boolean) => { const i = sections.findIndex((s, k) => !used.has(k) && pred(s)); if (i >= 0) used.add(i); return i >= 0 ? sections[i] : null; };
   const lines = (s: SiteSection) => [...s.paragraphs, ...s.items];
+  const size = (s: SiteSection) => lines(s).join(" ").length;
 
-  const echo = (text: string, tag = "h2", attrs = "") => `<${tag} class="echo"${attrs}>${text}</${tag}>`;
-  const disc = (text: string, center = false) => `<p class="disc"${center ? ' style="justify-content:center"' : ""}><span class="mu-shiny">${esc(text)}</span></p>`;
+  // Section heads are numbered in page order once the page is assembled (see NO below).
+  const NO = "\u0000no\u0000";
+  const head = (label: string) => `<div class="head"><span class="no">No. ${NO}</span><span class="eyebrow">${esc(label)}</span></div>`;
+  const maskH = (html: string, tag = "h2") => `<${tag}><span class="line"><span>${html}</span></span></${tag}>`;
   const priceLine = (l: string) => {
-    const m = l.match(/^(.*?)[\s.·…-]*((?:[$€£]\s?)?\d{1,4}(?:[.,]\d{2})?\s?(?:¢|€|\$|kr|zł|Kč|CHF)?)$/);
+    const m = l.match(PRICE_LINE);
     return m && m[1].length > 1 && m[1].length < 80
       ? `<li><span class="n">${esc(m[1].trim())}</span><span class="p">${esc(m[2])}</span></li>`
       : `<li><span class="n">${esc(l)}</span></li>`;
   };
-  const sectionBody = (s: SiteSection, story = false) =>
-    `${s.paragraphs.map((p, i) => `<p class="muted"${story && i === 0 ? " data-su-scroll-reveal" : ""}>${esc(p)}</p>`).join("")}${s.items.length ? `<ul class="price-list${s.items.length > 8 ? " list-cols" : ""}">${s.items.map(priceLine).join("")}</ul>` : ""}`;
+  const body = (s: SiteSection, skipFirst = false) =>
+    `${s.paragraphs.slice(skipFirst ? 1 : 0).map((p) => `<p>${esc(p)}</p>`).join("")}${s.items.length ? `<ul class="price-list${s.items.length > 8 ? " list-cols" : ""}">${s.items.map(priceLine).join("")}</ul>` : ""}`;
 
-  /** Every remaining section of the page, shaped by its content. */
-  const renderRest = () => {
-    let flip = false;
-    return sections.map((s, k) => {
-      if (used.has(k)) return "";
-      used.add(k);
-      const head = s.heading ? `${disc("Discover")}${echo(esc(s.heading))}` : "";
-      const ls = lines(s);
-      if (!ls.length && s.images.length) {
-        return `<section style="padding-top:0"><div class="wrap">${head}<div class="gallery">${s.images.map((u, i) => `<figure data-mu-blur-fade data-delay="${(i % 4) * 0.08}">${imgTag({ src: safeUrl(img(u)), fallback: stock(k) }, s.heading || lead.name)}</figure>`).join("")}</div></div></section>`;
-      }
-      if (s.images.length) {
-        flip = !flip;
-        const [first, ...more] = s.images;
-        return `<section style="padding-top:0"><div class="wrap"><div class="story"${flip ? ' style="direction:rtl"' : ""}>
-  <div style="direction:ltr">${head}${sectionBody(s)}</div>
-  <div class="ph" style="direction:ltr">${imgTag({ src: safeUrl(img(first)), fallback: stock(k) }, s.heading || lead.name)}</div>
-</div>${more.length ? `<div class="gallery">${more.map((u, i) => `<figure data-mu-blur-fade data-delay="${(i % 4) * 0.08}">${imgTag({ src: safeUrl(img(u)), fallback: stock(k + 1) }, s.heading || lead.name)}</figure>`).join("")}</div>` : ""}</div></section>`;
-      }
-      const long = s.items.length > 5;
-      return `<section style="padding-top:0"><div class="wrap"><div class="${long ? "" : "prose-block"}" data-mu-blur-fade>${head}${sectionBody(s)}</div></div></section>`;
-    }).join("\n");
+  /** A content section in the house layout: numbered head, masked heading, text, and its own photos. */
+  let flip = false;
+  const block = (s: SiteSection, k: number) => {
+    const label = s.heading || page.label;
+    const title = s.heading ? maskH(esc(s.heading)) : "";
+    if (!lines(s).length && s.images.length) {
+      return `<section><div class="wrap">${head(label)}${title}<ul class="bento">${s.images.slice(0, 10).map((u, i) => `<li>${imgTag(own(u, k + i), s.heading || lead.name)}</li>`).join("")}</ul></div></section>`;
+    }
+    if (s.images.length) {
+      flip = !flip;
+      const [first, ...more] = s.images;
+      return `<section><div class="wrap">${head(label)}<div class="block with-ph${flip ? " flip" : ""}"><div class="prose rise">${title}${body(s)}</div>${photo(own(first, k), s.heading || lead.name)}</div>${more.length ? `<ul class="bento">${more.slice(0, 10).map((u, i) => `<li>${imgTag(own(u, k + 1 + i), s.heading || lead.name)}</li>`).join("")}</ul>` : ""}</div></section>`;
+    }
+    return `<section><div class="wrap">${head(label)}${title}<div class="${s.items.length > 5 ? "" : "prose "}rise">${body(s)}</div></div></section>`;
   };
+  const renderRest = () => sections.map((s, k) => (used.has(k) ? "" : (used.add(k), block(s, k)))).join("\n");
 
-  // Info strip: the facts a visitor needs, with glowing line icons.
-  const info = `<div class="info mu-beam">
-  <div>${ICON.pin}<div><b>Locate us</b><span><a href="${esc(osm)}" target="_blank" rel="noopener">${esc(where)}</a></span></div></div>
-  <div>${ICON.clock}<div><b>Open hours</b><span>${hours.length ? hours.map(esc).join(" · ") : esc(t.label)}</span></div></div>
-  <div>${phone ? ICON.phone : ICON.mail}<div><b>${phone ? "Call us" : "Write to us"}</b><span>${phone ? `<a href="tel:${tel}">${esc(phone)}</a>` : ""}${email ? `${phone ? " · " : ""}<a href="mailto:${esc(email)}">${esc(email)}</a>` : ""}</span></div></div>
-</div>`;
+  // Contact band (inverse colours), on every page.
+  const visit = `<section class="inverse" id="visit"><div class="wrap">
+  ${head("Visit")}${maskH(name)}
+  <div class="visit">
+    <div class="rise">
+      <address class="addr">${esc(where)}</address>
+      ${phone ? `<p style="margin-top:20px"><a class="ulink" href="tel:${tel}">${esc(phone)}</a></p>` : ""}
+      <div class="ctas"><a class="btn" data-su-magnetic href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a><a class="btn ghost" href="${esc(osm)}" target="_blank" rel="noopener">Directions ${ICON.arrow}</a></div>
+    </div>
+    <div class="facts-list rise">
+      <div>${ICON.pin}<div><b>Address</b><span><a href="${esc(osm)}" target="_blank" rel="noopener">${esc(where)}</a></span></div></div>
+      ${hours.length ? `<div>${ICON.clock}<div><b>Opening hours</b>${hours.map((h) => `<span>${esc(h)}</span>`).join("")}</div></div>` : ""}
+      ${phone ? `<div>${ICON.phone}<div><b>Telephone</b><span><a href="tel:${tel}">${esc(phone)}</a></span></div></div>` : ""}
+      ${email ? `<div>${ICON.mail}<div><b>Email</b><span><a href="mailto:${esc(email)}">${esc(email)}</a></span></div></div>` : ""}
+    </div>
+  </div>
+</div></section>`;
 
   let main = "";
   if (isHome) {
-    const words = lead.name.split(/\s+/);
-    const longName = lead.name.length > 24;
-    const h1 = words.length > 2 && !longName ? `<span class="nw">${esc(words.slice(0, Math.ceil(words.length / 2)).join(" "))}</span><br><span class="nw">${esc(words.slice(Math.ceil(words.length / 2)).join(" "))}</span>` : name;
+    // Headline: the business name over two masked lines, its last word in the italic accent.
+    const words = lead.name.trim().split(/\s+/);
+    const cut = words.length > 1 ? Math.ceil(words.length / 2) : 1;
+    const l1 = words.slice(0, cut), l2 = words.slice(cut);
+    const withEm = (ws: string[]) => ws.length ? `${esc(ws.slice(0, -1).join(" "))}${ws.length > 1 ? " " : ""}<em>${esc(ws[ws.length - 1])}</em>` : "";
+    const longest = Math.max(l1.join(" ").length, l2.join(" ").length);
+    const h1 = `<h1 id="hero-title"${longest > 14 ? ' data-long=""' : ""}><span class="line"><span>${l2.length ? esc(l1.join(" ")) : withEm(l1)}</span></span>${l2.length ? `<span class="line"><span>${withEm(l2)}</span></span>` : ""}</h1>`;
     const second = others[0];
-    const heroPhoto = nextPhoto(0, 1000);
-    const revealTitle = sections.find((s) => s.heading && s.heading.length <= 60 && s.heading.toLowerCase() !== lead.name.toLowerCase())?.heading || `${t.label} in ${lead.city}`;
-    // The business's own photos from every page, for the photo marquee.
-    const ownPhotos = [...new Set(site.pages.flatMap((p) => p.sections.flatMap((s) => s.images)))];
+    const heroPhoto = nextPhoto(0, 2000);
+    // The caption is built from facts the site states: what it is, where, and since when.
+    const revealTitle = `${t.label} in ${lead.city}${founded ? ` since ${founded}` : ""}.`;
+    const facts = [
+      founded ? `<div><dt class="sr-only">Established</dt><dd class="f" data-roll>${esc(founded)}</dd><dd class="l">Established</dd></div>` : "",
+      phone ? `<div><dt class="sr-only">Telephone</dt><dd class="f"><a href="tel:${tel}">${esc(phone)}</a></dd><dd class="l">Call</dd></div>` : "",
+      hours.length ? `<div><dt class="sr-only">Opening hours</dt><dd class="f">${esc(hours[0])}</dd><dd class="l">Open</dd></div>` : "",
+    ].filter(Boolean);
+    const ribbonItems = [lead.name, t.label, lead.city, founded ? `Est. ${founded}` : "", lead.address ?? "", hours[0] ?? ""].filter((x) => x && x.length < 60);
+    const ribbonRow = (hidden: boolean) => `<div class="ribbon-row"${hidden ? ' aria-hidden="true"' : ""}>${ribbonItems.map((x) => `<span>${esc(x)}</span>${ICON.star}`).join("")}</div>`;
+
+    // Story: its first sentence becomes the statement; the rest of its words follow beside two photographs.
     const storySec = take((s) => s.paragraphs.some((p) => p.length >= 80));
-    const offers = [0, 1, 2].map(() => take((s) => lines(s).length >= 2)).filter(Boolean) as SiteSection[];
+    const storyPara = storySec ? storySec.paragraphs.find((p) => p.length >= 80)! : lead1;
+    const [statement, restOfFirst] = storyPara ? splitFirstSentence(storyPara) : ["", ""];
+    const storyRest = storySec ? [restOfFirst, ...storySec.paragraphs.filter((p) => p !== storyPara)].filter(Boolean) : restOfFirst ? [restOfFirst] : [];
+    const storyImgs = storySec?.images ?? [];
+
+    // Offers: short sections become panels on the horizontal track (three or more), longer ones stay as blocks.
+    const offers: SiteSection[] = [];
+    for (let i = 0; i < 6; i++) { const s = take((x) => lines(x).length >= 1 && size(x) <= 480 && !!x.heading); if (!s) break; offers.push(s); }
+    const track = offers.length >= 3 ? `<section class="track" aria-labelledby="track-title"><div class="track-stick">
+  <div class="wrap track-top"><div>${head("What we offer")}<h2 id="track-title"><span class="line"><span>${esc(t.label)}, <em>in ${esc(lead.city)}</em></span></span></h2></div><div class="track-count" aria-hidden="true"><b>01</b> / ${String(offers.length).padStart(2, "0")}<div class="track-bar"><i></i></div></div></div>
+  <ol class="track-list">${offers.map((s, i) => `<li class="panel"><p class="pn" aria-hidden="true">${String(i + 1).padStart(2, "0")}</p><div><h3>${esc(s.heading)}</h3>${body(s)}${s.images[0] ? `<figure class="ph" style="aspect-ratio:5/4;max-width:11rem;margin-top:20px">${imgTag(own(s.images[0], 3 + i, 600), s.heading)}</figure>` : ""}</div></li>`).join("")}</ol>
+</div></section>` : offers.map((s, i) => block(s, 3 + i)).join("\n");
+
+    // The business's own photos from every page, for the bento.
+    const ownPhotos = [...new Set(site.pages.flatMap((p) => p.sections.flatMap((s) => s.images)))].filter((u) => u !== storyImgs[0] && u !== storyImgs[1]);
+
     main += `
-<section class="hero"><div class="wrap">
-  <div>
-    ${disc("Welcome to")}
-    ${echo(h1, "h1", longName ? ' data-long=""' : "")}
-    <p class="sub">${esc(t.label)} in ${esc(lead.city)}</p>
-    ${lead1 ? `<p class="muted">${esc(firstSentences(lead1, 220))}</p>` : ""}
-    <div class="ctas"><a class="btn gold mu-shimmer" data-su-magnetic href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a>${second ? `<a class="btn" href="${pageHref(second.slug)}">${esc(second.label)}</a>` : `<a class="btn" href="#visit">Visit us</a>`}</div>
-  </div>
-  <div class="plate-stage"><div class="dust"></div>${imgTag(heroPhoto, lead.name, "plate round")}</div>
-</div></section>
-
-<section class="cloud-reveal" aria-label="${esc(revealTitle)}">
-  <img src="${stock(1, 2200)}" alt="" loading="lazy">
-  <div class="clouds" aria-hidden="true"></div>
-  <div class="title"><p>${name}</p><h2>${esc(revealTitle)}</h2></div>
+<section class="hero-x" style="padding:0" aria-labelledby="hero-title">
+  <div class="hx"><div class="wrap">
+    <div class="hx-top"><p class="eyebrow">${esc(t.label)} · ${esc(lead.city)}</p>${phone ? `<a class="eyebrow" href="tel:${tel}">${esc(phone)}</a>` : ""}</div>
+    <div class="hx-body${longest > 12 ? " hx-stack" : ""}">
+      ${h1}
+      <div class="hx-side rise">
+        ${lead1 ? `<p>${esc(firstSentences(lead1, 220))}</p>` : ""}
+        <div class="ctas"><a class="btn" data-su-magnetic href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a>${second ? `<a class="btn ghost" href="${pageHref(second.slug)}">${esc(second.label)}</a>` : `<a class="btn ghost" href="#visit">Visit us ${ICON.down}</a>`}</div>
+      </div>
+    </div>
+  </div></div>
+  <div class="xp"><div class="xp-stick"><div class="xp-frame">
+    ${imgTag(heroPhoto, lead.name, "xp-img", true)}
+    <div class="xp-shade" aria-hidden="true"></div>
+    <div class="xp-cap"><div class="wrap">
+      <div><p class="eyebrow">${esc(where)}</p><p class="big">${esc(revealTitle)}</p></div>
+      ${facts.length ? `<dl class="facts">${facts.join("")}</dl>` : ""}
+    </div></div>
+    <div class="seal" aria-hidden="true"><svg viewBox="0 0 120 120"><defs><path id="seal-path" d="M60,60 m-46,0 a46,46 0 1,1 92,0 a46,46 0 1,1 -92,0"/></defs><text font-size="9" letter-spacing="2.6" fill="currentColor" style="font-family:var(--body);font-weight:600"><textPath href="#seal-path">${esc(`${lead.name} · ${lead.city} ·`.toUpperCase().slice(0, 48))}</textPath></text><text x="60" y="${founded ? 58 : 66}" text-anchor="middle" font-size="11" fill="currentColor" style="font-family:var(--serif);font-style:italic">${founded ? "est." : esc(t.label.toLowerCase())}</text>${founded ? `<text x="60" y="77" text-anchor="middle" font-size="21" fill="currentColor" style="font-family:var(--display)">${esc(founded)}</text>` : ""}</svg></div>
+  </div></div></div>
 </section>
-
-<section><div class="wrap">
-  <div class="story">
-    <div>${disc("Discover")}${echo(esc(storySec?.heading || "Our story"))}${storySec ? sectionBody(storySec, true) : lead1 ? `<p class="muted">${esc(lead1)}</p>` : ""}${second ? `<a class="ulink" href="${pageHref(second.slug)}">${esc(second.label)}</a>` : ""}</div>
-    <div class="ph">${imgTag(storySec?.images[0] ? { src: safeUrl(img(storySec.images[0])), fallback: stock(2) } : nextPhoto(2), lead.name)}</div>
+${ribbonItems.length >= 3 ? `<div class="ribbon" aria-label="${esc(lead.name)}"><div class="ribbon-track">${ribbonRow(false)}${ribbonRow(true)}</div></div>` : ""}
+${statement ? `<section><div class="wrap">
+  ${head(storySec?.heading || "Our story")}
+  <p class="statement" data-su-scroll-reveal>${esc(statement)}</p>
+  <div class="split">
+    <div class="txt rise">${storyRest.map((p) => `<p>${esc(p)}</p>`).join("")}${storySec ? body({ ...storySec, paragraphs: [] }) : ""}${second ? `<p><a class="ulink" href="${pageHref(second.slug)}">${esc(second.label)} ${ICON.arrow}</a></p>` : ""}</div>
+    <div class="pics">${photo(storyImgs[0] ? own(storyImgs[0], 2, 1600) : nextPhoto(2, 1600), storySec?.heading || lead.name, "a", 7)}${photo(storyImgs[1] ? own(storyImgs[1], 4) : nextPhoto(4), lead.name, "b", 12)}</div>
   </div>
-  ${info}
-</div></section>
-${offers.length ? `<section style="padding-top:0"><div class="wrap">
-  <div class="menu-head"><div>${disc("Discover")}${echo("What we offer")}</div>${lead1 ? `<p class="muted small">${esc(firstSentences(lead1, 160))}</p>` : ""}</div>
-  ${offers.map((s, i) => `<div class="zig${i % 2 ? " flip" : ""}">
-  <div class="zig-img"><div class="dust"></div>${imgTag(s.images[0] ? { src: safeUrl(img(s.images[0])), fallback: stock(3 + i, 900) } : { src: stock(3 + i, 900), fallback: stock(3 + i, 900) }, s.heading || lead.name, "round")}</div>
-  <div class="zig-txt">${s.heading ? `<h3>${esc(s.heading)}</h3>` : ""}${s.paragraphs.map((p) => `<p class="muted small">${esc(p)}</p>`).join("")}${s.items.length ? `<ul>${s.items.map((x) => { const m = x.match(/^(.*?)[\s.·…-]*((?:[$€£]\s?)?\d{1,4}(?:[.,]\d{2})?\s?(?:¢|€|\$)?)$/); return m && m[1].length > 1 ? `<li><span>${esc(m[1].trim())}</span><span>${esc(m[2])}</span></li>` : `<li><span>${esc(x)}</span><span></span></li>`; }).join("")}</ul>` : ""}<a class="btn" href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a></div>
-</div>`).join("")}
 </div></section>` : ""}
+${track}
 ${renderRest()}
-${ownPhotos.length >= 4 ? `<section style="padding-top:0" aria-label="${esc(lead.name)} photos"><div class="mu-marquee" style="--duration:60s">
-  <div class="mu-marquee-track">${ownPhotos.slice(0, 10).map((u, i) => imgTag({ src: safeUrl(img(u)), fallback: stock(6 + i, 900) }, lead.name)).join("")}</div>
-</div></section>` : ""}
-${others.length ? `<section style="padding-top:0"><div class="wrap"><div class="framed">
-  ${disc("Discover")}${echo("Explore")}
-  <div class="cards" data-su-glow>${others.slice(0, 6).map((p, i) => { const ph = p.sections.flatMap((s) => s.images)[0]; const line = p.sections.flatMap((s) => [...s.paragraphs, ...s.items]).find((x) => x.length > 30) ?? p.title; return `<a class="dish-card mu-spotlight" href="${pageHref(p.slug)}" style="text-decoration:none"><div class="ph">${imgTag(ph ? { src: safeUrl(img(ph)), fallback: stock(4 + i, 900) } : { src: stock(4 + i, 900), fallback: stock(4 + i, 900) }, p.label)}</div><div class="row"><h3>${esc(p.label)}</h3><span class="p">${ICON.arrow}</span></div><p>${esc(firstSentences(line, 110))}</p></a>`; }).join("")}</div>
-</div></div></section>` : ""}`;
+${ownPhotos.length >= 5 ? `<section style="padding-top:0"><div class="wrap">${head("In pictures")}${maskH(`${name}, <em>in pictures</em>`)}<ul class="bento">${ownPhotos.slice(0, 5).map((u, i) => `<li>${imgTag(own(u, 6 + i), lead.name)}</li>`).join("")}</ul></div></section>` : ""}
+${others.length ? `<section><div class="wrap">${head("Explore")}${maskH("Explore the <em>site</em>")}
+  <ul class="index" data-previews>${others.map((p, i) => { const ph = p.sections.flatMap((s) => s.images)[0]; const line = p.sections.flatMap((s) => [...s.paragraphs, ...s.items]).find((x) => x.length > 20) ?? p.title; return `<li><a href="${pageHref(p.slug)}" data-preview="${ph ? safeUrl(img(ph)) || stock(4 + i, 600) : stock(4 + i, 600)}"><span class="i">${String(i + 1).padStart(2, "0")}</span><span class="t">${esc(p.label)}</span><span class="d">${esc(firstSentences(line ?? "", 90))}</span><span class="go">View ${ICON.arrow}</span></a></li>`; }).join("")}</ul>
+</div></section>` : ""}`;
   } else {
-    const side = nextPhoto(1, 900);
+    const side = nextPhoto(1, 1200);
     main += `<section class="page-top"><div class="wrap">
-  <div>${disc(lead.name)}${echo(esc(page.label), "h1")}${lead1 ? `<p class="muted">${esc(firstSentences(lead1, 220))}</p>` : ""}</div>
-  <div class="plate-stage"><div class="dust"></div>${imgTag(side, page.label, "plate round")}</div>
+  <div><p class="eyebrow">${name}</p>${maskH(esc(page.label), "h1")}${lead1 ? `<p class="muted rise">${esc(firstSentences(lead1, 220))}</p>` : ""}</div>
+  ${photo(side, page.label, "", 8)}
 </div></section>
 ${renderRest()}`;
   }
 
-  // Visit / call to action over a dark photo.
-  main += `
-<section class="order" id="visit"><img src="${stock(isHome ? 5 : 2, 2000)}" alt="" loading="lazy"><div class="wrap">
-  ${disc("Visit us", true)}
-  ${echo(name)}
-  <p class="muted">${esc(where)}${hours.length ? ` · ${hours.map(esc).join(" · ")}` : ""}</p>
-  <div style="display:flex;gap:14px;justify-content:center;flex-wrap:wrap"><a class="btn gold mu-shimmer" data-su-magnetic href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a><a class="btn" href="${esc(osm)}" target="_blank" rel="noopener">Directions</a>${email ? `<a class="btn" href="mailto:${esc(email)}">${esc(email)}</a>` : ""}</div>
-</div></section>`;
+  main += visit;
+  let no = 0;
+  main = main.split(NO).reduce((acc, part, i) => (i === 0 ? part : `${acc}${String(++no).padStart(2, "0")}${part}`), "");
 
+  const picker = themePicker();
   const half = Math.ceil(site.pages.length / 2);
   const footer = `<footer class="site">
   <div class="wrap">
-    <div class="foot-cta"><div class="tw-paths" aria-hidden="true"></div>
-      <div>${disc(hours.length ? "Open hours" : "Get in touch")}<p class="big">${hours.length ? esc(hours.join(" · ")) : name}</p></div>
-      <div class="foot-cta-btns"><a class="btn gold" href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a><a class="btn" href="${esc(osm)}" target="_blank" rel="noopener">Directions</a></div>
+    <div class="foot-top">
+      <div><p class="wordmark"><span class="line"><span>${name}</span></span></p><p class="foot-tag">${esc(t.label)} · ${esc(lead.city)}</p><a class="btn" href="${primaryHref}">${esc(t.cta)} ${ICON.arrow}</a></div>
+      <div class="foot-cols">
+        <div><h4>Visit</h4><p>${esc(where)}</p>${phone ? `<a href="tel:${tel}">${esc(phone)}</a>` : ""}${email ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : ""}<a href="${esc(osm)}" target="_blank" rel="noopener">Map</a></div>
+        <nav aria-label="Pages"><h4>Pages</h4>${site.pages.slice(0, half).map(navLink).join("")}</nav>
+        ${site.pages.length > 1 ? `<nav aria-label="More pages"><h4>More</h4>${site.pages.slice(half).map(navLink).join("")}</nav>` : hours.length ? `<div><h4>Hours</h4>${hours.map((h) => `<p>${esc(h)}</p>`).join("")}</div>` : ""}
+      </div>
     </div>
-    <div class="foot-grid">
-      <div class="foot-brand"><a class="logo-text" href="./">${name}</a>${lead1 ? `<p>${esc(firstSentences(lead1, 180))}</p>` : ""}${email ? `<a class="ulink" href="mailto:${esc(email)}">${esc(email)}</a>` : ""}</div>
-      <nav aria-label="Explore"><h4>Explore</h4>${site.pages.slice(0, half).map(navLink).join("")}</nav>
-      <nav aria-label="More"><h4>More</h4>${site.pages.slice(half).map(navLink).join("")}</nav>
-      <div class="foot-locs"><h4>Contact</h4><div class="fl"><b>${name}</b><span>${esc(where)}</span>${phone ? `<span><a href="tel:${tel}">${esc(phone)}</a></span>` : ""}${hours.length ? `<span>${hours.map(esc).join(" · ")}</span>` : ""}<span class="fl-links"><a href="${esc(osm)}" target="_blank" rel="noopener">Map</a>${email ? `<a href="mailto:${esc(email)}">Email</a>` : ""}</span></div></div>
-    </div>
-    <div class="wordmark" aria-hidden="true">${name}</div>
-    <div class="foot-bottom"><span>${esc(domain)}</span><span>Concept redesign by Revamp Radar. Not the official website. Photography: the business's own where available, otherwise Unsplash.</span><a class="totop" href="#top">Back to top <span aria-hidden="true">&uarr;</span></a></div>
+    <div class="foot-bottom"><span>${esc(domain)} · Concept redesign by Revamp Radar. Not the official website. Photography: the business's own where available, otherwise Unsplash.</span><a href="#top">Back to top &uarr;</a></div>
   </div>
 </footer>`;
 
   return `<!doctype html>
-<html lang="en">
+<html lang="en" data-theme="${look.id}" data-site="${esc(domain)}">
 <head>
 <script>${HEAD_JS}</script>
 <meta charset="utf-8">
@@ -282,21 +322,21 @@ ${renderRest()}`;
 <title>${isHome ? name : `${esc(page.label)} · ${name}`} · Concept redesign</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?${look.fonts}&display=swap">
-<style>${lookVars(look)}${SYSTEM_CSS}${UI_KIT_CSS}</style>
+<style>${lookVars(look)}${SYSTEM_CSS}${UI_KIT_CSS}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}</style>
 </head>
 <body id="top" data-look="${look.id}">
 <div class="mu-progress" aria-hidden="true"></div>
-<div class="curtain" aria-hidden="true"><span class="logo-text">${name}</span><span class="count">0</span><span class="bar-line"><i></i></span></div>
+<div class="intro" aria-hidden="true"><span class="s">${esc(t.label)} · ${esc(lead.city)}</span><span class="n">${name}</span><span class="r"></span></div>
 <div class="concept">Concept redesign of ${esc(domain)}, built from its own text and photos. Not the official website. <a href="${safeUrl(page.url)}" target="_blank" rel="noopener nofollow">View the original page</a></div>
 <header class="site">
   <div class="wrap bar">
     <a class="logo-text" href="./">${name}</a>
     <nav class="links" aria-label="Pages">${topNav}</nav>
-    <a class="btn gold" href="${primaryHref}">${esc(t.cta)}</a>
-    <button class="menu-toggle" aria-expanded="false" aria-controls="mobile-menu">Menu</button>
+    <div class="tools">${picker.button}<a class="btn" href="${primaryHref}">${esc(t.cta)}</a><button class="menu-toggle" aria-expanded="false" aria-controls="mobile-menu">Menu</button></div>
   </div>
-  <nav class="mobile" id="mobile-menu" aria-label="Pages">${nav}<a class="btn gold" href="${primaryHref}">${esc(t.cta)}</a></nav>
+  <nav class="mobile" id="mobile-menu" aria-label="Pages">${nav}<a class="btn" href="${primaryHref}">${esc(t.cta)}</a></nav>
 </header>
+${picker.panel}
 <main>
 ${main}
 </main>

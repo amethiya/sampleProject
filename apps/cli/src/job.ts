@@ -3,7 +3,7 @@
  *
  *   npm run job -- fetch --url example.com --category restaurant [--city Vienna]   add a website and claim its job
  *   npm run job -- fetch --lead example.com                                          claim the job for a known lead
- *        [--notes "what to change"] [--revise] [--theme midnight-navy] [--direction editorial-magazine]
+ *        [--notes "what to change"] [--revise] [--theme classic|noir|latte|sage|cobalt|cocoa|rose]
  *   npm run job -- fetch                                                             claim the oldest queued job
  *   npm run job -- qa jobs/<id>                                                      browser QA → jobs/<id>/qa/report.md
  *   npm run job -- upload jobs/<id>                                                  QA (when possible) + upload site/*.html

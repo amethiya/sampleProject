@@ -77,7 +77,7 @@ h1{font-size:clamp(2rem,5vw,3.2rem);line-height:1.05;letter-spacing:-.03em;margi
 <body>
 <main>
 <h1>Redesign themes</h1>
-<p class="lead">Every redesign is built on one design system: the structure, components and motion of the approved Rise &amp; Shine redesign. Each site gets one of these ${LOOKS.length} themes, chosen for its trade (navy leads for most) and rotated so neighbouring redesigns look different. Open a demo and scroll to see the motion.</p>
+<p class="lead">Every redesign is built in the house style of the approved Union Oyster House redesign: editorial type, one motion language and these ${LOOKS.length} house colour themes. Each site opens in one of them (Classic Monochrome first, rotated so neighbouring redesigns differ), and its theme button switches between all seven. Open a demo and scroll to see the motion.</p>
 <div class="grid">${LOOKS.map(card).join("")}</div>
 </main>
 </body>

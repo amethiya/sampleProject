@@ -1,12 +1,12 @@
 /**
- * A site's design DNA: which look (colour theme + fonts) of the design system it gets, and which trade it really is
+ * A site's design DNA: which of the seven house themes of the design system it gets, and which trade it really is
  * (map data sometimes files a biscuit kitchen as a shop). Stored as "3|<look>|<trade>".
  */
 import type { CategoryId } from "../types";
 import { LOOKS, lookById, pickLook, type Look } from "./system";
 
 /** Bumped when the picking rules change, so looks chosen under older rules are picked again. */
-export const DNA_VERSION = "3";
+export const DNA_VERSION = "4";
 
 export interface DesignDna {
   key: string;
