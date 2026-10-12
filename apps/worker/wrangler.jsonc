@@ -15,15 +15,19 @@
     // Run `npx wrangler d1 create revamp-radar` and paste the returned database_id here.
     { "binding": "DB", "database_name": "revamp-radar", "database_id": "97f2b40d-3213-4783-8c7e-c9aeaf27ebd1" }
   ],
-  // Every 10 minutes: discover a slice if the queue is low, audit a small batch, sync to Sheets.
+  // Night lead search: every minute 19:00–01:59 UTC; the Worker only works inside NIGHT_START–NIGHT_END
+  // (19:30–01:30 UTC = 01:00–07:00 IST). Each run discovers a slice if the queue is low and audits a small batch.
   // Small batches keep each run under the free plan's 50-subrequest limit (each site: page, contact page, robots,
   // up to two sitemaps, a feed and an MX lookup).
-  "triggers": { "crons": ["*/10 * * * *"] },
+  "triggers": { "crons": ["* 19-23,0-1 * * *"] },
   "vars": {
     "DAILY_TARGET": "10",
     "MIN_SCORE": "35",
     "BATCH_SIZE": "4",
     "ACTIVE_DAYS": "30",
+    "NIGHT_START": "19:30",
+    "NIGHT_END": "01:30",
+    "NIGHT_TARGET": "200",
     "PUBLIC_URL": "https://revamp-radar.amethiyavivek.workers.dev",
     "SENDER_NAME": "Vivek Amethiya"
   }

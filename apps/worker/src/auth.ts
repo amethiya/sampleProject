@@ -58,8 +58,8 @@ function readCookie(req: Request, name: string): string | undefined {
     .find(([k]) => k === name)?.[1];
 }
 
-// Runners may claim jobs and report on them, but not approve, reject, cancel, list or batch-queue them.
-const RUNNER_PATHS = [/^\/api\/redesign-jobs\/next$/, /^\/api\/redesign-jobs\/\d+\/(progress|complete|fail)$/, /^\/api\/leads\/add$/, /^\/api\/leads\/[^/]+\/(redesign|crawl)$/];
+// The runner token may read today's list, claim jobs and report on them, but not approve, reject, cancel or batch-queue.
+const RUNNER_PATHS = [/^\/api\/redesign-jobs\/today$/, /^\/api\/redesign-jobs\/next$/, /^\/api\/redesign-jobs\/\d+\/(progress|complete|fail)$/, /^\/api\/leads\/add$/, /^\/api\/leads\/[^/]+\/(redesign|crawl)$/];
 
 /** Returns the signed-in email, "token" for the admin token, "runner" for the runner token, or null. */
 export async function currentUser(req: Request, env: AuthEnv): Promise<string | null> {

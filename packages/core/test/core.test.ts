@@ -143,6 +143,73 @@ describe("buildPitch", () => {
   });
 });
 
+describe("night search window", () => {
+  it("runs 01:00–07:00 IST (19:30–01:30 UTC), across midnight UTC, and counts the night from its start", async () => {
+    const { inWindow, windowStart } = await import("../src");
+    const at = (iso: string) => new Date(iso);
+    expect(inWindow(at("2026-10-12T19:29:00Z"))).toBe(false);
+    expect(inWindow(at("2026-10-12T19:30:00Z"))).toBe(true);
+    expect(inWindow(at("2026-10-12T23:59:00Z"))).toBe(true);
+    expect(inWindow(at("2026-10-13T01:29:00Z"))).toBe(true);
+    expect(inWindow(at("2026-10-13T01:30:00Z"))).toBe(false);
+    expect(inWindow(at("2026-10-13T06:00:00Z"))).toBe(false);
+    expect(windowStart(at("2026-10-13T00:45:00Z")).toISOString()).toBe("2026-10-12T19:30:00.000Z");
+    expect(windowStart(at("2026-10-12T21:00:00Z")).toISOString()).toBe("2026-10-12T19:30:00.000Z");
+    expect(inWindow(at("2026-10-12T10:00:00Z"), "09:00", "17:00")).toBe(true);
+  });
+});
+
+describe("website details", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reads domain age, archive history and Google's real-user data, and estimates traffic honestly", async () => {
+    const { parseRdap, parseCdx, parsePsi, trafficLevel } = await import("../src");
+    const now = new Date("2026-10-12T00:00:00Z");
+    expect(parseRdap({ events: [{ eventAction: "registration", eventDate: "1997-11-05T05:00:00Z" }, { eventAction: "expiration", eventDate: "2028-11-04T04:00:00Z" }],
+      entities: [{ roles: ["registrar"], vcardArray: ["vcard", [["version", {}, "text", "4.0"], ["fn", {}, "text", "Network Solutions, LLC"]]] }] }, now))
+      .toEqual({ registered: "1997-11-05", expires: "2028-11-04", registrar: "Network Solutions, LLC", ageYears: 28 });
+    expect(parseCdx([["timestamp"], ["19981206111024"], ["20090115000000"], ["20260901000000"]])).toEqual({ first: "1998-12-06", last: "2026-09-01", monthsCaptured: 3 });
+    const g = parsePsi({ lighthouseResult: { categories: { performance: { score: 0.42 }, seo: { score: 0.9 }, accessibility: { score: 0.7 }, "best-practices": { score: 1 } } },
+      originLoadingExperience: { metrics: { LARGEST_CONTENTFUL_PAINT_MS: { percentile: 3100 }, CUMULATIVE_LAYOUT_SHIFT_SCORE: { percentile: 12 }, INTERACTION_TO_NEXT_PAINT: { percentile: 240 } }, overall_category: "AVERAGE" } });
+    expect(g).toMatchObject({ performance: 42, seo: 90, accessibility: 70, bestPractices: 100, hasRealUserData: true, lcpMs: 3100, cls: 0.12, inpMs: 240, overall: "AVERAGE" });
+    expect(parsePsi({ lighthouseResult: { categories: {} }, loadingExperience: {} as never }).hasRealUserData).toBe(false);
+    const live = { up: true, status: 200, finalUrl: "x", https: true, responseMs: 900 };
+    expect(trafficLevel({ live, popularity: { trancoRank: 920275 }, google: { hasRealUserData: null } }).label).toBe("Moderate: #920,275 worldwide");
+    expect(trafficLevel({ live, popularity: { trancoRank: 5000 }, google: { hasRealUserData: null } }).level).toBe("high");
+    expect(trafficLevel({ live, popularity: { trancoRank: null }, google: { hasRealUserData: true } }).level).toBe("moderate");
+    expect(trafficLevel({ live, popularity: { trancoRank: null }, google: { hasRealUserData: false } }).level).toBe("low");
+    expect(trafficLevel({ live: { ...live, up: false }, popularity: { trancoRank: null }, google: { hasRealUserData: null } }).level).toBe("unknown");
+  });
+
+  it("collects every source, skips Google without a key, and survives an archive outage", async () => {
+    const { websiteInsights } = await import("../src");
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const url = String(input); calls.push(url);
+      const j = (b: unknown, status = 200) => new Response(JSON.stringify(b), { status, headers: { "content-type": "application/json" } });
+      if (url.startsWith("https://rdap.org")) return j({ events: [{ eventAction: "registration", eventDate: "2010-01-01T00:00:00Z" }] });
+      if (url.includes("collapse=timestamp:6")) return new Response("Temporarily Offline", { status: 503 });
+      if (url.includes("web.archive.org/cdx") && url.includes("limit=1")) return j([["timestamp"], ["20110304000000"]]);
+      if (url.startsWith("https://tranco-list.eu")) return j({ ranks: [] });
+      if (url.includes("pagespeedonline")) return j({ lighthouseResult: { categories: { performance: { score: 0.5 } } }, loadingExperience: { id: "x" } });
+      return new Response("<html></html>", { status: 200, headers: { "content-type": "text/html" } });
+    }));
+    const noKey = await websiteInsights("https://www.bakery.example/", { now: new Date("2026-10-12T00:00:00Z") });
+    expect(calls.some((u) => u.includes("pagespeedonline"))).toBe(false);
+    expect(noKey.google.error).toMatch(/Google API key/);
+    expect(noKey.domain).toMatchObject({ name: "bakery.example", registered: "2010-01-01", ageYears: 16 });
+    expect(noKey.archive).toMatchObject({ first: "2011-03-04", monthsCaptured: 0 });
+    expect(noKey.archive.error).toMatch(/only the first capture/);
+    expect(noKey.traffic.level).toBe("low");
+    const withKey = await websiteInsights("https://www.bakery.example/", { googleKey: "K" });
+    expect(calls.find((u) => u.includes("pagespeedonline"))).toMatch(/strategy=MOBILE/);
+    expect(calls.find((u) => u.includes("pagespeedonline"))).not.toMatch(/key=/);
+    expect((await websiteInsights("not a url")).live.error).toBe("Not a valid website address");
+    expect(withKey.google).toMatchObject({ performance: 50, hasRealUserData: false });
+    expect(withKey.traffic.level).toBe("low");
+  });
+});
+
 describe("lead criteria", () => {
   afterEach(() => vi.unstubAllGlobals());
 

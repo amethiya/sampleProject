@@ -1,10 +1,9 @@
 /**
- * Prepares a job folder for Claude (shared by the background runner and `npm run job` for cloud sessions):
+ * Prepares a job folder for Claude (`npm run job -- fetch` in the owner's Claude Code session):
  * the skill, BRIEF.md, research/ (real-browser inspection of the original site), content.json with the creative
  * direction, uiux.md and the starter pages.
  */
-import { appendFile, cp, mkdir, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { cp, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { SKILL_DIR, briefContent, dnaFromKey, jobBrief, lookById, makeDna, writeStarter, type BriefContent, type Lead, type SiteSnapshot } from "@rr/core";
 import { writeInspiration, type Inspiration } from "./inspiration";
@@ -49,15 +48,6 @@ export async function prepareJob(repoRoot: string, dir: string, next: Required<P
     await Promise.all(previous.filter((p) => current.has(p.slug)).map((p) => writeFile(join(dir, "site", p.slug === "home" ? "index.html" : `${p.slug}.html`), p.html)));
   }
   await writeFile(join(dir, "BRIEF.md"), jobBrief(job, prevFiles));
-
-  // An approved design concept for this direction (npm run concepts) becomes the home page to build from.
-  const concept = join(repoRoot, "out", "concepts", job.leadId, job.direction ?? "", "site", "index.html");
-  if (job.direction && existsSync(concept) && !dir.startsWith(join(repoRoot, "out", "concepts"))) {
-    await mkdir(join(dir, "concept"), { recursive: true });
-    await cp(concept, join(dir, "concept", "index.html"));
-    await appendFile(join(dir, "BRIEF.md"), `\n## Approved concept\n\nThe owner compared several design concepts and chose this one: ./concept/index.html is the approved home page. Use it as the home page (keep its design; fix only what is broken or missing) and build every other page in exactly the same design system: its fonts, colours, components, spacing, navigation, footer and motion. This takes precedence over any palette or typography in content.json that differs from it.\n`);
-    opts.log("using the owner's approved concept for the home page");
-  }
 
   // Stage A/B: look at the real site before designing anything.
   let found: Research | null = opts.reuseResearch ?? null;
