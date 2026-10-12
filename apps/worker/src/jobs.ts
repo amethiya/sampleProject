@@ -290,7 +290,8 @@ export async function todayList(env: Db, limit = 20) {
   const n = Math.max(1, Math.min(100, limit));
   const queued = (await env.DB.prepare(
     `SELECT j.id, j.lead_id, j.notes, j.mode, s.name, s.category, s.city, s.country, s.score, s.audited_at, s.last_activity
-     FROM redesign_jobs j JOIN sites s ON s.id = j.lead_id WHERE j.status = 'queued' ORDER BY j.created_at LIMIT ?`,
+     FROM redesign_jobs j JOIN sites s ON s.id = j.lead_id WHERE j.status = 'queued' AND (j.run_after IS NULL OR j.run_after <= datetime('now'))
+     ORDER BY j.created_at LIMIT ?`,
   ).bind(n).all<{ id: number; lead_id: string; notes: string | null; mode: string; name: string; category: string; city: string; country: string; score: number; audited_at: string; last_activity: string | null }>()).results;
   const leads = queued.length >= n ? [] : (await env.DB.prepare(
     `SELECT id, name, category, city, country, score, audited_at, last_activity, email FROM sites

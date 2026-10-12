@@ -3,7 +3,7 @@ import {
   type Candidate, type Lead,
 } from "@rr/core";
 import { currentUser, login, logout, type AuthEnv } from "./auth";
-import { ensureSite, imageProxy, preview, redesignApi } from "./redesign";
+import { imageProxy, preview, redesignApi } from "./redesign";
 import { templates } from "./templates";
 
 export interface Env extends AuthEnv {
@@ -18,8 +18,6 @@ export interface Env extends AuthEnv {
   NIGHT_TARGET?: string;
   /** Activity window in days for a lead to count as active (default 30). */
   ACTIVE_DAYS?: string;
-  /** Qualified leads per day after which the cron stops auditing (free-tier budget). "0" means no cap. Default 3 × DAILY_TARGET. */
-  MAX_QUALIFIED_PER_DAY?: string;
   PUBLIC_URL?: string;
   SENDER_NAME?: string;
   SHEETS_WEBHOOK_URL?: string;
@@ -51,9 +49,13 @@ export default {
     }
   },
 
-  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
     // The lead search runs only in the night window (default 01:00–07:00 IST); the cron fires a little wider.
-    if (!inWindow(new Date(), env.NIGHT_START || NIGHT_START, env.NIGHT_END || NIGHT_END)) return;
+    // To run one cycle by hand at any time, POST /api/run.
+    if (!inWindow(new Date(event.scheduledTime), env.NIGHT_START || NIGHT_START, env.NIGHT_END || NIGHT_END)) {
+      console.log("outside the night window; nothing to do");
+      return;
+    }
     ctx.waitUntil(runCycle(env).then((r) => console.log("cycle", JSON.stringify(r))));
   },
 } satisfies ExportedHandler<Env>;
@@ -178,11 +180,16 @@ async function api(req: Request, url: URL, env: Env, ctx: ExecutionContext): Pro
 export async function runCycle(env: Env) {
   const batchSize = Number(env.BATCH_SIZE) || 4;
   const minScore = Number(env.MIN_SCORE) || 35;
-  const target = Number(env.DAILY_TARGET) || 10;
   const report: Record<string, unknown> = {};
 
+  // A run that died mid-audit leaves its sites claimed; give them back after 15 minutes.
+  await env.DB.prepare("UPDATE sites SET state = 'pending' WHERE state = 'auditing' AND audited_at < datetime('now', '-15 minutes')").run();
+
+  // Refill the queue from Overpass when it runs low, at most every 3 minutes (the public server is easily overloaded).
   const pending = (await env.DB.prepare("SELECT COUNT(*) AS n FROM sites WHERE state = 'pending'").first<{ n: number }>())!.n;
-  if (pending < batchSize) {
+  const lastDiscovery = Number((await env.DB.prepare("SELECT value FROM meta WHERE key = 'last_discovery'").first<{ value: string }>())?.value ?? 0);
+  if (pending < batchSize * 3 && Date.now() - lastDiscovery > 3 * 60_000) {
+    await env.DB.prepare("INSERT INTO meta (key, value) VALUES ('last_discovery', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(String(Date.now())).run();
     const cursor = Number((await env.DB.prepare("SELECT value FROM meta WHERE key = 'cursor'").first<{ value: string }>())?.value ?? 0);
     const { category, city } = sliceForCursor(cursor);
     report.discovered = { category: category.id, city: city.id };
@@ -198,8 +205,7 @@ export async function runCycle(env: Env) {
   }
 
   // Stop for the night once the night's target is reached (configurable; 0 = no cap). The night starts at NIGHT_START.
-  const cap = env.NIGHT_TARGET !== undefined && env.NIGHT_TARGET !== "" ? Number(env.NIGHT_TARGET)
-    : env.MAX_QUALIFIED_PER_DAY !== undefined && env.MAX_QUALIFIED_PER_DAY !== "" ? Number(env.MAX_QUALIFIED_PER_DAY) : target * 20;
+  const cap = env.NIGHT_TARGET !== undefined && env.NIGHT_TARGET !== "" ? Number(env.NIGHT_TARGET) : 200;
   const since = windowStart(new Date(), env.NIGHT_START || NIGHT_START, env.NIGHT_END || NIGHT_END).toISOString().slice(0, 19).replace("T", " ");
   const tonight = (await env.DB.prepare(
     "SELECT COUNT(*) AS n FROM sites WHERE qualified = 1 AND audited_at >= ?",
@@ -207,8 +213,11 @@ export async function runCycle(env: Env) {
   report.qualifiedTonight = tonight;
 
   if (!cap || tonight < cap) {
+    // Claim the batch atomically, so overlapping runs never audit the same site.
     const { results } = await env.DB.prepare(
-      "SELECT id, candidate FROM sites WHERE state = 'pending' ORDER BY RANDOM() LIMIT ?",
+      `UPDATE sites SET state = 'auditing', audited_at = datetime('now')
+       WHERE id IN (SELECT id FROM sites WHERE state = 'pending' ORDER BY RANDOM() LIMIT ?) AND state = 'pending'
+       RETURNING id, candidate`,
     ).bind(batchSize).all<{ id: string; candidate: string }>();
     const activeDays = Number(env.ACTIVE_DAYS) || 30;
     const leads = await Promise.all(results.map((r) => auditCandidate(JSON.parse(r.candidate) as Candidate, minScore, { activeDays })));
@@ -322,9 +331,9 @@ async function stats(env: Env) {
       COALESCE(SUM(state = 'pending'), 0) AS pending,
       COALESCE(SUM(state = 'audited'), 0) AS audited,
       COALESCE(SUM(qualified), 0) AS qualified,
-      COALESCE(SUM(qualified = 1 AND date(audited_at) = date('now')), 0) AS today,
+      COALESCE(SUM(qualified = 1 AND audited_at >= ?), 0) AS today,
       COALESCE(SUM(qualified = 1 AND sheet_synced = 0), 0) AS unsynced
-    FROM sites`).first();
+    FROM sites`).bind(windowStart(new Date(), env.NIGHT_START || NIGHT_START, env.NIGHT_END || NIGHT_END).toISOString().slice(0, 19).replace("T", " ")).first();
   const { results: byCategory } = await env.DB.prepare(
     "SELECT category, COUNT(*) AS n FROM sites WHERE qualified = 1 GROUP BY category",
   ).all();

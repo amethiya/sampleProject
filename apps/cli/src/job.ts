@@ -82,9 +82,10 @@ async function list() {
 
 /** The lead id for `--pick N`, from the last saved list (or a fresh one). */
 async function pickedLead(n: number): Promise<string> {
-  let saved: { items: TodayItem[] } | null = null;
+  let saved: { at?: string; items: TodayItem[] } | null = null;
   try { saved = JSON.parse(await readFile(listFile(), "utf8")); } catch { /* no list yet */ }
-  if (!saved?.items?.length) {
+  const stale = !saved?.at || Date.now() - new Date(saved.at).getTime() > 12 * 3_600_000;
+  if (!saved?.items?.length || stale) {
     await list();
     saved = JSON.parse(await readFile(listFile(), "utf8"));
   }
@@ -95,6 +96,7 @@ async function pickedLead(n: number): Promise<string> {
 }
 
 async function fetchJob() {
+  if (args.pick && (args.url || args.lead)) throw new Error("Use --pick on its own (not with --url or --lead).");
   let leadId = args.lead;
   if (args.pick) leadId = await pickedLead(Number(args.pick));
   if (args.url) {

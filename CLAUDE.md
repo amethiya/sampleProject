@@ -50,7 +50,8 @@ TypeScript npm-workspaces monorepo. See README.md for the architecture.
 - Job lifecycle (`apps/worker/src/jobs.ts`, migration `0006_pipeline.sql`): leases, retries with backoff, failure
   kinds, one active job per lead (unique index), `job_events`. Jobs claimed by `npm run job` (runner `claude-code`)
   keep their claim 6 hours (`INTERACTIVE_STALE_MINUTES`); `job qa` sends a heartbeat. RUNNER_TOKEN can read today's
-  list, claim and report, nothing else.
+  list, claim and report, nothing else. An abandoned pick holds its lead up to 6 hours; release it sooner with
+  `npm run job -- fail jobs/<id> --reason "..."`. To test a lead-search cycle outside the night window, `POST /api/run`.
 - UI UX Pro Max (`.claude/skills/ui-ux-pro-max/`, MIT, vendored from nextlevelbuilder/ui-ux-pro-max-skill): `job fetch`
   runs its local search (`apps/cli/src/uiux.ts`, needs python3) and write `uiux.md` into each job;
   the brief and the website-redesign skill take precedence over it.
