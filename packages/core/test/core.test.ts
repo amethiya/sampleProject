@@ -199,6 +199,26 @@ describe("design system", () => {
     expect(dnaFromKey("ember|jakarta|split|soft|bold|pizzeria|2")).toBeNull();
   });
 
+  it("lets the client compare the seven themes on the home page and copy their favourite, with no form or address", async () => {
+    const { renderSitePage, LOOKS, HEAD_JS, SYSTEM_BASE_JS } = await import("../src");
+    const lead = { name: "Fav Cafe", category: "cafe", city: "Austin", country: "US", website: "https://fav.example", contacts: { emails: ["hi@fav.example"], phones: [] }, content: { title: "", description: "", headings: [], paragraphs: [], images: [], navLinks: [] } } as never;
+    const site = { crawledAt: "", pages: [
+      { slug: "home", url: "https://fav.example", label: "Home", title: "", description: "", sections: [] },
+      { slug: "menu", url: "https://fav.example/menu", label: "Menu", title: "", description: "", sections: [{ heading: "Coffee", paragraphs: [], items: ["Latte 4.00"], images: [] }] },
+    ] };
+    const home = renderSitePage(lead, site, "home");
+    expect(home).toContain('<section class="themes" id="themes"');
+    expect(home.match(/class="th-card"/g)).toHaveLength(LOOKS.length);
+    expect(home).toContain("Copy my choice");
+    expect(home.indexOf('id="themes"')).toBeLessThan(home.indexOf('id="visit"'));
+    expect(home).not.toMatch(/<form|mailto:[^"]*subject=/);
+    expect(renderSitePage(lead, site, "menu")).not.toContain('id="themes"');
+    // A shared link (?theme=rose) opens the page in that theme; the choice text carries it.
+    expect(HEAD_JS).toContain("theme=");
+    expect(SYSTEM_BASE_JS).toContain("?theme=");
+    expect(SYSTEM_BASE_JS).toContain("rr-fav:");
+  });
+
   it("renders every section of the page in the house style, escaped, numbered in page order, with no 3D", async () => {
     const { renderSitePage, makeDna, lookById } = await import("../src");
     const lead = { id: "x", name: "Tony <b>Burger</b>", website: "https://t.com", category: "restaurant", city: "Austin", country: "US", contacts: { emails: ["a@t.com"], phones: ["+1 512 555 0100"] }, audit: { score: 50, issues: [] }, content: { title: "T", description: "", headings: [], paragraphs: [], images: [] } } as never;
@@ -216,7 +236,8 @@ describe("design system", () => {
     expect(html).toContain('class="xp"');
     expect(html).toContain('class="statement"');
     expect(html).toContain('data-roll>1998<');
-    expect([...html.matchAll(/class="no">No\. (\d+)/g)].map((m) => m[1])).toEqual(["01", "02", "03", "04", "05"].slice(0, [...html.matchAll(/class="no">/g)].length));
+    const nos = [...html.matchAll(/class="no">No\. (\d+)/g)].map((m) => m[1]);
+    expect(nos).toEqual(nos.map((_, i) => String(i + 1).padStart(2, "0")));
     expect(html).toContain("Tony &lt;b&gt;Burger&lt;/b&gt;");
     expect(html).not.toContain("<b>Burger</b>");
     expect(html).not.toMatch(/three(\.min)?\.js|lenis|<canvas id|class="echo"|plate-stage|cloud-reveal/);

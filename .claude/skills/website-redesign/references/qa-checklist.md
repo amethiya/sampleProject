@@ -19,6 +19,8 @@ them yourself first.
 - [ ] `<html data-theme>` is designDirection.theme; the tokens of all seven house themes are in the CSS; the header's
       theme picker lists all seven, switches without a reload (circular reveal), remembers the choice and works with
       the keyboard. No colour outside the theme tokens (photo scrims excepted).
+- [ ] The home page has the theme chooser section before the visit band: seven cards, Preview and Love it work, Copy
+      my choice copies a line with a ?theme= link, and opening that link shows the page in that theme.
 - [ ] It does not read as a template: the photos, words, figures and crops are this business's.
 - [ ] The primary action is on the first screen, repeated in the visit band and footer, and in the header.
 

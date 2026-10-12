@@ -144,6 +144,27 @@ export function themePicker(): { button: string; panel: string } {
   return { button, panel };
 }
 
+/**
+ * The "choose your colours" section: every house theme as a live card the client can preview and mark as their
+ * favourite, then copy their choice (with a link that opens the page in that theme) to send to us by email.
+ * `no` is the section number shown in its head.
+ */
+export function themeChooser(no: string): string {
+  const heart = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg>';
+  const cards = LOOKS.map((l) => `<li class="th-card" data-theme="${l.id}" data-id="${l.id}" data-name="${esc(l.name)}">
+<div class="th-mini" aria-hidden="true"><span class="th-dots"><i style="background:var(--bg)"></i><i style="background:var(--accent)"></i><i style="background:var(--accent-2)"></i><i style="background:var(--inv-bg)"></i></span><span class="aa">A<em>a</em></span><span class="ln"></span><span class="ln s"></span><span class="bt">Book now</span><span class="now">Showing</span></div>
+<div class="th-meta"><b>${esc(l.name)}</b><small>${esc(l.note)}</small></div>
+<div class="th-act"><button class="th-try" type="button" aria-pressed="false">Preview<span class="sr-only"> ${esc(l.name)}</span></button><button class="th-fav" type="button" aria-pressed="false" aria-label="Make ${esc(l.name)} my favourite">${heart}<span> Love it</span></button></div>
+</li>`).join("");
+  return `<section class="themes" id="themes" aria-labelledby="themes-title"><div class="wrap">
+<div class="head"><span class="no">No. ${no}</span><span class="eyebrow">Colour themes</span></div>
+<h2 id="themes-title"><span class="line"><span>Choose the <em>colours</em> you love.</span></span></h2>
+<p class="th-lead muted rise">See this design in each of our seven colour themes. Preview any of them on the whole page, mark the one you like most, then copy your choice and send it to us by email.</p>
+<ul class="th-grid">${cards}</ul>
+<div class="th-pick rise" aria-live="polite"><p>Your favourite: <b class="th-name">none yet</b></p><label class="sr-only" for="th-text">Your theme choice</label><input class="th-text" id="th-text" readonly value="" placeholder="Mark a favourite above"><button class="btn th-copy" type="button" disabled>Copy my choice</button><span class="th-note"></span></div>
+</div></section>`;
+}
+
 export const SYSTEM_CSS = `
 *,*::before,*::after{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;scroll-padding-top:88px}
@@ -408,6 +429,40 @@ footer.site .btn{background:var(--inv-text);color:var(--inv-bg);border-color:var
 .foot-cols a:hover{text-decoration:underline}
 .foot-bottom{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px;padding-top:28px;font-size:.75rem;color:var(--inv-muted)}
 .foot-bottom a{color:var(--inv-text)}
+/* theme chooser section */
+.themes{background:var(--bg-muted);border-block:1px solid var(--line)}
+.th-lead{max-width:60ch;margin-top:8px}
+.th-grid{list-style:none;margin:40px 0 0;padding:0;display:grid;gap:16px;grid-template-columns:repeat(auto-fill,minmax(15.5rem,1fr))}
+.th-card{background:var(--bg);color:var(--text);border:1px solid var(--line-strong);display:flex;flex-direction:column;transition:transform .45s var(--ease),box-shadow .45s var(--ease)}
+.th-card:hover{transform:translateY(-4px);box-shadow:0 26px 50px -30px rgba(0,0,0,.45)}
+.th-card.fav{outline:2px solid var(--accent);outline-offset:3px}
+.th-mini{position:relative;padding:22px 20px 20px;border-bottom:1px solid var(--line);overflow:hidden}
+.th-mini .aa{display:block;font:400 3.2rem/1 var(--display);letter-spacing:-.02em}
+.th-mini .aa em{color:var(--accent)}
+.th-mini .ln{display:block;height:6px;width:82%;margin-top:14px;background:var(--text-muted);opacity:.28}
+.th-mini .ln.s{width:56%;margin-top:8px}
+.th-mini .bt{display:inline-block;margin-top:16px;padding:8px 12px;background:var(--accent);color:var(--on-accent);font:600 .6rem/1 var(--body);letter-spacing:.14em;text-transform:uppercase}
+.th-dots{position:absolute;top:20px;right:18px;display:flex;gap:6px}
+.th-dots i{width:14px;height:14px;border-radius:50%;border:1px solid var(--line-strong)}
+.th-mini .now{display:none;position:absolute;right:18px;bottom:20px;font:600 .6rem/1 var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--text-muted)}
+.th-card.showing .now{display:block}
+.th-meta{padding:14px 20px 0}
+.th-meta b{display:block;font-size:.95rem;font-weight:600}
+.th-meta small{display:block;font-size:.78rem;line-height:1.4;color:var(--text-muted)}
+.th-act{display:flex;gap:8px;padding:14px 20px 20px;margin-top:auto}
+.th-act button{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 8px;border:1px solid var(--line-strong);background:none;color:var(--text);font:600 .66rem/1.2 var(--body);letter-spacing:.1em;text-transform:uppercase;cursor:pointer;transition:border-color .3s,background-color .3s,color .3s}
+.th-act button:hover{border-color:var(--text)}
+.th-act svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;flex:none}
+.th-try[aria-pressed="true"]{border-color:var(--text)}
+.th-fav[aria-pressed="true"]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.th-fav[aria-pressed="true"] svg{fill:currentColor}
+.th-pick{display:grid;gap:12px;align-items:center;margin-top:36px;padding-top:24px;border-top:1px solid var(--line)}
+.th-pick p{margin:0}
+@media (min-width:900px){.th-pick{grid-template-columns:auto 1fr auto}.th-note{grid-column:1/-1}}
+.th-text{width:100%;min-height:48px;padding:0 14px;border:1px solid var(--line-strong);background:var(--bg);color:var(--text);font:400 .85rem var(--body)}
+.th-copy[disabled]{opacity:.45;cursor:not-allowed}
+.th-note{font-size:.82rem;color:var(--text-muted);min-height:1.2em}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* opening curtain (once per session) */
 .intro{position:fixed;inset:0;z-index:200;background:var(--inv-bg);color:var(--inv-text);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;pointer-events:none;text-align:center;padding:0 20px}
 html.anim .intro.play{display:flex}
@@ -433,27 +488,31 @@ export const SYSTEM_BASE_JS = `(function(){
     if (i.complete) c(); else i.addEventListener('load', c);
     i.addEventListener('error', bad);
   });
-  // Theme picker: seven house palettes, remembered per site, revealed in a circle from the chosen swatch.
+  // Themes: seven house palettes, remembered per site, revealed in a circle from the chosen swatch.
+  var site = d.getAttribute('data-site') || location.pathname.split('/').slice(0, 3).join('/');
+  var store = function(k, v){ try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) {} return null; };
   var btn = document.querySelector('.theme-btn'), panel = document.getElementById('theme-panel');
+  var opts = panel ? $$('.tp-opt', panel) : [];
+  var cards = $$('.th-card');
+  var sync = function(){
+    var cur = d.getAttribute('data-theme');
+    opts.forEach(function(o){ var on = o.getAttribute('data-id') === cur; o.setAttribute('aria-checked', String(on)); o.tabIndex = on ? 0 : -1; });
+    cards.forEach(function(c){ var on = c.getAttribute('data-id') === cur; c.classList.toggle('showing', on); var t = c.querySelector('.th-try'); if (t) t.setAttribute('aria-pressed', String(on)); });
+    var s = btn && btn.querySelector('.sw'); if (s) s.setAttribute('data-theme', cur);
+  };
+  var apply = function(id, from){
+    if (d.getAttribute('data-theme') === id) return;
+    store('rr-theme:' + site, id);
+    var rc = from ? from.getBoundingClientRect() : null;
+    var x = rc ? rc.left + rc.width / 2 : innerWidth / 2, y = rc ? rc.top + rc.height / 2 : innerHeight / 2;
+    var set = function(){ d.setAttribute('data-theme', id); sync(); };
+    if (document.startViewTransition && !reduce) {
+      var rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
+      var tr = document.startViewTransition(set);
+      tr.ready.then(function(){ d.animate({ clipPath: ['circle(0px at ' + x + 'px ' + y + 'px)', 'circle(' + rad + 'px at ' + x + 'px ' + y + 'px)'] }, { duration: 850, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', pseudoElement: '::view-transition-new(root)' }); }).catch(function(){});
+    } else { d.classList.add('theme-fade'); set(); setTimeout(function(){ d.classList.remove('theme-fade'); }, 500); }
+  };
   if (btn && panel) {
-    var key = 'rr-theme:' + (d.getAttribute('data-site') || location.pathname.split('/').slice(0, 3).join('/'));
-    var opts = $$('.tp-opt', panel);
-    var sync = function(){
-      var cur = d.getAttribute('data-theme');
-      opts.forEach(function(o){ var on = o.getAttribute('data-id') === cur; o.setAttribute('aria-checked', String(on)); o.tabIndex = on ? 0 : -1; });
-      var s = btn.querySelector('.sw'); if (s) s.setAttribute('data-theme', cur);
-    };
-    var apply = function(id, o){
-      try { localStorage.setItem(key, id); } catch (e) {}
-      var r = o && o.querySelector('.tp-sw'), rc = r ? r.getBoundingClientRect() : null;
-      var x = rc ? rc.left + rc.width / 2 : innerWidth / 2, y = rc ? rc.top + rc.height / 2 : innerHeight / 2;
-      var set = function(){ d.setAttribute('data-theme', id); sync(); };
-      if (document.startViewTransition && !reduce) {
-        var rad = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-        var tr = document.startViewTransition(set);
-        tr.ready.then(function(){ d.animate({ clipPath: ['circle(0px at ' + x + 'px ' + y + 'px)', 'circle(' + rad + 'px at ' + x + 'px ' + y + 'px)'] }, { duration: 850, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', pseudoElement: '::view-transition-new(root)' }); }).catch(function(){});
-      } else { d.classList.add('theme-fade'); set(); setTimeout(function(){ d.classList.remove('theme-fade'); }, 500); }
-    };
     var isOpen = function(){ return panel.classList.contains('open'); };
     var open = function(){ panel.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); var c = opts.filter(function(o){ return o.getAttribute('aria-checked') === 'true'; })[0] || opts[0]; setTimeout(function(){ c.focus(); }, 30); };
     var close = function(back){ panel.classList.remove('open'); btn.setAttribute('aria-expanded', 'false'); if (back) btn.focus(); };
@@ -462,7 +521,7 @@ export const SYSTEM_BASE_JS = `(function(){
     document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && isOpen()) close(true); });
     document.addEventListener('pointerdown', function(e){ if (isOpen() && !panel.contains(e.target) && !btn.contains(e.target)) close(); });
     opts.forEach(function(o, i){
-      o.addEventListener('click', function(){ apply(o.getAttribute('data-id'), o); });
+      o.addEventListener('click', function(){ apply(o.getAttribute('data-id'), o.querySelector('.tp-sw')); });
       o.addEventListener('keydown', function(e){
         var last = opts.length - 1, n = null;
         if (e.key === 'ArrowDown' || e.key === 'ArrowRight') n = i === last ? 0 : i + 1;
@@ -470,11 +529,41 @@ export const SYSTEM_BASE_JS = `(function(){
         if (e.key === 'Home') n = 0;
         if (e.key === 'End') n = last;
         if (n === null) return;
-        e.preventDefault(); apply(opts[n].getAttribute('data-id'), opts[n]); opts[n].focus();
+        e.preventDefault(); apply(opts[n].getAttribute('data-id'), opts[n].querySelector('.tp-sw')); opts[n].focus();
       });
     });
-    sync();
   }
+  // Theme chooser section: preview each theme, mark a favourite, copy the choice to send by email.
+  var chooser = document.querySelector('.themes');
+  if (chooser && cards.length) {
+    var nameEl = chooser.querySelector('.th-name'), text = chooser.querySelector('.th-text'), copy = chooser.querySelector('.th-copy'), note = chooser.querySelector('.th-note');
+    var siteName = (document.querySelector('.logo-text') || {}).textContent || document.title;
+    var page = location.href.split('#')[0].split('?')[0];
+    var setFav = function(id, save){
+      var card = cards.filter(function(c){ return c.getAttribute('data-id') === id; })[0];
+      cards.forEach(function(c){ var on = c === card; c.classList.toggle('fav', on); var f = c.querySelector('.th-fav'); if (f) { f.setAttribute('aria-pressed', String(on)); f.lastChild.textContent = on ? ' Favourite' : ' Love it'; } });
+      if (!card) return;
+      var nm = card.getAttribute('data-name');
+      if (nameEl) nameEl.textContent = nm;
+      if (text) text.value = siteName.trim() + ': my favourite theme is ' + nm + ' (' + id + '). ' + page + '?theme=' + id;
+      if (copy) copy.disabled = false;
+      if (note) note.textContent = '';
+      if (save) store('rr-fav:' + site, id);
+    };
+    cards.forEach(function(c){
+      var id = c.getAttribute('data-id');
+      var t = c.querySelector('.th-try'); if (t) t.addEventListener('click', function(){ apply(id, c.querySelector('.th-mini')); });
+      var f = c.querySelector('.th-fav'); if (f) f.addEventListener('click', function(){ setFav(id, true); apply(id, c.querySelector('.th-mini')); });
+    });
+    if (copy && text) copy.addEventListener('click', function(){
+      var done = function(){ if (note) note.textContent = 'Copied. Paste it into an email to us.'; };
+      var fallback = function(){ text.focus(); text.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} if (ok) done(); else if (note) note.textContent = 'Select the text and copy it.'; };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text.value).then(done, fallback); else fallback();
+    });
+    var saved = store('rr-fav:' + site);
+    if (saved) setFav(saved, false);
+  }
+  sync();
   // Page index: a photograph follows the pointer and changes with the row under it (mouse only).
   if (!reduce && matchMedia('(hover: hover) and (pointer: fine)').matches) $$('.index[data-previews]').forEach(function(list){
     var host = list.parentNode; if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
@@ -609,5 +698,5 @@ export const SYSTEM_LIBRARIES = [
   "https://cdn.jsdelivr.net/npm/motion@13.4.4/dist/motion.js",
 ];
 
-/** In <head>, before anything paints: restore this site's chosen theme, and turn motion on unless the visitor asked for less. */
-export const HEAD_JS = `(function(){var d=document.documentElement;try{var t=localStorage.getItem('rr-theme:'+(d.getAttribute('data-site')||location.pathname.split('/').slice(0,3).join('/')));if(t&&/^(${LOOKS.map((l) => l.id).join("|")})$/.test(t))d.setAttribute('data-theme',t)}catch(e){}if(!matchMedia('(prefers-reduced-motion: reduce)').matches){d.classList.add('anim');setTimeout(function(){if(!window.Motion)d.classList.remove('anim')},3500)}})();`;
+/** In <head>, before anything paints: the theme from the link (?theme=), else this site's remembered one; motion on unless the visitor asked for less. */
+export const HEAD_JS = `(function(){var d=document.documentElement,ok=/^(${LOOKS.map((l) => l.id).join("|")})$/;var q=(location.search.match(/[?&]theme=([a-z]+)/)||[])[1];try{var t=q&&ok.test(q)?q:localStorage.getItem('rr-theme:'+(d.getAttribute('data-site')||location.pathname.split('/').slice(0,3).join('/')));if(t&&ok.test(t))d.setAttribute('data-theme',t)}catch(e){if(q&&ok.test(q))d.setAttribute('data-theme',q)}if(!matchMedia('(prefers-reduced-motion: reduce)').matches){d.classList.add('anim');setTimeout(function(){if(!window.Motion)d.classList.remove('anim')},3500)}})();`;

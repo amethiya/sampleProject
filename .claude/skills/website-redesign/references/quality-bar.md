@@ -25,7 +25,9 @@ boxes reads as "you just changed the colours", and a flat, correct layout reads 
 5. The remaining content, each with a numbered head, a masked heading and its own photos
 6. The business's photos as a bento grid
 7. An index of the other pages whose photo follows the pointer
-8. The visit band in inverse colours, then a footer with a large wordmark
+8. "Choose the colours you love": the seven themes as live cards the client can preview and love, then copy their
+   choice to email us
+9. The visit band in inverse colours, then a footer with a large wordmark
 
 ## Craft details
 - Type: Libre Caslon Display for headlines (up to ~9.5rem in the hero), Libre Caslon Text italics for accent words,
