@@ -17,6 +17,12 @@ interface Db {
 
 /** A running job whose runner has not reported for this long is handed back (or failed after its last attempt). */
 export const STALE_MINUTES = 20;
+/**
+ * Jobs the owner picks in an interactive Claude Code session (runner "claude-code"; "cloud-session" is the old name)
+ * send no heartbeats while Claude works, and a redesign takes about an hour: they keep their claim this long.
+ */
+export const INTERACTIVE_STALE_MINUTES = 360;
+export const INTERACTIVE_RUNNERS = ["claude-code", "cloud-session"];
 const ACTIVE = "status IN ('queued', 'running')";
 
 export interface JobRow {
@@ -110,7 +116,8 @@ export async function queueBatch(env: Db, body: { count?: number; leadIds?: stri
 /** Hand back running jobs whose runner went quiet; after the last attempt they fail for a person to look at. */
 async function reclaimStale(env: Db) {
   const { results } = await env.DB.prepare(
-    `SELECT id, attempts, max_attempts FROM redesign_jobs WHERE status = 'running' AND COALESCE(heartbeat_at, started_at) < datetime('now', '-${STALE_MINUTES} minutes')`,
+    `SELECT id, attempts, max_attempts FROM redesign_jobs WHERE status = 'running' AND COALESCE(heartbeat_at, started_at) < datetime('now',
+       CASE WHEN runner IN (${INTERACTIVE_RUNNERS.map((r) => `'${r}'`).join(", ")}) THEN '-${INTERACTIVE_STALE_MINUTES} minutes' ELSE '-${STALE_MINUTES} minutes' END)`,
   ).all<{ id: number; attempts: number; max_attempts: number }>();
   for (const j of results) {
     if (j.attempts >= j.max_attempts) {
@@ -272,6 +279,30 @@ export function publicJob(j: JobRow | null) {
     qa, qaScore: j.qa_score, costUsd: j.cost_usd, durationS: j.duration_s, runner: j.runner,
     createdAt: j.created_at, startedAt: j.started_at, heartbeatAt: j.heartbeat_at, finishedAt: j.finished_at, reviewedAt: j.reviewed_at,
   };
+}
+
+/**
+ * "Today's list" for an interactive session: jobs already queued (oldest first, e.g. from the portal's Redesign with
+ * Claude button), then the best qualified leads that have no Claude redesign or open job (highest outdated score,
+ * newest first). Read-only; picking one creates and claims its job.
+ */
+export async function todayList(env: Db, limit = 20) {
+  const n = Math.max(1, Math.min(100, limit));
+  const queued = (await env.DB.prepare(
+    `SELECT j.id, j.lead_id, j.notes, j.mode, s.name, s.category, s.city, s.country, s.score, s.audited_at, s.last_activity
+     FROM redesign_jobs j JOIN sites s ON s.id = j.lead_id WHERE j.status = 'queued' ORDER BY j.created_at LIMIT ?`,
+  ).bind(n).all<{ id: number; lead_id: string; notes: string | null; mode: string; name: string; category: string; city: string; country: string; score: number; audited_at: string; last_activity: string | null }>()).results;
+  const leads = queued.length >= n ? [] : (await env.DB.prepare(
+    `SELECT id, name, category, city, country, score, audited_at, last_activity, email FROM sites
+     WHERE state = 'audited' AND qualified = 1 AND status IN ('new', 'contacted')
+       AND NOT EXISTS (SELECT 1 FROM ai_pages a WHERE a.lead_id = sites.id)
+       AND NOT EXISTS (SELECT 1 FROM redesign_jobs j WHERE j.lead_id = sites.id AND j.status IN ('queued', 'running', 'needs_review', 'done'))
+     ORDER BY date(audited_at) DESC, score DESC LIMIT ?`,
+  ).bind(n - queued.length).all<{ id: string; name: string; category: string; city: string; country: string; score: number; audited_at: string; last_activity: string | null; email: string | null }>()).results;
+  return [
+    ...queued.map((q) => ({ kind: "job" as const, jobId: q.id, leadId: q.lead_id, name: q.name, category: q.category, city: q.city, country: q.country, score: q.score, foundAt: q.audited_at, lastActivity: q.last_activity, notes: q.notes, mode: q.mode })),
+    ...leads.map((l) => ({ kind: "lead" as const, jobId: null, leadId: l.id, name: l.name, category: l.category, city: l.city, country: l.country, score: l.score, foundAt: l.audited_at, lastActivity: l.last_activity, notes: null, mode: "fresh" })),
+  ];
 }
 
 export async function listJobs(env: Db, url: URL) {

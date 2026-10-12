@@ -1,5 +1,8 @@
 /**
- * Redesign jobs for Claude cloud sessions (or any Claude Code session): the session itself does the design work.
+ * Redesign jobs for the owner's Claude Code session: the session itself does the design work (no background runner).
+ *
+ *   npm run job -- list [--limit 20]                                                 today's list, numbered: queued jobs, then the best new leads
+ *   npm run job -- fetch --pick 2                                                    take number 2 from the last list
  *
  *   npm run job -- fetch --url example.com --category restaurant [--city Vienna]   add a website and claim its job
  *   npm run job -- fetch --lead example.com                                          claim the job for a known lead
@@ -13,7 +16,7 @@
  * QA and sends the scorecard: a pass is published as done, anything else (or no QA) as "needs review".
  * Needs RR_URL and RR_TOKEN (the limited RUNNER_TOKEN is enough). Job folders live in ./jobs (git-ignored).
  */
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import type { Scorecard } from "@rr/core";
@@ -28,6 +31,8 @@ const { values: args, positionals } = parseArgs({
     category: { type: "string", default: "restaurant" },
     city: { type: "string" },
     lead: { type: "string" },
+    pick: { type: "string" },
+    limit: { type: "string", default: "20" },
     reason: { type: "string", default: "Abandoned" },
     notes: { type: "string" },
     revise: { type: "boolean", default: false },
@@ -43,19 +48,55 @@ const token = process.env.RR_TOKEN;
 const cwd = resolve(process.env.INIT_CWD ?? process.cwd());
 const root = join(cwd, "jobs");
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
+/** The runner name the Worker uses to give interactive jobs a long claim (no heartbeats while Claude works). */
+const RUNNER = "claude-code";
+
+interface TodayItem { kind: "job" | "lead"; jobId: number | null; leadId: string; name: string; category: string; city: string; country: string; score: number; foundAt: string; lastActivity: string | null; notes: string | null; mode: string }
+
+async function call<T>(path: string, body?: unknown, method = "POST"): Promise<T> {
   if (!base || !token) throw new Error("Set RR_URL (the Worker URL) and RR_TOKEN (RUNNER_TOKEN or ADMIN_TOKEN).");
   const res = await fetch(base + path, {
-    method: "POST",
+    method,
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
-    body: JSON.stringify(body ?? {}),
+    ...(method === "GET" ? {} : { body: JSON.stringify(body ?? {}) }),
   });
   if (!res.ok) throw new Error(`${path} → ${res.status} ${await res.text()}`);
   return res.json() as Promise<T>;
 }
 
+const listFile = () => join(root, "today.json");
+
+/** Today's numbered list: queued jobs first, then the best new qualified leads. Saved so `fetch --pick N` matches it. */
+async function list() {
+  const { items } = await call<{ items: TodayItem[] }>(`/api/redesign-jobs/today?limit=${Number(args.limit) || 20}`, undefined, "GET");
+  await mkdir(root, { recursive: true });
+  await writeFile(listFile(), JSON.stringify({ at: new Date().toISOString(), items }, null, 2));
+  if (!items.length) return console.log("Nothing to redesign: no queued jobs and no new qualified leads.");
+  console.log(`Today's list (${items.length}). Say "pick job N" to redesign number N.\n`);
+  items.forEach((it, i) => {
+    const tag = it.kind === "job" ? `queued${it.mode === "revise" ? " revision" : ""}` : `new lead, found ${it.foundAt.slice(0, 10)}`;
+    console.log(`${String(i + 1).padStart(3)}. ${it.name} · ${it.category} · ${it.city}, ${it.country} · score ${it.score} · ${tag}${it.lastActivity ? ` · active ${it.lastActivity}` : ""}`);
+    console.log(`     ${it.leadId}${it.notes ? ` · notes: ${it.notes.replace(/\s+/g, " ").slice(0, 100)}` : ""}`);
+  });
+}
+
+/** The lead id for `--pick N`, from the last saved list (or a fresh one). */
+async function pickedLead(n: number): Promise<string> {
+  let saved: { items: TodayItem[] } | null = null;
+  try { saved = JSON.parse(await readFile(listFile(), "utf8")); } catch { /* no list yet */ }
+  if (!saved?.items?.length) {
+    await list();
+    saved = JSON.parse(await readFile(listFile(), "utf8"));
+  }
+  const it = saved!.items[n - 1];
+  if (!it) throw new Error(`There is no number ${n} in today's list (${saved!.items.length} items). Run: npm run job -- list`);
+  console.log(`Picked ${n}: ${it.name} (${it.leadId}).`);
+  return it.leadId;
+}
+
 async function fetchJob() {
   let leadId = args.lead;
+  if (args.pick) leadId = await pickedLead(Number(args.pick));
   if (args.url) {
     const added = await call<{ id: string; name: string }>("/api/leads/add", { url: args.url, category: args.category, city: args.city });
     console.log(`Added ${added.name} (${added.id}).`);
@@ -66,7 +107,7 @@ async function fetchJob() {
     await call(`/api/leads/${encodeURIComponent(leadId)}/redesign`, { notes: args.notes, mode: args.revise ? "revise" : "fresh", theme: args.theme, direction: args.direction })
       .catch((e: Error) => { if (!/ 409 /.test(e.message)) throw e; });
   }
-  const next = await call<NextJob>("/api/redesign-jobs/next", { ...(leadId ? { leadId } : {}), runner: "cloud-session" });
+  const next = await call<NextJob>("/api/redesign-jobs/next", { ...(leadId ? { leadId } : {}), runner: RUNNER });
   if (!next.job || !next.lead || !next.site) {
     console.log(leadId ? `No queued job for ${leadId} (it may already be running or done).` : "No queued redesign jobs.");
     return;
@@ -93,8 +134,14 @@ async function jobInfo(dirArg: string | undefined) {
   return { dir, job: JSON.parse(await readFile(join(dir, "job.json"), "utf8")) as { id: number; leadId: string; preview: string } };
 }
 
+/** Heartbeat + progress line for the portal; never fails the command. */
+async function beat(id: number, stage: string, message: string) {
+  await call(`/api/redesign-jobs/${id}/progress`, { stage, message, level: "info" }).catch(() => {});
+}
+
 async function qa(dirArg: string | undefined): Promise<Scorecard> {
-  const { dir } = await jobInfo(dirArg);
+  const { dir, job } = await jobInfo(dirArg);
+  await beat(job.id, "qa", "Browser QA in the Claude Code session.");
   const r = await runQa(dir, await readReview(dir), (m) => console.log(`  ${m}`));
   console.log(`QA ${r.scorecard.pass ? "PASSED" : "not passed"}: ${r.scorecard.overall}/10. Report: ${join(dir, "qa/report.md")}`);
   for (const c of r.scorecard.critical) console.log(`  critical: ${c}`);
@@ -127,11 +174,12 @@ async function fail(dirArg: string | undefined) {
 
 const [cmd, target] = positionals;
 try {
-  if (cmd === "fetch") await fetchJob();
+  if (cmd === "list") await list();
+  else if (cmd === "fetch") await fetchJob();
   else if (cmd === "qa") await qa(target);
   else if (cmd === "upload") await upload(target);
   else if (cmd === "fail") await fail(target);
-  else console.log("Usage: npm run job -- fetch [--url <site> --category <cat>] [--lead <id>] [--direction <id>] | qa jobs/<id> | upload jobs/<id> | fail jobs/<id>");
+  else console.log("Usage: npm run job -- list | fetch [--pick N] [--url <site> --category <cat>] [--lead <id>] | qa jobs/<id> | upload jobs/<id> | fail jobs/<id>");
 } catch (e) {
   console.error((e as Error).message);
   process.exitCode = 1;

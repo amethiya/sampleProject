@@ -1,5 +1,5 @@
 import {
-  CATEGORIES, CITIES, SHEET_HEADERS, auditCandidate, buildPitch, discoverCandidates, leadToRow, sliceForCursor,
+  CATEGORIES, CITIES, NIGHT_END, NIGHT_START, SHEET_HEADERS, auditCandidate, inWindow, windowStart, buildPitch, discoverCandidates, leadToRow, sliceForCursor,
   type Candidate, type Lead,
 } from "@rr/core";
 import { currentUser, login, logout, type AuthEnv } from "./auth";
@@ -12,6 +12,10 @@ export interface Env extends AuthEnv {
   DAILY_TARGET: string;
   MIN_SCORE: string;
   BATCH_SIZE: string;
+  /** Night search window in UTC (default 19:30–01:30 = 01:00–07:00 IST) and the qualified leads it aims for. */
+  NIGHT_START?: string;
+  NIGHT_END?: string;
+  NIGHT_TARGET?: string;
   /** Activity window in days for a lead to count as active (default 30). */
   ACTIVE_DAYS?: string;
   /** Qualified leads per day after which the cron stops auditing (free-tier budget). "0" means no cap. Default 3 × DAILY_TARGET. */
@@ -48,6 +52,8 @@ export default {
   },
 
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    // The lead search runs only in the night window (default 01:00–07:00 IST); the cron fires a little wider.
+    if (!inWindow(new Date(), env.NIGHT_START || NIGHT_START, env.NIGHT_END || NIGHT_END)) return;
     ctx.waitUntil(runCycle(env).then((r) => console.log("cycle", JSON.stringify(r))));
   },
 } satisfies ExportedHandler<Env>;
@@ -191,14 +197,16 @@ export async function runCycle(env: Env) {
       .bind(String(cursor + 1)).run();
   }
 
-  // Stop auditing for the day once we're well past the target, to stay inside free-tier limits (configurable; 0 = no cap).
-  const cap = env.MAX_QUALIFIED_PER_DAY !== undefined && env.MAX_QUALIFIED_PER_DAY !== "" ? Number(env.MAX_QUALIFIED_PER_DAY) : target * 3;
-  const today = (await env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM sites WHERE qualified = 1 AND date(audited_at) = date('now')",
-  ).first<{ n: number }>())!.n;
-  report.qualifiedToday = today;
+  // Stop for the night once the night's target is reached (configurable; 0 = no cap). The night starts at NIGHT_START.
+  const cap = env.NIGHT_TARGET !== undefined && env.NIGHT_TARGET !== "" ? Number(env.NIGHT_TARGET)
+    : env.MAX_QUALIFIED_PER_DAY !== undefined && env.MAX_QUALIFIED_PER_DAY !== "" ? Number(env.MAX_QUALIFIED_PER_DAY) : target * 20;
+  const since = windowStart(new Date(), env.NIGHT_START || NIGHT_START, env.NIGHT_END || NIGHT_END).toISOString().slice(0, 19).replace("T", " ");
+  const tonight = (await env.DB.prepare(
+    "SELECT COUNT(*) AS n FROM sites WHERE qualified = 1 AND audited_at >= ?",
+  ).bind(since).first<{ n: number }>())!.n;
+  report.qualifiedTonight = tonight;
 
-  if (!cap || today < cap) {
+  if (!cap || tonight < cap) {
     const { results } = await env.DB.prepare(
       "SELECT id, candidate FROM sites WHERE state = 'pending' ORDER BY RANDOM() LIMIT ?",
     ).bind(batchSize).all<{ id: string; candidate: string }>();
@@ -213,8 +221,8 @@ export async function runCycle(env: Env) {
     }));
     report.audited = results.length;
     report.newQualified = leads.filter((l) => l?.qualified).map((l) => l!.id);
-    // Read new leads' whole sites now, so their redesigns open instantly.
-    for (const lead of leads) if (lead?.qualified) await ensureSite(env, lead.id, lead, null).catch(() => null);
+    // No full-site crawl here: it would use the run's subrequest budget. A lead's site is read when its preview is
+    // opened or its redesign job is picked (ensureSite).
   }
 
   report.sheet = await syncSheet(env, env.PUBLIC_URL ?? "");

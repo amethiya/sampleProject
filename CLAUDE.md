@@ -29,9 +29,14 @@ TypeScript npm-workspaces monorepo. See README.md for the architecture.
   21st.dev-style effects written from the components' descriptions (no React or Tailwind; pages are static and
   CSP-locked). Ships on every page; documented for Claude in the skill's
   `references/ui-kit.md`. After changing it run `npm run skill:catalog`. Licences in THIRD_PARTY_NOTICES.md.
-- Claude redesigns: `packages/core/src/redesign/brief.ts` is the brief Claude follows; the runner is
-  `apps/cli/src/redesign-runner.ts` (research → design → build → QA → refine → validate). Pages it uploads are
+- Claude redesigns are done **interactively in the owner's Claude Code session** with `npm run job` (see the daily
+  routine below); there is no background redesign runner or server (removed 2026-10-12: the owner wants zero cost and
+  no machine to keep running). `packages/core/src/redesign/brief.ts` is the brief Claude follows. Uploaded pages are
   untrusted and served with a `sandbox` CSP (`packages/core/src/redesign/csp.ts`; the QA server uses the same one).
+- Night lead search: the Worker cron fires every minute 19:00–01:59 UTC and works only inside NIGHT_START–NIGHT_END
+  (19:30–01:30 UTC = 01:00–07:00 IST, `packages/core/src/schedule.ts`), stopping at NIGHT_TARGET qualified leads.
+  Free plan limits (50 subrequests, 10 ms CPU per run) cap it at a few audits a minute; it does not crawl full sites
+  (that happens when a preview is opened or a job is picked).
 - Creative direction (`packages/core/src/redesign/directions.ts`): one house direction (`house-editorial`) for every
   business; old direction ids map onto it. The palette is the job's house theme (no brand recolouring). The retired
   Cinematic Hospitality pieces (counter loader, echo headings, plates, dust, clouds) are rejected by QA
@@ -42,10 +47,12 @@ TypeScript npm-workspaces monorepo. See README.md for the architecture.
 - Inspiration (`apps/cli/src/inspiration.ts`): while a job folder is prepared, 3-5 real reference sites for the trade
   and direction are fetched from Inspo (inspomcp.dev, free, no key) into `inspiration/` (JPEG captures + DESIGN.md).
   Claude calibrates craft against them and never copies them. Inspo is also a project MCP server (`.mcp.json`).
-- Job lifecycle (`apps/worker/src/jobs.ts`, migration `0006_pipeline.sql`): leases with heartbeats, retries with
-  backoff, failure kinds, one active job per lead (unique index), `job_events`. RUNNER_TOKEN can only claim and report.
+- Job lifecycle (`apps/worker/src/jobs.ts`, migration `0006_pipeline.sql`): leases, retries with backoff, failure
+  kinds, one active job per lead (unique index), `job_events`. Jobs claimed by `npm run job` (runner `claude-code`)
+  keep their claim 6 hours (`INTERACTIVE_STALE_MINUTES`); `job qa` sends a heartbeat. RUNNER_TOKEN can read today's
+  list, claim and report, nothing else.
 - UI UX Pro Max (`.claude/skills/ui-ux-pro-max/`, MIT, vendored from nextlevelbuilder/ui-ux-pro-max-skill): `job fetch`
-  and the runner run its local search (`apps/cli/src/uiux.ts`, needs python3) and write `uiux.md` into each job;
+  runs its local search (`apps/cli/src/uiux.ts`, needs python3) and write `uiux.md` into each job;
   the brief and the website-redesign skill take precedence over it.
 
 Commands:
@@ -58,13 +65,21 @@ Commands:
 
 Done means: tests + typecheck pass, and `npm run discover -- --target 2` still produces leads.
 
-## Redesign a website from a cloud session (phone-friendly)
+## Daily routine: redesigning in Claude Code
+
+Leads are found automatically every night (01:00–07:00 IST). During the day the owner opens Claude Code in this
+folder and asks for redesigns one at a time. You are the designer.
+
+- **"Show today's leads"** → `npm run job -- list`. Show the numbered list as printed (queued jobs from the portal
+  first, then the best new leads).
+- **"Pick job N" / "redesign number N"** → `npm run job -- fetch --pick N`, then steps 2–5 below.
+- **"Process the next redesign job"** → `npm run job -- fetch` (oldest queued job), then steps 2–5.
 
 **Always use the `website-redesign` skill (`.claude/skills/website-redesign/`) for any website redesign.** It is
 the design standard for every Revamp Radar redesign; the steps below only cover moving the job in and out.
 
-When asked to "redesign <site>" or "process the next redesign job", you are the designer. Steps:
-1. `npm run job -- fetch --url <site> --category <restaurant|gym|healthcare|accounting|import_export>`
+When asked to "redesign <site>", "pick job N" or "process the next redesign job", you are the designer. Steps:
+1. `npm run job -- fetch --pick N` (from today's list), or `--url <site> --category <restaurant|gym|healthcare|accounting|import_export>`
    (or `--lead <domain>` for an existing lead, or no flags for the oldest queued job). It prints `jobs/<id>`.
    Add `--notes "<what to change>"`, `--revise` (improve the last Claude version: its pages are in `jobs/<id>/previous/` and already copied into `site/`;
    edit only the pages the notes concern)

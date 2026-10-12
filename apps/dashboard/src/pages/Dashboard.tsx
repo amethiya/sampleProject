@@ -627,7 +627,7 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
         method: "POST",
         body: JSON.stringify({ notes: notes.trim() || undefined, mode: hasClaude ? mode : "fresh", theme: claudeTemplate === "keep" || claudeTemplate === "auto" ? undefined : claudeTemplate, direction: direction === "auto" ? undefined : direction }),
       }));
-      setNotes(""); setMsg("Sent. Claude picks it up as soon as your Mac runner or a cloud session is running.");
+      setNotes(""); setMsg("Queued. In Claude Code, say \u201cshow today's leads\u201d and pick it from the list.");
       onChanged();
     } catch (e) { onError(e); }
     setBusy("");
@@ -712,7 +712,7 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
       <section className="callout">
         <div>
           <h3>Claude redesign</h3>
-          <p className="muted small">Claude researches the current site in a browser, picks a creative direction for this business, rebuilds {st.pages.length === 1 ? "the page" : `all ${st.pages.length} pages`}, then checks them at desktop, tablet and phone width and refines them. It runs on your Mac (<code>npm run redesign-runner</code>) or a Claude Code session and takes about 15–25 minutes. You can leave this page while it works.</p>
+          <p className="muted small">Claude researches the current site in a browser, picks a creative direction for this business, rebuilds {st.pages.length === 1 ? "the page" : `all ${st.pages.length} pages`}, then checks them at desktop, tablet and phone width and refines them. You run it in Claude Code ("show today's leads", then "pick job N"); it takes about an hour. You can leave this page while it works.</p>
           {job && <JobPanel job={job} busy={!!busy} onAction={jobAction} />}
         </div>
         {!active && (
