@@ -64,14 +64,17 @@ async function api(req: Request, url: URL, env: Env, ctx: ExecutionContext): Pro
   // Website details for a lead's Website tab: fetched on demand, cached for 7 days (?refresh=1 fetches again).
   const ins = path.match(/^\/api\/leads\/([^/]+)\/insights$/);
   if (ins && m === "GET") {
-    const id = decodeURIComponent(ins[1]);
+    let id: string;
+    try { id = decodeURIComponent(ins[1]); } catch { return json({ error: "Bad lead id" }, 400); }
     const row = await env.DB.prepare("SELECT website, insights, insights_at FROM sites WHERE id = ?").bind(id)
       .first<{ website: string; insights: string | null; insights_at: string | null }>();
     if (!row) return json({ error: "Lead not found" }, 404);
     const fresh = row.insights && row.insights_at && Date.now() - new Date(`${row.insights_at.replace(" ", "T")}Z`).getTime() < 7 * 86_400_000;
     if (fresh && url.searchParams.get("refresh") !== "1") return json(JSON.parse(row.insights!));
     const data = await websiteInsights(row.website, { googleKey: env.GOOGLE_API_KEY });
-    await env.DB.prepare("UPDATE sites SET insights = ?, insights_at = datetime('now') WHERE id = ?").bind(JSON.stringify(data), id).run();
+    // A result with a failed part is kept for 1 day instead of 7, so a passing outage doesn't stick for a week.
+    const partial = !data.live.up || !!data.archive.error || !!data.popularity.error || (!!data.google.error && !!env.GOOGLE_API_KEY) || (!!data.domain.error && !/doesn't publish/.test(data.domain.error));
+    await env.DB.prepare(`UPDATE sites SET insights = ?, insights_at = datetime('now', '${partial ? "-6 days" : "0 days"}') WHERE id = ?`).bind(JSON.stringify(data), id).run();
     return json(data);
   }
 

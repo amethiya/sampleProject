@@ -186,7 +186,9 @@ describe("website details", () => {
     expect(noKey.archive.error).toMatch(/only the first capture/);
     expect(noKey.traffic.level).toBe("low");
     const withKey = await websiteInsights("https://www.bakery.example/", { googleKey: "K" });
-    expect(calls.find((u) => u.includes("pagespeedonline"))).toMatch(/strategy=MOBILE.*key=K/);
+    expect(calls.find((u) => u.includes("pagespeedonline"))).toMatch(/strategy=MOBILE/);
+    expect(calls.find((u) => u.includes("pagespeedonline"))).not.toMatch(/key=/);
+    expect((await websiteInsights("not a url")).live.error).toBe("Not a valid website address");
     expect(withKey.google).toMatchObject({ performance: 50, hasRealUserData: false });
     expect(withKey.traffic.level).toBe("low");
   });

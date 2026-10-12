@@ -553,7 +553,7 @@ function WebsiteTab({ lead, onError }: { lead: LeadRow; onError(e: unknown): voi
         {d.domain.error ? <p className="muted small">{d.domain.name}: {d.domain.error}</p> : (
           <ul className="list plain">
             {row("Domain", d.domain.name)}
-            {d.domain.registered && row("Registered", `${d.domain.registered}${d.domain.ageYears !== undefined ? ` (${d.domain.ageYears} years ago)` : ""}`)}
+            {d.domain.registered && row("Registered", `${d.domain.registered}${typeof d.domain.ageYears === "number" ? ` (${d.domain.ageYears} ${d.domain.ageYears === 1 ? "year" : "years"} ago)` : ""}`)}
             {d.domain.expires && row("Expires", d.domain.expires)}
             {d.domain.registrar && row("Registrar", d.domain.registrar)}
           </ul>
