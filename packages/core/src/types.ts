@@ -1,7 +1,7 @@
 export type CategoryId =
   | "restaurant" | "cafe" | "gym" | "salon" | "clothing" | "retail" | "import_export" | "healthcare" | "accounting" | "services";
-/** Target markets: United States, European Union, Canada, Australia, New Zealand. */
-export type RegionId = "us" | "eu" | "ca" | "au" | "nz";
+/** Target markets: the United States and the European Union. */
+export type RegionId = "us" | "eu";
 
 export interface City {
   id: string;
@@ -22,6 +22,8 @@ export interface Candidate {
   region: RegionId;
   website: string;
   osmEmail?: string;
+  /** The OpenStreetMap kind (hairdresser, fitness_centre, dentist...), for "the best <noun> in <city>". */
+  kind?: string;
   osmPhone?: string;
   address?: string;
   openingHours?: string;
@@ -52,11 +54,30 @@ export interface Contacts {
   contactPage?: string;
 }
 
+/** Everything we know about a site, collected when it is audited and stored with the lead. */
+export interface SiteProfile {
+  checkedAt: string;
+  /** "the best <noun> in <city>" */
+  businessNoun: string;
+  email: { address: string | null; onSiteDomain: boolean; mailServer: boolean | null };
+  location: { city: string; country: string; countryName: string; region: string; address?: string; lat?: number; lon?: number; inTargetMarket: boolean };
+  activity: import("./activity").ActivityResult;
+  findings: import("./findings").Findings;
+  tech: import("./findings").TechProfile;
+  structuredData: string[];
+  social: { platform: string; url: string }[];
+  hasSitemap: boolean | null;
+  wordCount: number;
+}
+
 export interface Lead extends Candidate {
   audit: AuditResult;
   contacts: Contacts;
   content: SiteContent;
   qualified: boolean;
+  /** Why the site does not qualify (empty when it does). */
+  rejected?: string[];
+  profile?: SiteProfile;
   auditedAt: string;
 }
 

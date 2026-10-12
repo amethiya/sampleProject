@@ -1,6 +1,6 @@
 /**
  * Local discovery run, no Cloudflare needed:
- *   npm run discover -- --target 10 [--category gym] [--city berlin] [--min-score 35]
+ *   npm run discover -- --target 10 [--category gym] [--city berlin] [--min-score 35] [--active-days 30]
  * Writes out/leads-<date>.csv, out/leads-<date>.json and out/previews/<host>.html
  *
  * Feed the deployed Worker's queue instead (discovery only, the Worker audits):
@@ -11,7 +11,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 import {
-  CATEGORIES, CITIES, DEFAULT_MIN_SCORE, SHEET_HEADERS, auditCandidate, categoryById, cityById,
+  CATEGORIES, CITIES, DEFAULT_ACTIVE_DAYS, DEFAULT_MIN_SCORE, SHEET_HEADERS, auditCandidate, categoryById, cityById,
   discoverCandidates, leadToRow, renderRedesign, type Lead,
 } from "@rr/core";
 
@@ -21,6 +21,7 @@ const { values: args } = parseArgs({
     category: { type: "string" },
     city: { type: "string" },
     "min-score": { type: "string", default: String(DEFAULT_MIN_SCORE) },
+    "active-days": { type: "string", default: String(DEFAULT_ACTIVE_DAYS) },
     "max-per-slice": { type: "string", default: "15" },
     out: { type: "string", default: "out" },
     push: { type: "boolean", default: false },
@@ -77,12 +78,14 @@ outer: for (const city of cities) {
     }
     console.log(`  ${cands.length} businesses with websites`);
     const batch = shuffle(cands.filter((c) => !seen.has(c.id))).slice(0, perSlice);
-    const results = await pool(batch, 5, (c) => auditCandidate(c, minScore));
+    const results = await pool(batch, 5, (c) => auditCandidate(c, minScore, { activeDays: Number(args["active-days"]) }));
     for (const lead of results) {
       if (!lead) continue;
       seen.add(lead.id);
       const mark = lead.qualified ? "✅" : "  ";
       console.log(`  ${mark} ${String(lead.audit.score).padStart(3)}  ${lead.name}  ${lead.website}  ${lead.contacts.emails[0] ?? ""}`);
+      if (lead.qualified) console.log(`       active: ${lead.profile?.activity.evidence.slice(0, 2).map((e) => e.detail).join("; ")}`);
+      else if (lead.audit.score >= minScore) console.log(`       skipped: ${lead.rejected?.join("; ")}`);
       if (lead.qualified) leads.push(lead);
       if (leads.length >= target) break outer;
     }

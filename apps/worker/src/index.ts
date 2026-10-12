@@ -12,6 +12,8 @@ export interface Env extends AuthEnv {
   DAILY_TARGET: string;
   MIN_SCORE: string;
   BATCH_SIZE: string;
+  /** Activity window in days for a lead to count as active (default 30). */
+  ACTIVE_DAYS?: string;
   /** Qualified leads per day after which the cron stops auditing (free-tier budget). "0" means no cap. Default 3 × DAILY_TARGET. */
   MAX_QUALIFIED_PER_DAY?: string;
   PUBLIC_URL?: string;
@@ -88,10 +90,11 @@ async function api(req: Request, url: URL, env: Env, ctx: ExecutionContext): Pro
   if (m === "POST" && path === "/api/import") {
     const leads = ((await req.json()) as Lead[]).filter((l) => l?.id && l.audit && l.contacts && l.content).slice(0, 200);
     if (leads.length) await env.DB.batch(leads.map((l) => env.DB.prepare(
-      `INSERT INTO sites (id, name, category, city, country, region, website, candidate, state, score, qualified, lead, audited_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'audited', ?, ?, ?, datetime('now'))
-       ON CONFLICT(id) DO UPDATE SET state = 'audited', score = excluded.score, qualified = excluded.qualified, lead = excluded.lead, audited_at = excluded.audited_at`,
-    ).bind(l.id, l.name, l.category, l.city, l.country, l.region, l.website, JSON.stringify(l), l.audit.score, l.qualified ? 1 : 0, JSON.stringify(l))));
+      `INSERT INTO sites (id, name, category, city, country, region, website, candidate, state, score, qualified, lead, audited_at, email, active, last_activity, reject_reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'audited', ?, ?, ?, datetime('now'), ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET state = 'audited', score = excluded.score, qualified = excluded.qualified, lead = excluded.lead, audited_at = excluded.audited_at,
+         email = excluded.email, active = excluded.active, last_activity = excluded.last_activity, reject_reason = excluded.reject_reason`,
+    ).bind(l.id, l.name, l.category, l.city, l.country, l.region, l.website, JSON.stringify(l), l.audit.score, l.qualified ? 1 : 0, JSON.stringify(l), ...criteria(l))));
     return json({ imported: leads.length });
   }
 
@@ -167,7 +170,7 @@ async function api(req: Request, url: URL, env: Env, ctx: ExecutionContext): Pro
 
 /** One unit of work: refill the queue if needed, audit a batch, push new leads to Sheets. */
 export async function runCycle(env: Env) {
-  const batchSize = Number(env.BATCH_SIZE) || 6;
+  const batchSize = Number(env.BATCH_SIZE) || 4;
   const minScore = Number(env.MIN_SCORE) || 35;
   const target = Number(env.DAILY_TARGET) || 10;
   const report: Record<string, unknown> = {};
@@ -199,12 +202,13 @@ export async function runCycle(env: Env) {
     const { results } = await env.DB.prepare(
       "SELECT id, candidate FROM sites WHERE state = 'pending' ORDER BY RANDOM() LIMIT ?",
     ).bind(batchSize).all<{ id: string; candidate: string }>();
-    const leads = await Promise.all(results.map((r) => auditCandidate(JSON.parse(r.candidate) as Candidate, minScore)));
+    const activeDays = Number(env.ACTIVE_DAYS) || 30;
+    const leads = await Promise.all(results.map((r) => auditCandidate(JSON.parse(r.candidate) as Candidate, minScore, { activeDays })));
     if (results.length) await env.DB.batch(results.map((r, i) => {
       const lead = leads[i];
       return lead
-        ? env.DB.prepare("UPDATE sites SET state = 'audited', score = ?, qualified = ?, lead = ?, audited_at = datetime('now') WHERE id = ?")
-            .bind(lead.audit.score, lead.qualified ? 1 : 0, JSON.stringify(lead), r.id)
+        ? env.DB.prepare("UPDATE sites SET state = 'audited', score = ?, qualified = ?, lead = ?, audited_at = datetime('now'), email = ?, active = ?, last_activity = ?, reject_reason = ? WHERE id = ?")
+            .bind(lead.audit.score, lead.qualified ? 1 : 0, JSON.stringify(lead), ...criteria(lead), r.id)
         : env.DB.prepare("UPDATE sites SET state = 'failed', audited_at = datetime('now') WHERE id = ?").bind(r.id);
     }));
     report.audited = results.length;
@@ -215,6 +219,13 @@ export async function runCycle(env: Env) {
 
   report.sheet = await syncSheet(env, env.PUBLIC_URL ?? "");
   return report;
+}
+
+/** The queryable criteria columns of an audited lead: email, active, last_activity, reject_reason. */
+function criteria(l: Lead): [string | null, number | null, string | null, string | null] {
+  const a = l.profile?.activity;
+  const checked = !!a && (a.evidence.length > 0 || a.hasSitemap !== null || !!a.parked);
+  return [l.contacts.emails[0] ?? null, checked ? (a!.active ? 1 : 0) : null, a?.lastActivity ?? null, l.rejected?.length ? l.rejected.join("; ") : null];
 }
 
 function insertCandidate(env: Env, c: Candidate) {
@@ -336,6 +347,7 @@ function summarize(l: Lead, status: string, synced: number) {
     id: l.id, name: l.name, category: l.category, city: l.city, country: l.country, website: l.website,
     score: l.audit.score, reasons: l.audit.reasons, emails: l.contacts.emails, phones: l.contacts.phones,
     contactPage: l.contacts.contactPage, auditedAt: l.auditedAt, status, sheetSynced: !!synced,
+    profile: l.profile ?? null, rejected: l.rejected ?? [],
   };
 }
 

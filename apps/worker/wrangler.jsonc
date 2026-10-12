@@ -16,12 +16,14 @@
     { "binding": "DB", "database_name": "revamp-radar", "database_id": "97f2b40d-3213-4783-8c7e-c9aeaf27ebd1" }
   ],
   // Every 10 minutes: discover a slice if the queue is low, audit a small batch, sync to Sheets.
-  // Small batches keep each run under the free plan's 50-subrequest limit.
+  // Small batches keep each run under the free plan's 50-subrequest limit (each site: page, contact page, robots,
+  // up to two sitemaps, a feed and an MX lookup).
   "triggers": { "crons": ["*/10 * * * *"] },
   "vars": {
     "DAILY_TARGET": "10",
     "MIN_SCORE": "35",
-    "BATCH_SIZE": "6",
+    "BATCH_SIZE": "4",
+    "ACTIVE_DAYS": "30",
     "PUBLIC_URL": "https://revamp-radar.amethiyavivek.workers.dev",
     "SENDER_NAME": "Vivek Amethiya"
   }

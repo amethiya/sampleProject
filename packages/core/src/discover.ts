@@ -56,6 +56,7 @@ export function parseOverpass(json: { elements?: OverpassElement[] }, category: 
       region: city.region,
       website,
       osmEmail: t.email ?? t["contact:email"],
+      kind: t.amenity ?? t.shop ?? t.healthcare ?? t.office ?? t.craft ?? t.leisure ?? t.sport,
       osmPhone: t.phone ?? t["contact:phone"],
       address: address || undefined,
       openingHours: t.opening_hours,

@@ -27,9 +27,12 @@ function doPost(e) {
     var width = body.headers.length;
     if (sheet.getLastRow() === 0) {
       sheet.appendRow(body.headers);
-      sheet.getRange(1, 1, 1, width).setFontWeight('bold');
       sheet.setFrozenRows(1);
+    } else {
+      // Keep the header row in step when new columns are added.
+      sheet.getRange(1, 1, 1, width).setValues([body.headers]);
     }
+    sheet.getRange(1, 1, 1, width).setFontWeight('bold');
 
     var websiteCol = body.headers.indexOf('Website');
     var rowOf = {};
