@@ -116,9 +116,9 @@ export const PASS_THRESHOLD = 7;
 const clamp = (n: number) => Math.max(0, Math.min(10, Math.round(n * 10) / 10));
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
-/** The Cinematic Hospitality system's signature pieces, as CSS selectors. Other directions must not use them. */
+/** The retired Cinematic Hospitality system's signature pieces, as CSS selectors. The house style never uses them. */
 export const CINEMATIC_MARKERS: [string, string][] = [
-  ["curtain loader", ".curtain, .loader-count, [data-loader-count]"],
+  ["counter loader", ".loader-count, [data-loader-count], .curtain .count"],
   ["echo headings", ".echo"],
   ["round cut-out plates", ".plate, .plate-stage"],
   ["dust splash", ".dust, canvas.dust, [data-dust]"],
@@ -189,9 +189,9 @@ export function scoreRedesign(measures: PageMeasure[], expectedSlugs: string[], 
     - Math.max(0, (avg((m) => m.lcpMs ?? m.loadMs) - 2500) / 600)
     - Math.max(0, (avg((m) => m.bytes) / 1e6 - 3) * 0.8));
 
-  // Each direction has its own look and motion: borrowing the old system's signature pieces makes sites look alike.
-  if (design.direction && design.direction !== "cinematic-hospitality") {
-    for (const m of desktop) if (m.borrowed?.length) critical.push(`"${m.slug}" reuses another direction's signature (${m.borrowed.join(", ")}); build ${design.direction}'s own motion system instead.`);
+  // The retired system's pieces (counter loader, echo headings, plates, dust, clouds) don't belong in the house style.
+  if (design.direction) {
+    for (const m of desktop) if (m.borrowed?.length) critical.push(`"${m.slug}" uses the retired system's pieces (${m.borrowed.join(", ")}); build the house style's motion system instead.`);
   }
   for (const m of desktop) {
     const extra = foreignKit(m, design.kit);

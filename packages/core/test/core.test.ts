@@ -129,16 +129,13 @@ describe("design system", () => {
     const md = readFileSync(new URL("../../../.claude/skills/website-redesign/references/ui-kit.md", import.meta.url), "utf8");
     for (const c of UI_KIT) expect(md, `run npm run skill:catalog (${c.id} missing)`).toContain(`\`${c.id}\``);
     expect(readFileSync(new URL("../../../.claude/skills/website-redesign/references/ui-kit.js", import.meta.url), "utf8")).toContain(UI_KIT_JS);
-    const lead = { name: "Kit Cafe", category: "cafe", city: "Austin", country: "US", website: "https://kit.example", contacts: { emails: [], phones: [] }, content: { title: "Kit Cafe", description: "", headings: ["Coffee"], paragraphs: ["Roasting our own beans in Austin since 1987, every single morning."], images: [], navLinks: [] } } as never;
+    const lead = { name: "Kit Cafe", category: "cafe", city: "Austin", country: "US", website: "https://kit.example", contacts: { emails: [], phones: [] }, content: { title: "Kit Cafe", description: "", headings: ["Coffee"], paragraphs: ["Roasting our own beans in Austin since 1987, every single morning. Come early for the first batch."], images: [], navLinks: [] } } as never;
     const html = renderSitePage(lead, snapshotFromLead(lead), "home");
     expect(html).toContain(UI_KIT_JS);
     expect(html).toContain('class="mu-progress"');
-    expect(html).toContain("mu-shimmer");
-    expect(html).toContain('class="tw-paths"');
+    expect(html).toContain("data-su-magnetic");
     expect(html).toContain("data-su-scroll-reveal");
-    expect(html).toContain("mu-beam");
   });
-
   it("gives each direction its own kit components instead of the same set on every site", async () => {
     const { BRIEF, RUNNER_PROMPT, briefContent, UI_KIT, DIRECTIONS } = await import("../src");
     expect(BRIEF).not.toContain("UI kit placement");
@@ -160,14 +157,38 @@ describe("design system", () => {
     expect(() => new Function(SYSTEM_MOTION_JS)).not.toThrow();
   });
 
-  it("offers rich themes, navy first for most trades, rotating away from recent ones", async () => {
-    const { LOOKS, pickLook } = await import("../src");
-    expect(LOOKS.length).toBeGreaterThanOrEqual(8);
-    expect(LOOKS.some((l) => !l.dark)).toBe(true);
-    expect(pickLook("accounting").id).toBe("midnight-navy");
-    expect(pickLook("accounting", ["midnight-navy"]).id).not.toBe("midnight-navy");
+  it("offers the seven house themes, Classic Monochrome first, rotating away from recent ones, all readable", async () => {
+    const { LOOKS, pickLook, contrast } = await import("../src");
+    expect(LOOKS.map((l) => l.id)).toEqual(["classic", "noir", "latte", "sage", "cobalt", "cocoa", "rose"]);
+    for (const l of LOOKS) {
+      for (const [a, b] of [[l.text, l.bg], [l.textMuted, l.bg], [l.textSubtle, l.bg], [l.textMuted, l.bgMuted], [l.onAccent, l.accent], [l.invText, l.invBg], [l.invMuted, l.invBg]]) {
+        expect(contrast(a, b), `${l.id}: ${a} on ${b}`).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    expect(pickLook("accounting").id).toBe("classic");
+    expect(pickLook("restaurant", ["classic"]).id).not.toBe("classic");
+    expect(pickLook("salon", ["classic", "rose"]).id).toBe("latte");
   });
 
+  it("ships every house theme and the theme picker on every page, opening in the site's own theme", async () => {
+    const { renderSitePage, makeDna, lookById, LOOKS, HEAD_JS, SYSTEM_BASE_JS } = await import("../src");
+    const lead = { name: "Pick Bistro", category: "restaurant", city: "Austin", country: "US", website: "https://pick.example", contacts: { emails: [], phones: [] }, content: { title: "", description: "", headings: [], paragraphs: [], images: [], navLinks: [] } } as never;
+    const site = { crawledAt: "", pages: [{ slug: "home", url: "https://pick.example", label: "Home", title: "", description: "", sections: [] }] };
+    const html = renderSitePage(lead, site, "home", { dna: makeDna(lookById("cocoa")!, "restaurant") });
+    expect(html).toContain('<html lang="en" data-theme="cocoa" data-site="pick.example">');
+    for (const l of LOOKS) {
+      expect(html).toContain(`[data-theme="${l.id}"]{`);
+      expect(html).toContain(`data-id="${l.id}"`);
+    }
+    expect(html).toContain('class="theme-btn"');
+    expect(html).toContain('id="theme-panel"');
+    // The choice is remembered per site, and storage never throws in sandboxed previews.
+    expect(HEAD_JS).toContain("rr-theme:");
+    expect(HEAD_JS).toMatch(/try\{.*localStorage.*\}catch/);
+    expect(SYSTEM_BASE_JS).toContain("startViewTransition");
+    expect(() => new Function(HEAD_JS)).not.toThrow();
+    expect(() => new Function(SYSTEM_BASE_JS)).not.toThrow();
+  });
   it("designs for the trade the business name says, over a mis-filed category", async () => {
     const { tradeFor, pickDna, dnaFromKey } = await import("../src");
     expect(tradeFor("retail", "Rise & Shine Biscuit Kitchen")).toBe("restaurant");
@@ -178,24 +199,27 @@ describe("design system", () => {
     expect(dnaFromKey("ember|jakarta|split|soft|bold|pizzeria|2")).toBeNull();
   });
 
-  it("renders every section of the page in the design system, escaped, with no 3D", async () => {
+  it("renders every section of the page in the house style, escaped, numbered in page order, with no 3D", async () => {
     const { renderSitePage, makeDna, lookById } = await import("../src");
     const lead = { id: "x", name: "Tony <b>Burger</b>", website: "https://t.com", category: "restaurant", city: "Austin", country: "US", contacts: { emails: ["a@t.com"], phones: ["+1 512 555 0100"] }, audit: { score: 50, issues: [] }, content: { title: "T", description: "", headings: [], paragraphs: [], images: [] } } as never;
     const site = { crawledAt: "", pages: [
       { slug: "home", url: "https://t.com", label: "Home", title: "T", description: "", sections: [
-        { heading: "Our story", paragraphs: ["Every patty is smashed to order on a seasoned flat-top grill since 1998."], items: [], images: [] },
+        { heading: "Our story", paragraphs: ["Every patty is smashed to order on a seasoned flat-top grill since 1998. We still grind the beef every morning."], items: [], images: [] },
         { heading: "Burgers", paragraphs: [], items: ["Classic 9.50", "Double 12.00", "Veggie 10.00"], images: [] },
         { heading: "Unique closing words", paragraphs: ["A final paragraph that must appear on the page as well."], items: [], images: [] },
       ] },
       { slug: "menu", url: "https://t.com/menu", label: "Menu", title: "Menu", description: "", sections: [{ heading: "Sides", paragraphs: [], items: ["Fries 4.00"], images: [] }] },
     ] };
-    const html = renderSitePage(lead, site, "home", { dna: makeDna(lookById("midnight-navy")!, "restaurant") });
-    for (const text of ["Every patty is smashed", "Classic", "12.00", "Unique closing words", "A final paragraph"]) expect(html).toContain(text);
-    expect(html).toContain("--bg:#0c1424");
-    expect(html).toContain('class="echo"');
+    const html = renderSitePage(lead, site, "home", { dna: makeDna(lookById("classic")!, "restaurant") });
+    for (const text of ["Every patty is smashed to order on a seasoned flat-top grill since 1998.", "We still grind the beef every morning.", "Classic", "12.00", "Unique closing words", "A final paragraph"]) expect(html).toContain(text);
+    expect(html).toContain("--bg:#ffffff");
+    expect(html).toContain('class="xp"');
+    expect(html).toContain('class="statement"');
+    expect(html).toContain('data-roll>1998<');
+    expect([...html.matchAll(/class="no">No\. (\d+)/g)].map((m) => m[1])).toEqual(["01", "02", "03", "04", "05"].slice(0, [...html.matchAll(/class="no">/g)].length));
     expect(html).toContain("Tony &lt;b&gt;Burger&lt;/b&gt;");
     expect(html).not.toContain("<b>Burger</b>");
-    expect(html).not.toMatch(/three(\.min)?\.js|lenis|<canvas id/);
+    expect(html).not.toMatch(/three(\.min)?\.js|lenis|<canvas id|class="echo"|plate-stage|cloud-reveal/);
   });
 });
 
@@ -228,84 +252,65 @@ describe("crawler image resolution", () => {
 describe("creative directions", () => {
   const sig = (trade: string, extra: Record<string, unknown> = {}) => ({ trade, pages: 4, images: 6, prices: 0, words: 800, hasMenu: false, hasTeam: false, hasBooking: false, hasFaq: false, phone: true, email: true, hours: true, ...extra }) as never;
 
-  it("fits the direction to the business, not one layout for every trade", async () => {
-    const { chooseDirection } = await import("../src");
-    expect(chooseDirection(sig("healthcare")).id).toBe("clinical-calm");
-    expect(["swiss-precision", "bento-modern"]).toContain(chooseDirection(sig("accounting", { images: 2 })).id);
-    expect(chooseDirection(sig("import_export", { images: 1 })).id).toBe("global-trade-3d");
-    expect(chooseDirection(sig("gym")).id).toBe("bold-kinetic");
-    // The restaurant layout is never chosen for a clinic or an accountant.
-    for (const t of ["healthcare", "accounting", "import_export", "gym", "salon"]) {
-      for (const seed of ["a", "b", "c", "d"]) expect(chooseDirection(sig(t), [], seed).id).not.toBe("cinematic-hospitality");
+  it("builds every business in the house direction, and maps old direction ids onto it", async () => {
+    const { chooseDirection, directionById, DIRECTIONS, HOUSE_DIRECTION_ID } = await import("../src");
+    expect(DIRECTIONS.map((d) => d.id)).toEqual([HOUSE_DIRECTION_ID]);
+    for (const t of ["restaurant", "healthcare", "accounting", "import_export", "gym", "salon"]) {
+      for (const seed of ["a", "b"]) expect(chooseDirection(sig(t), [], seed).id).toBe(HOUSE_DIRECTION_ID);
     }
+    expect(directionById("editorial-magazine")?.id).toBe(HOUSE_DIRECTION_ID);
+    expect(directionById("cinematic-hospitality")?.id).toBe(HOUSE_DIRECTION_ID);
+    expect(directionById("not-a-direction")).toBeUndefined();
   });
-
-  it("never repeats the last two directions and spreads a run of same-trade leads across directions", async () => {
-    const { chooseDirection } = await import("../src");
-    const recent: string[] = [];
-    for (let i = 0; i < 10; i++) {
-      const d = chooseDirection(sig("restaurant", { prices: 12, images: 12 }), recent, `lead-${i}`).id;
-      expect(recent.slice(0, 2)).not.toContain(d);
-      recent.unshift(d);
-    }
-    expect(new Set(recent).size).toBeGreaterThanOrEqual(4);
+  it("uses the job's house theme as the palette, and the owner's chosen theme over it", async () => {
+    const { directionById, paletteFor, lookById, briefContent, LOOKS } = await import("../src");
+    const d = directionById("house-editorial")!;
+    const rose = paletteFor(d, { colors: ["#22c55e"], fonts: [] }, "seed", lookById("rose"));
+    expect(rose).toMatchObject({ themeId: "rose", bg: lookById("rose")!.bg, accent: lookById("rose")!.accent, fromBrand: false });
+    // Without a theme, one of the seven is picked by seed; brand colours never recolour it.
+    const p = paletteFor(d, { colors: ["#22c55e"], fonts: [] }, "x");
+    expect(LOOKS.map((l) => l.accent)).toContain(p.accent);
+    const lead = { id: "y", name: "Pal Cafe", category: "cafe", city: "Austin", country: "US", website: "https://pal.example", contacts: { emails: [], phones: [] } } as never;
+    const c = briefContent(lead, { crawledAt: "", pages: [] } as never, undefined, [], { forcedLook: lookById("sage") });
+    expect(c.designDirection.theme.id).toBe("sage");
+    expect(c.designDirection.creative.palette.themeId).toBe("sage");
+    expect(c.designDirection.allThemes).toHaveLength(7);
   });
-
   it("avoids photo-led directions when the site has few photos", async () => {
     const { chooseDirection } = await import("../src");
     for (const seed of ["1", "2", "3"]) expect(["luxe-minimal", "immersive-showcase"]).not.toContain(chooseDirection(sig("clothing", { images: 1 }), [], seed).id);
   });
 
-  it("builds the palette from the brand's own accent and keeps every pair readable", async () => {
-    const { directionById, paletteFor, contrast, brandAccent } = await import("../src");
-    expect(brandAccent({ colors: ["#ffffff", "#111111", "#888888", "#741616"], fonts: [] })).toBe("#741616");
-    expect(brandAccent({ colors: ["#ffffff", "#000000"], fonts: [] })).toBeNull();
-    for (const d of ["editorial-magazine", "swiss-precision", "bold-kinetic", "luxe-minimal", "global-trade-3d"]) {
-      for (const accent of ["#741616", "#ffe066", "#1d4ed8", "#22c55e"]) {
-        const p = paletteFor(directionById(d)!, { colors: [accent], fonts: [] }, "seed");
-        expect(p.fromBrand).toBe(true);
-        // The brand's true colour stays the fill colour (bright yellow is not darkened to olive).
-        expect(p.accent).toBe(accent);
-        expect(contrast(p.text, p.bg)).toBeGreaterThanOrEqual(7);
-        expect(contrast(p.muted, p.bg)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(p.accentText!, p.bg)).toBeGreaterThanOrEqual(4.5);
-        expect(contrast(p.onAccent, p.accent)).toBeGreaterThanOrEqual(4.5);
-        expect(p.accentNeedsEdge).toBe(contrast(p.accent, p.bg) < 3);
-      }
+  it("keeps every house palette readable", async () => {
+    const { DIRECTIONS, contrast } = await import("../src");
+    for (const p of DIRECTIONS[0].palettes) {
+      expect(contrast(p.text, p.bg)).toBeGreaterThanOrEqual(7);
+      expect(contrast(p.muted, p.bg)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(p.onAccent, p.accent)).toBeGreaterThanOrEqual(4.5);
     }
-    // A dark original keeps a dark palette when the direction has one.
-    expect(paletteFor(directionById("swiss-precision")!, { colors: [], background: "#101010", fonts: [] }).dark).toBe(true);
   });
-
-  it("puts the direction, signals and UX audit in content.json, and offers Three.js only when the direction allows 3D", async () => {
-    const { briefContent, THREE_URL } = await import("../src");
+  it("puts the house direction, theme, signals and UX audit in content.json, with Motion and no Three.js", async () => {
+    const { briefContent, LIBRARIES } = await import("../src");
     const lead = { id: "x.com", name: "Harbor Freight Partners", website: "https://x.com", category: "import_export", city: "Hamburg", country: "DE", contacts: { emails: ["a@x.com"], phones: [] }, audit: { score: 60, reasons: ["No mobile viewport meta tag"], finalUrl: "", https: false }, content: { title: "", description: "", headings: [], paragraphs: [], images: [], navLinks: [] } } as never;
     const site = { crawledAt: "", pages: [{ slug: "home", url: "https://x.com", label: "Home", title: "Home", description: "", sections: [{ heading: "Shipping", paragraphs: ["Sea and air freight from Hamburg to the world."], items: [], images: [] }] }] };
-    const globe = briefContent(lead, site, undefined, [], { direction: "global-trade-3d" });
-    expect(globe.designDirection.creative.id).toBe("global-trade-3d");
-    expect(globe.libraries).toHaveProperty("three", THREE_URL);
-    expect(globe.designDirection.uxAudit.some((f: { area: string }) => f.area === "mobile")).toBe(true);
-    expect(globe.designDirection.creative.typography.googleFontsUrl).toMatch(/^https:\/\/fonts\.googleapis\.com\/css2\?family=/);
-    const flat = briefContent(lead, site, undefined, [], { direction: "swiss-precision" });
-    expect(flat.libraries).not.toHaveProperty("three");
-    expect(THREE_URL).toMatch(/^https:\/\/cdn\.jsdelivr\.net\/npm\/three@\d+\.\d+\.\d+\//);
+    const c = briefContent(lead, site, undefined, [], { direction: "global-trade-3d" });
+    expect(c.designDirection.creative.id).toBe("house-editorial");
+    expect(c.designDirection.creative.threeD).toBe("none");
+    expect(c.libraries).toEqual(LIBRARIES);
+    expect(c.designDirection.theme.id).toBe("classic");
+    expect(c.designDirection.uxAudit.some((f: { area: string }) => f.area === "mobile")).toBe(true);
+    expect(c.designDirection.creative.typography.googleFontsUrl).toBe("https://fonts.googleapis.com/css2?family=Libre+Caslon+Display&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Instrument+Sans:wght@400;500;600&display=swap");
   });
-
-  it("gives every direction its own motion system and kit, and never picks the old Cinematic system on its own", async () => {
-    const { DIRECTIONS, UI_KIT, chooseDirection } = await import("../src");
+  it("gives the house direction its motion system and a focused kit, all real components", async () => {
+    const { DIRECTIONS, UI_KIT, BRIEF, RUNNER_PROMPT } = await import("../src");
     const ids = new Set(UI_KIT.map((c) => c.id));
-    for (const d of DIRECTIONS) for (const k of d.kit) expect(ids, `${d.id}: unknown kit ${k}`).toContain(k);
-    for (const key of ["intro", "transition", "scroll", "hover", "signature"] as const) {
-      const vals = DIRECTIONS.map((d) => d.motionSystem[key]);
-      expect(new Set(vals).size, `${key} repeats across directions`).toBe(vals.length);
-    }
-    expect(new Set(DIRECTIONS.map((d) => [...d.kit].sort().join())).size).toBe(DIRECTIONS.length);
-    // At most a few directions open with a loader-style intro; most have none.
-    expect(DIRECTIONS.filter((d) => d.motionSystem.intro.startsWith("None")).length).toBeGreaterThanOrEqual(8);
-    const s = { trade: "restaurant", pages: 4, images: 12, prices: 20, words: 900, hasMenu: true, hasTeam: false, hasBooking: true, hasFaq: false, phone: true, email: true, hours: true } as never;
-    for (const seed of ["a", "b", "c", "d", "e", "f"]) expect(chooseDirection(s, [], seed).id).not.toBe("cinematic-hospitality");
+    const [d] = DIRECTIONS;
+    for (const k of d.kit) expect(ids, `unknown kit ${k}`).toContain(k);
+    for (const key of ["intro", "transition", "scroll", "hover", "signature"] as const) expect(d.motionSystem[key].length).toBeGreaterThan(20);
+    expect(BRIEF).toContain("seven house themes");
+    expect(BRIEF).toContain("theme picker");
+    expect(RUNNER_PROMPT).toContain("house-style.md");
   });
-
   it("documents every direction for the skill (npm run skill:catalog)", async () => {
     const { DIRECTIONS } = await import("../src");
     const { readFileSync } = await import("node:fs");
@@ -358,18 +363,15 @@ describe("redesign QA scorecard", () => {
     expect(md).toContain("TypeError");
   });
 
-  it("rejects a page that borrows the old Cinematic system under another direction, and flags kit from other directions", async () => {
+  it("rejects a page that uses the retired system's pieces, and flags kit outside the house list", async () => {
     const { scoreRedesign, UI_KIT } = await import("../src");
     expect(new Set(UI_KIT.map((c) => c.selector)).size).toBe(UI_KIT.length);
-    const old = all({ borrowed: ["curtain loader", "dust splash"], kit: ["marquee"] });
-    const editorial = scoreRedesign(old, ["home"], good, undefined, { direction: "editorial-magazine", kit: ["mask-reveal-up"] });
-    expect(editorial.pass).toBe(false);
-    expect(editorial.critical.join(" ")).toMatch(/reuses another direction's signature \(curtain loader, dust splash\)/);
-    expect(editorial.warnings.join(" ")).toMatch(/don't belong to this direction: marquee/);
-    // The same pieces are fine for the Cinematic Hospitality direction itself.
-    expect(scoreRedesign(all({ borrowed: ["curtain loader"] }), ["home"], good, undefined, { direction: "cinematic-hospitality" }).pass).toBe(true);
+    const old = all({ borrowed: ["counter loader", "dust splash"], kit: ["border-beam"] });
+    const s = scoreRedesign(old, ["home"], good, undefined, { direction: "house-editorial", kit: ["mask-reveal-up"] });
+    expect(s.pass).toBe(false);
+    expect(s.critical.join(" ")).toMatch(/retired system's pieces \(counter loader, dust splash\)/);
+    expect(s.warnings.join(" ")).toMatch(/don't belong to this direction: border-beam/);
   });
-
   it("retries technical failures with backoff and sends everything else to a person", async () => {
     const { retryDelayMinutes, shouldRetry } = await import("../src");
     expect([1, 2, 3, 4, 5, 9].map(retryDelayMinutes)).toEqual([5, 10, 20, 40, 60, 60]);

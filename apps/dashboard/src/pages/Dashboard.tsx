@@ -671,7 +671,7 @@ function RedesignTab({ lead, onError, onChanged }: { lead: LeadRow; onError(e: u
             <label className="field">
               <span>What should Claude change? <span className="muted">(optional)</span></span>
               <textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={4000}
-                placeholder="For example: darker and more premium, bigger food photos at the top, make the menu easier to read, show opening hours higher up, use the Midnight Navy theme." />
+                placeholder="For example: darker and more premium, bigger food photos at the top, make the menu easier to read, show opening hours higher up, use the Burgundy Rose theme." />
             </label>
             <label className="field">
               <span>Creative direction</span>

@@ -15,5 +15,5 @@ export * from "./redesign/directions";
 export * from "./redesign/quality";
 export { pickDna, dnaFromKey, makeDna, tradeFor, DNA_VERSION, type DesignDna } from "./redesign/styles";
 export { UI_KIT, UI_KIT_CSS, UI_KIT_JS, type KitComponent } from "./redesign/ui-kit";
-export { LOOKS, TRADE_PROMPTS, lookById, pickLook, lookVars, SYSTEM_CSS, SYSTEM_BASE_JS, SYSTEM_MOTION_JS, SYSTEM_LIBRARIES, HEAD_JS, type Look, type TradePrompt } from "./redesign/system";
+export { LOOKS, DEFAULT_LOOK, HOUSE_FONTS, THEME_CSS, themeTokens, themePicker, TRADE_PROMPTS, lookById, pickLook, lookVars, SYSTEM_CSS, SYSTEM_BASE_JS, SYSTEM_MOTION_JS, SYSTEM_LIBRARIES, HEAD_JS, type Look, type TradePrompt } from "./redesign/system";
 export { AI_CSP, TEMPLATE_CSP } from "./redesign/csp";
