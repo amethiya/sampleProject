@@ -25,7 +25,29 @@ interface LeadRow {
   sheetSynced: boolean;
   crawled: boolean;
   redesign: "pending" | "template" | "queued" | "running" | "review" | "done" | "failed";
+  /** Everything collected at audit time (absent for leads audited before profiles existed). */
+  profile?: LeadProfile | null;
+  rejected?: string[];
 }
+
+interface LeadProfile {
+  checkedAt: string;
+  businessNoun: string;
+  email: { address: string | null; onSiteDomain: boolean; mailServer: boolean | null };
+  location: { city: string; countryName: string; address?: string; inTargetMarket: boolean };
+  activity: { active: boolean; windowDays: number; lastActivity?: string; evidence: { kind: string; detail: string; date?: string }[]; parked?: string };
+  findings: Record<"design" | "technology" | "userExperience" | "mobile" | "seo" | "aiSearch", string[]>;
+  tech: { cms?: string; generator?: string; libraries: string[]; server?: string; https: boolean };
+  structuredData: string[];
+  social: { platform: string; url: string }[];
+  hasSitemap: boolean | null;
+  wordCount: number;
+}
+
+const FINDING_LABELS: [keyof LeadProfile["findings"], string][] = [
+  ["design", "Design"], ["technology", "Technology"], ["userExperience", "User-friendliness"],
+  ["mobile", "Mobile"], ["seo", "SEO"], ["aiSearch", "AI search"],
+];
 
 interface Stats {
   pending: number;
@@ -247,7 +269,7 @@ export default function Dashboard() {
           <div className="page-head">
             <div>
               <h1>Leads</h1>
-              <p className="muted">Businesses with outdated websites and a public email address, in the US, EU, Canada, Australia and New Zealand.</p>
+              <p className="muted">Active US and EU businesses with an outdated website and a working public email address.</p>
             </div>
             <div className="head-actions">
               <button className="btn" onClick={() => setPanel("add")}><Icon d={I.plus} />Redesign any website</button>
@@ -477,6 +499,7 @@ function AuditTab({ lead }: { lead: LeadRow }) {
         <h3>Issues found</h3>
         <ul className="list">{lead.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
       </div>
+      {lead.profile && <ProfileSection p={lead.profile} />}
       <div>
         <h3>Contacts</h3>
         <ul className="list plain">
@@ -487,6 +510,38 @@ function AuditTab({ lead }: { lead: LeadRow }) {
       </div>
       <p className="muted small">Found {ago(lead.auditedAt)} · {lead.sheetSynced ? "In Google Sheet" : "Not in Google Sheet yet"}</p>
     </div>
+  );
+}
+
+function ProfileSection({ p }: { p: LeadProfile }) {
+  const yes = (b: boolean | null, y: string, n: string, u = "not checked") => (b === null ? u : b ? y : n);
+  return (
+    <>
+      <div>
+        <h3>Lead criteria</h3>
+        <ul className="list plain">
+          <li><b>Email:</b> {p.email.address ?? "none"} · {yes(p.email.mailServer, "domain accepts mail", "domain does NOT accept mail")}{p.email.onSiteDomain ? " · on the site's own domain" : ""}</li>
+          <li><b>Market:</b> {p.location.city}, {p.location.countryName} · {p.location.inTargetMarket ? "US / EU" : "outside US / EU"}</li>
+          <li><b>Active:</b> {p.activity.parked ?? (p.activity.active ? `yes, within ${p.activity.windowDays} days` : `no activity found within ${p.activity.windowDays} days`)}{p.activity.lastActivity ? ` · latest ${p.activity.lastActivity}` : ""}</li>
+          {p.activity.evidence.map((e) => <li key={e.detail} className="muted">{e.detail}</li>)}
+          <li><b>Business type:</b> {p.businessNoun}</li>
+        </ul>
+      </div>
+      <div>
+        <h3>What we found (used in the pitch)</h3>
+        {FINDING_LABELS.filter(([k]) => p.findings[k].length).map(([k, label]) => (
+          <div key={k}><b>{label}</b><ul className="list">{p.findings[k].map((x) => <li key={x}>{x}</li>)}</ul></div>
+        ))}
+      </div>
+      <div>
+        <h3>Website</h3>
+        <ul className="list plain">
+          <li><b>Technology:</b> {[p.tech.cms, p.tech.generator, ...p.tech.libraries, p.tech.server].filter(Boolean).join(", ") || "not detected"} · {p.tech.https ? "HTTPS" : "no HTTPS"}</li>
+          <li><b>Structured data:</b> {p.structuredData.length ? p.structuredData.join(", ") : "none"} · <b>Sitemap:</b> {yes(p.hasSitemap, "yes", "no")} · <b>Words on homepage:</b> {p.wordCount}</li>
+          {p.social.map((s) => <li key={s.url}><a href={s.url} target="_blank" rel="noreferrer">{s.platform}</a></li>)}
+        </ul>
+      </div>
+    </>
   );
 }
 

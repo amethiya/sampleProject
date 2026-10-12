@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   auditHtml, buildOverpassQuery, decodeCfEmail, extractContacts, extractContent, parseHtml,
   parseOverpass, renderRedesign, sliceForCursor, buildPitch, CATEGORIES, CITIES,
@@ -90,7 +90,7 @@ describe("renderRedesign", () => {
 });
 
 describe("buildPitch", () => {
-  it("writes a plain-language pitch with preview link, opt-out and Gmail compose URL", () => {
+  it("writes the pitch for an older lead from its audit reasons, with preview link, opt-out and Gmail compose URL", () => {
     const lead = {
       id: "joesdiner.com", name: "Joe's Diner", category: "restaurant", city: "Austin", country: "US", region: "us",
       website: "http://joesdiner.com/", auditedAt: "", qualified: true,
@@ -103,9 +103,144 @@ describe("buildPitch", () => {
     expect(p.body).toContain("https://x.dev/preview/joesdiner.com");
     expect(p.body).toMatch(/phone/);
     expect(p.body).toMatch(/Not secure/);
+    expect(p.body).toContain("the best restaurant in Austin");
     expect(p.body).toMatch(/won't contact you again/);
-    expect(p.subject).toContain("redesigned website");
+    expect(p.subject).toBe("Joe's Diner: a new website for your restaurant (free preview inside)");
     expect(p.gmailUrl).toContain("to=joe%40joesdiner.com");
+  });
+
+  it("pitches what the audit measured, with the business type in the AI-search line", () => {
+    const profile = {
+      businessNoun: "gym",
+      findings: {
+        design: ["The layout is built with old techniques (tables, fixed widths, inline styling), so it looks dated next to modern sites"],
+        technology: ["Very old jQuery 1.7"], userExperience: ["Phone numbers are not tappable, so mobile visitors can't call in one tap"],
+        mobile: ["The layout doesn't adapt to phone and tablet screens"],
+        seo: ["No meta description, so Google writes its own snippet", "No main heading (H1) on the page"],
+        aiSearch: ["The site doesn't publish this information in a form they can read (no structured business data)"],
+      },
+      tech: { cms: "WordPress", libraries: ["jQuery 1.7", "Bootstrap 3"], https: true },
+    };
+    const lead = { id: "iron.com", name: "Iron Gym", category: "gym", city: "Austin", country: "US", region: "us", website: "https://www.iron.com/", auditedAt: "", qualified: true,
+      audit: { score: 60, finalUrl: "", https: true, reasons: [] }, contacts: { emails: ["hi@iron.com"], phones: [] }, content: {}, profile };
+    const p = buildPitch(lead as never, "https://x.dev/preview/iron.com/", "Vivek")!;
+    expect(p.body).toContain("Outdated design and technology: the layout is built with old techniques");
+    expect(p.body).toContain("older technology (WordPress, jQuery 1.7, Bootstrap 3)");
+    expect(p.body).toContain("Not user-friendly: phone numbers are not tappable");
+    expect(p.body).toContain("Not built for phones");
+    expect(p.body).toContain("Search engines (SEO) aren't set up: no meta description");
+    expect(p.body).toContain('"the best gym in Austin"');
+    expect(p.body).toContain("Your site doesn't publish this information in a form they can read (no structured business data), so your gym is unlikely to be suggested.");
+    expect(p.body).toContain("Most people look for a gym on their phone today.");
+    expect(p.body).toContain("recommend you when someone asks for the best gym in Austin");
+    expect(p.body).toContain("Full mobile support");
+    expect(p.body).toContain("looking at gyms in Austin");
+    expect(p.body).not.toMatch(/Not secure/);
+    // Nothing is claimed without a finding behind it.
+    const quiet = buildPitch({ ...lead, profile: { ...profile, findings: { ...profile.findings, mobile: [], seo: [], aiSearch: [] } } } as never, "u", "V")!;
+    expect(quiet.body).not.toMatch(/Not built for phones|Search engines \(SEO\) aren't|AI assistants aren't recommending/);
+    expect(quiet.body).toContain("AI-search ready"); // the offer still lists what we'd do
+  });
+});
+
+describe("lead criteria", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reads dates in US, EU and ISO formats, ignoring copyright lines", async () => {
+    const { pageDates, sitemapDates, feedDates } = await import("../src");
+    const iso = (ds: Date[]) => ds.map((d) => d.toISOString().slice(0, 10)).sort();
+    expect(iso(pageDates("Live music on October 3, 2026! Brunch 12 Oktober 2026. Menu updated 2026-09-28. Closed 11/26/2026, 24.12.2026. © 2019 Joe's"))).toEqual(["2026-09-28", "2026-10-03", "2026-10-12", "2026-11-26", "2026-12-24"]);
+    expect(pageDates("Copyright 2026 Joe's Diner. Since 1987.")).toEqual([]);
+    expect(iso(sitemapDates("<urlset><url><lastmod>2026-10-01T10:00:00+00:00</lastmod></url><url><lastmod>2024-01-01</lastmod></url></urlset>"))).toEqual(["2024-01-01", "2026-10-01"]);
+    expect(iso(feedDates("<rss><channel><lastBuildDate>Mon, 05 Oct 2026 09:00:00 +0000</lastBuildDate></channel></rss>"))).toEqual(["2026-10-05"]);
+  });
+
+  it("counts a site as active only with evidence inside the window, or a live booking/ordering service", async () => {
+    const { judgeActivity, liveServices, parkedReason } = await import("../src");
+    const now = new Date("2026-10-12T12:00:00Z");
+    expect(judgeActivity([{ kind: "sitemap", detail: "x", date: "2026-09-20" }], now, 30).active).toBe(true);
+    const old = judgeActivity([{ kind: "sitemap", detail: "x", date: "2026-08-01" }], now, 30);
+    expect(old.active).toBe(false);
+    expect(old.lastActivity).toBe("2026-08-01");
+    expect(judgeActivity([{ kind: "sitemap", detail: "x", date: "2026-08-01" }], now, 90).active).toBe(true);
+    expect(judgeActivity([{ kind: "page-date", detail: "x", date: "2026-12-24" }], now, 30).active).toBe(true); // upcoming event
+    expect(judgeActivity([{ kind: "live-service", detail: "Live OpenTable reservations on the site" }], now, 30).active).toBe(true);
+    expect(judgeActivity([{ kind: "sitemap", detail: "x", date: "2026-10-10" }], now, 30, "Not a live site").active).toBe(false);
+    expect(liveServices('<a href="https://www.opentable.com/single.aspx?rid=1">Reserve</a>')).toEqual(["OpenTable reservations"]);
+    expect(parkedReason("<title>example.com is for sale!</title><body>Buy this domain</body>")).toMatch(/Not a live site/);
+    expect(parkedReason("<title>Under Construction</title>")).toMatch(/Not a live site/);
+    expect(parkedReason(`<title>Joe's Diner</title><body>${"Great food since 1987. ".repeat(10)}</body>`)).toBeUndefined();
+  });
+
+  it("names the business the way searchers do, from its map listing, name or category", async () => {
+    const { businessNoun } = await import("../src");
+    expect(businessNoun("salon", "hairdresser")).toBe("hair salon");
+    expect(businessNoun("gym", "fitness_centre")).toBe("gym");
+    expect(businessNoun("retail", "florist")).toBe("florist");
+    expect(businessNoun("healthcare", undefined, "Smile Dental Care")).toBe("dentist");
+    expect(businessNoun("retail")).toBe("shop");
+  });
+
+  it("finds SEO and AI-search gaps from the page, and recognises structured business data", async () => {
+    const { siteFindings, structuredDataTypes, auditHtml } = await import("../src");
+    const bare = "<html><head><title>Home</title></head><body><p>Welcome</p></body></html>";
+    const f = siteFindings(bare, auditHtml(bare, "http://x.com/"), { hasSitemap: false, wordCount: 20 });
+    expect(f.seo.join(" ")).toMatch(/title .*tells Google very little/);
+    expect(f.seo.join(" ")).toMatch(/No meta description/);
+    expect(f.seo).toContain("No sitemap for search engines");
+    expect(f.aiSearch.join(" ")).toMatch(/no structured business data/);
+    expect(f.mobile.length).toBeGreaterThan(0);
+    const ld = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Restaurant","openingHours":"Mo-Su 11:00-22:00"}</script>`;
+    expect(structuredDataTypes(ld)).toEqual(["Restaurant"]);
+    expect(siteFindings(ld, auditHtml(ld, "https://x.com/"), { wordCount: 400 }).aiSearch).toEqual([]);
+  });
+
+  it("only looks for clients in the United States and the European Union", async () => {
+    const { CITIES, isTargetCountry } = await import("../src");
+    expect(CITIES.every((c) => isTargetCountry(c.country) && (c.region === "us" || c.region === "eu"))).toBe(true);
+    expect(isTargetCountry("DE")).toBe(true);
+    expect(isTargetCountry("CA")).toBe(false);
+    expect(isTargetCountry("GB")).toBe(false);
+  });
+
+  it("qualifies an outdated, active US/EU site with a working email, and records why others are skipped", async () => {
+    const { auditCandidate } = await import("../src");
+    const now = new Date("2026-10-12T12:00:00Z");
+    const home = `<html><head><title>Joe's Diner Austin</title></head><body><table><tr><td><font>Joe's Diner</font></td></tr></table><table><tr><td>a</td></tr></table><table><tr><td>b</td></tr></table>
+      <center>${"Best breakfast in town, served every morning. ".repeat(12)}</center><a href="mailto:joe@joesdiner.com">Email</a> © 2011</body></html>`;
+    const stub = (sitemapDate: string, mx: boolean) => vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const url = String(input);
+      const res = (body: string, type: string) => new Response(body, { status: 200, headers: { "content-type": type } });
+      if (url.startsWith("https://cloudflare-dns.com")) return new Response(JSON.stringify({ Status: 0, Answer: mx ? [{ type: 15 }] : [] }), { headers: { "content-type": "application/dns-json" } });
+      if (url.endsWith("/robots.txt")) return res("User-agent: *\nSitemap: http://joesdiner.com/sitemap.xml", "text/plain");
+      if (url.endsWith("/sitemap.xml")) return res(`<urlset><url><loc>x</loc><lastmod>${sitemapDate}</lastmod></url></urlset>`, "application/xml");
+      if (url === "http://joesdiner.com/") return res(home, "text/html");
+      return new Response("", { status: 404 });
+    }));
+    const cand = { id: "joesdiner.com", name: "Joe's Diner", category: "restaurant", kind: "restaurant", city: "Austin", country: "US", region: "us", website: "http://joesdiner.com/" } as const;
+
+    stub("2026-10-01", true);
+    const ok = (await auditCandidate(cand as never, 35, { now }))!;
+    expect(ok.rejected).toEqual([]);
+    expect(ok.qualified).toBe(true);
+    expect(ok.profile!.activity.active).toBe(true);
+    expect(ok.profile!.activity.evidence[0].detail).toBe("Sitemap updated 2026-10-01");
+    expect(ok.profile!.email).toEqual({ address: "joe@joesdiner.com", onSiteDomain: true, mailServer: true });
+    expect(ok.profile!.businessNoun).toBe("restaurant");
+    expect(ok.profile!.hasSitemap).toBe(true);
+
+    stub("2025-01-01", true);
+    const stale = (await auditCandidate(cand as never, 35, { now }))!;
+    expect(stale.qualified).toBe(false);
+    expect(stale.rejected!.join()).toMatch(/No sign of activity in the last 30 days \(latest: 2025-01-01\)/);
+
+    stub("2026-10-01", false);
+    expect((await auditCandidate(cand as never, 35, { now }))!.rejected!.join()).toMatch(/doesn't accept mail/);
+
+    stub("2026-10-01", true);
+    const abroad = (await auditCandidate({ ...cand, country: "CA" } as never, 35, { now }))!;
+    expect(abroad.qualified).toBe(false);
+    expect(abroad.rejected!.join()).toMatch(/Not in the US or the EU \(Canada\)/);
   });
 });
 

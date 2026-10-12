@@ -218,7 +218,9 @@ export async function redesignApi(req: Request, url: URL, env: Db): Promise<Resp
     }, 0);
     if (!lead) return json({ error: "That website couldn't be reached. Check the address and try again." }, 422);
     if (!body.name?.trim()) lead.name = (lead.content.title.split(/[|\-–—:]/)[0] || id).trim().slice(0, 80) || id;
+    // Added by the owner on purpose: the lead criteria don't apply.
     lead.qualified = true;
+    lead.rejected = [];
     await env.DB.prepare(
       `INSERT INTO sites (id, name, category, city, country, region, website, candidate, state, score, qualified, lead, audited_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'audited', ?, 1, ?, datetime('now'))

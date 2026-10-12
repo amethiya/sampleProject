@@ -14,7 +14,11 @@ CREATE TABLE IF NOT EXISTS sites (
   status        TEXT NOT NULL DEFAULT 'new',-- new | contacted | replied | won | lost | ignored
   sheet_synced  INTEGER NOT NULL DEFAULT 0,
   created_at    TEXT NOT NULL DEFAULT (datetime('now')),
-  audited_at    TEXT
+  audited_at    TEXT,
+  email         TEXT,                       -- first public email address
+  active        INTEGER,                    -- activity found inside the window (1/0), NULL when not checked
+  last_activity TEXT,                       -- latest dated activity evidence (ISO date)
+  reject_reason TEXT                        -- why an audited site did not qualify
 );
 CREATE INDEX IF NOT EXISTS sites_state ON sites(state, created_at);
 CREATE INDEX IF NOT EXISTS sites_qualified ON sites(qualified, audited_at);

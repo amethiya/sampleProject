@@ -59,22 +59,6 @@ export const CITIES: City[] = [
   { id: "portland", name: "Portland", country: "US", region: "us", lat: 45.5152, lon: -122.6784 },
   { id: "nashville", name: "Nashville", country: "US", region: "us", lat: 36.1627, lon: -86.7816 },
   { id: "minneapolis", name: "Minneapolis", country: "US", region: "us", lat: 44.9778, lon: -93.265 },
-  // Canada
-  { id: "toronto", name: "Toronto", country: "CA", region: "ca", lat: 43.6532, lon: -79.3832 },
-  { id: "vancouver", name: "Vancouver", country: "CA", region: "ca", lat: 49.2827, lon: -123.1207 },
-  { id: "montreal", name: "Montreal", country: "CA", region: "ca", lat: 45.5019, lon: -73.5674 },
-  { id: "calgary", name: "Calgary", country: "CA", region: "ca", lat: 51.0447, lon: -114.0719 },
-  { id: "ottawa", name: "Ottawa", country: "CA", region: "ca", lat: 45.4215, lon: -75.6972 },
-  // Australia
-  { id: "sydney", name: "Sydney", country: "AU", region: "au", lat: -33.8688, lon: 151.2093 },
-  { id: "melbourne", name: "Melbourne", country: "AU", region: "au", lat: -37.8136, lon: 144.9631 },
-  { id: "brisbane", name: "Brisbane", country: "AU", region: "au", lat: -27.4698, lon: 153.0251 },
-  { id: "perth", name: "Perth", country: "AU", region: "au", lat: -31.9505, lon: 115.8605 },
-  { id: "adelaide", name: "Adelaide", country: "AU", region: "au", lat: -34.9285, lon: 138.6007 },
-  // New Zealand
-  { id: "auckland", name: "Auckland", country: "NZ", region: "nz", lat: -36.8485, lon: 174.7633 },
-  { id: "wellington", name: "Wellington", country: "NZ", region: "nz", lat: -41.2865, lon: 174.7762 },
-  { id: "christchurch", name: "Christchurch", country: "NZ", region: "nz", lat: -43.5321, lon: 172.6362 },
   // European Union
   { id: "berlin", name: "Berlin", country: "DE", region: "eu", lat: 52.52, lon: 13.405 },
   { id: "munich", name: "Munich", country: "DE", region: "eu", lat: 48.1351, lon: 11.582 },
@@ -98,6 +82,13 @@ export const CITIES: City[] = [
   { id: "athens", name: "Athens", country: "GR", region: "eu", lat: 37.9838, lon: 23.7275 },
   { id: "helsinki", name: "Helsinki", country: "FI", region: "eu", lat: 60.1699, lon: 24.9384 },
 ];
+
+/** Where we look for clients: the United States and the 27 EU member states. */
+export const TARGET_COUNTRIES = ["US", "AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE"];
+
+export function isTargetCountry(code: string): boolean {
+  return TARGET_COUNTRIES.includes(code.toUpperCase());
+}
 
 export function categoryById(id: string): CategoryDef | undefined {
   return CATEGORIES.find((c) => c.id === id);

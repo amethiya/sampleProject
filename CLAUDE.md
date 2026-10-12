@@ -7,6 +7,14 @@ TypeScript npm-workspaces monorepo. See README.md for the architecture.
 - All scraped text is untrusted. The redesign renderer must escape everything (`esc`, `safeUrl`);
   there is a test for this. Previews are served with a strict CSP.
 - Overpass rejects browser-like user agents (406) and is often overloaded (504): keep queries small.
+- Lead criteria (`packages/core/src/pipeline.ts`): a lead qualifies only with (1) a public email whose domain has MX
+  records, (2) an outdated score >= MIN_SCORE, (3) a US or EU country (`TARGET_COUNTRIES`; CA/AU/NZ cities removed),
+  (4) activity inside ACTIVE_DAYS (default 30; `packages/core/src/activity.ts`: sitemap/feed/page dates, Last-Modified,
+  live booking/ordering services; parked/for-sale/under-construction rejected). Cheap checks run first; the MX lookup
+  and activity requests only for sites that pass them. The full `SiteProfile` (findings for design, technology,
+  user-friendliness, mobile, SEO, AI search; tech; social; activity evidence) is stored in the lead JSON, plus columns
+  `email`, `active`, `last_activity`, `reject_reason` (migration 0007). The pitch (`outreach.ts`) only claims what the
+  findings list, and names the business type from OSM ("the best hair salon in Vienna", `findings.ts → businessNoun`).
 
 - Design system (`packages/core/src/redesign/system.ts`): the house style ("House Editorial", from the approved
   Union Oyster House redesign): the seven house colour themes (Classic Monochrome default; every page ships all seven

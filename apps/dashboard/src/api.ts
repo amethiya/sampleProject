@@ -34,9 +34,6 @@ export const CATEGORY_LABELS: Record<string, string> = {
 export const REGION_LABELS: Record<string, string> = {
   us: "United States",
   eu: "European Union",
-  ca: "Canada",
-  au: "Australia",
-  nz: "New Zealand",
 };
 
 const regionNames = (() => {
