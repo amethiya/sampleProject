@@ -2,7 +2,7 @@ import { countryName } from "../categories";
 import type { SitePage, SiteSection, SiteSnapshot } from "../crawl";
 import type { CategoryId, Lead } from "../types";
 import { makeDna, tradeFor, type DesignDna } from "./styles";
-import { HEAD_JS, SYSTEM_BASE_JS, SYSTEM_CSS, SYSTEM_LIBRARIES, SYSTEM_MOTION_JS, lookVars, pickLook, themePicker } from "./system";
+import { HEAD_JS, SYSTEM_BASE_JS, SYSTEM_CSS, SYSTEM_LIBRARIES, SYSTEM_MOTION_JS, lookVars, pickLook, themeChooser, themePicker } from "./system";
 import { THEMES, photoUrl } from "./themes";
 import { UI_KIT_CSS, UI_KIT_JS } from "./ui-kit";
 
@@ -292,6 +292,8 @@ ${others.length ? `<section><div class="wrap">${head("Explore")}${maskH("Explore
 ${renderRest()}`;
   }
 
+  // Every home page lets the client compare the seven themes and send us their favourite.
+  if (isHome) main += themeChooser(NO);
   main += visit;
   let no = 0;
   main = main.split(NO).reduce((acc, part, i) => (i === 0 ? part : `${acc}${String(++no).padStart(2, "0")}${part}`), "");
@@ -322,7 +324,7 @@ ${renderRest()}`;
 <title>${isHome ? name : `${esc(page.label)} · ${name}`} · Concept redesign</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?${look.fonts}&display=swap">
-<style>${lookVars(look)}${SYSTEM_CSS}${UI_KIT_CSS}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}</style>
+<style>${lookVars(look)}${SYSTEM_CSS}${UI_KIT_CSS}</style>
 </head>
 <body id="top" data-look="${look.id}">
 <div class="mu-progress" aria-hidden="true"></div>

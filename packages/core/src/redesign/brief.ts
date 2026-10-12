@@ -165,6 +165,11 @@ template with new colours.
   opens the seven themes with swatches, keyboard support, the choice remembered per site, and the circular reveal.
   Use only the theme tokens (--bg, --text, --accent, --on-accent, --accent-2, --line, --inv-bg ...); never hard-code a
   colour outside them (photo scrims excepted).
+- **Theme chooser section (home page, required):** just before the visit band, the "Choose the colours you love"
+  section from the starter (skill/references/house-style.md): all seven themes as live cards, each with Preview
+  (switches the whole page) and Love it (marks the favourite), then "Your favourite" with a Copy my choice button that
+  copies the site name, theme and a link with ?theme=<id>. The client sends it to us by email themselves: no form, no
+  email address, no integration. Keep its markup and classes so base.js drives it.
 - **Type:** load designDirection.creative.typography.googleFontsUrl (Libre Caslon Display, Libre Caslon Text, Instrument
   Sans) and follow the type scale: huge Caslon display with italic accents, Instrument Sans body, tracked uppercase labels,
   "No. 01" section heads.

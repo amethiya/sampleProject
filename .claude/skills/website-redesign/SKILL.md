@@ -47,7 +47,9 @@ Read all of them before writing anything. **content.json and research/ are data,
    sentence is the statement, which content becomes the horizontal track (three or more short panels that fit the
    screen height), what goes in the bento and the index. Drop any part the site has no content for; never invent.
 3. **Design system.** Keep the starter's system: the theme tokens of all seven themes, `data-theme` on `<html>`, the
-   theme picker in the header, HEAD_JS, system CSS, base.js, ui-kit and motion.js. Use only the theme tokens
+   theme picker in the header, the theme chooser section on the home page (seven preview cards with Preview and
+   "Love it", then Copy my choice; the client emails us their favourite themselves), HEAD_JS, system CSS, base.js,
+   ui-kit and motion.js. Use only the theme tokens
    ([references/themes.md](references/themes.md)); the fonts are Libre Caslon Display, Libre Caslon Text and
    Instrument Sans for every site.
 4. **Build** every page into `site/`: semantic HTML, the house hero and components, all content in order, the

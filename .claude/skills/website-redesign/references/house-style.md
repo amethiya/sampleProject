@@ -11,7 +11,7 @@ order: HEAD_JS inline at the top of <head>, then base.js, ui-kit.js, Motion (htt
 - `<html lang="..." data-theme="<designDirection.theme.id>" data-site="<domain>">`; inline HEAD_JS first in <head>:
 
 ```html
-<script>(function(){var d=document.documentElement;try{var t=localStorage.getItem('rr-theme:'+(d.getAttribute('data-site')||location.pathname.split('/').slice(0,3).join('/')));if(t&&/^(classic|noir|latte|sage|cobalt|cocoa|rose)$/.test(t))d.setAttribute('data-theme',t)}catch(e){}if(!matchMedia('(prefers-reduced-motion: reduce)').matches){d.classList.add('anim');setTimeout(function(){if(!window.Motion)d.classList.remove('anim')},3500)}})();</script>
+<script>(function(){var d=document.documentElement,ok=/^(classic|noir|latte|sage|cobalt|cocoa|rose)$/;var q=(location.search.match(/[?&]theme=([a-z]+)/)||[])[1];try{var t=q&&ok.test(q)?q:localStorage.getItem('rr-theme:'+(d.getAttribute('data-site')||location.pathname.split('/').slice(0,3).join('/')));if(t&&ok.test(t))d.setAttribute('data-theme',t)}catch(e){if(q&&ok.test(q))d.setAttribute('data-theme',q)}if(!matchMedia('(prefers-reduced-motion: reduce)').matches){d.classList.add('anim');setTimeout(function(){if(!window.Motion)d.classList.remove('anim')},3500)}})();</script>
 ```
 
 - Right after <body>: `<div class="mu-progress" aria-hidden="true"></div>`, the opening curtain `<div class="intro" aria-hidden="true"><span class="s">Trade · City</span><span class="n">Name</span><span class="r"></span></div>`, the concept banner, the header.
@@ -38,6 +38,47 @@ order: HEAD_JS inline at the top of <head>, then base.js, ui-kit.js, Motion (htt
 - **Content block:** `<div class="block with-ph [flip]"><div class="prose rise">..</div><figure class="ph" data-parallax="8">img</figure></div>`; long lists as `<ul class="price-list">`.
 - **Bento:** `<ul class="bento"><li>img</li>×5</ul>` (repeats every five).
 - **Page index:** `<ul class="index" data-previews><li><a href="./page" data-preview="<photo url>"><span class="i">01</span><span class="t">Label</span><span class="d">Line</span><span class="go">View</span></a></li></ul>`.
+- **Theme chooser (home page, before the visit band; keep exactly, renumber its head):**
+
+```html
+<section class="themes" id="themes" aria-labelledby="themes-title"><div class="wrap">
+<div class="head"><span class="no">No. 05</span><span class="eyebrow">Colour themes</span></div>
+<h2 id="themes-title"><span class="line"><span>Choose the <em>colours</em> you love.</span></span></h2>
+<p class="th-lead muted rise">See this design in each of our seven colour themes. Preview any of them on the whole page, mark the one you like most, then copy your choice and send it to us by email.</p>
+<ul class="th-grid"><li class="th-card" data-theme="classic" data-id="classic" data-name="Classic Monochrome">
+<div class="th-mini" aria-hidden="true"><span class="th-dots"><i style="background:var(--bg)"></i><i style="background:var(--accent)"></i><i style="background:var(--accent-2)"></i><i style="background:var(--inv-bg)"></i></span><span class="aa">A<em>a</em></span><span class="ln"></span><span class="ln s"></span><span class="bt">Book now</span><span class="now">Showing</span></div>
+<div class="th-meta"><b>Classic Monochrome</b><small>White, black and neutral gray</small></div>
+<div class="th-act"><button class="th-try" type="button" aria-pressed="false">Preview<span class="sr-only"> Classic Monochrome</span></button><button class="th-fav" type="button" aria-pressed="false" aria-label="Make Classic Monochrome my favourite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg><span> Love it</span></button></div>
+</li><li class="th-card" data-theme="noir" data-id="noir" data-name="Dark Monochrome">
+<div class="th-mini" aria-hidden="true"><span class="th-dots"><i style="background:var(--bg)"></i><i style="background:var(--accent)"></i><i style="background:var(--accent-2)"></i><i style="background:var(--inv-bg)"></i></span><span class="aa">A<em>a</em></span><span class="ln"></span><span class="ln s"></span><span class="bt">Book now</span><span class="now">Showing</span></div>
+<div class="th-meta"><b>Dark Monochrome</b><small>Black, white and charcoal</small></div>
+<div class="th-act"><button class="th-try" type="button" aria-pressed="false">Preview<span class="sr-only"> Dark Monochrome</span></button><button class="th-fav" type="button" aria-pressed="false" aria-label="Make Dark Monochrome my favourite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg><span> Love it</span></button></div>
+</li><li class="th-card" data-theme="latte" data-id="latte" data-name="Cosmic Latte">
+<div class="th-mini" aria-hidden="true"><span class="th-dots"><i style="background:var(--bg)"></i><i style="background:var(--accent)"></i><i style="background:var(--accent-2)"></i><i style="background:var(--inv-bg)"></i></span><span class="aa">A<em>a</em></span><span class="ln"></span><span class="ln s"></span><span class="bt">Book now</span><span class="now">Showing</span></div>
+<div class="th-meta"><b>Cosmic Latte</b><small>Latte, mocha cream and deep burgundy</small></div>
+<div class="th-act"><button class="th-try" type="button" aria-pressed="false">Preview<span class="sr-only"> Cosmic Latte</span></button><button class="th-fav" type="button" aria-pressed="false" aria-label="Make Cosmic Latte my favourite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg><span> Love it</span></button></div>
+</li><li class="th-card" data-theme="sage" data-id="sage" data-name="Sage &amp; Amber">
+<div class="th-mini" aria-hidden="true"><span class="th-dots"><i style="background:var(--bg)"></i><i style="background:var(--accent)"></i><i style="background:var(--accent-2)"></i><i style="background:var(--inv-bg)"></i></span><span class="aa">A<em>a</em></span><span class="ln"></span><span class="ln s"></span><span class="bt">Book now</span><span class="now">Showing</span></div>
+<div class="th-meta"><b>Sage &amp; Amber</b><small>Sage green, concrete gray and burnt amber</small></div>
+<div class="th-act"><button class="th-try" type="button" aria-pressed="false">Preview<span class="sr-only"> Sage &amp; Amber</span></button><button class="th-fav" type="button" aria-pressed="false" aria-label="Make Sage &amp; Amber my favourite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg><span> Love it</span></button></div>
+</li><li class="th-card" data-theme="cobalt" data-id="cobalt" data-name="Cobalt">
+<div class="th-mini" aria-hidden="true"><span class="th-dots"><i style="background:var(--bg)"></i><i style="background:var(--accent)"></i><i style="background:var(--accent-2)"></i><i style="background:var(--inv-bg)"></i></span><span class="aa">A<em>a</em></span><span class="ln"></span><span class="ln s"></span><span class="bt">Book now</span><span class="now">Showing</span></div>
+<div class="th-meta"><b>Cobalt</b><small>Black, white and cobalt blue</small></div>
+<div class="th-act"><button class="th-try" type="button" aria-pressed="false">Preview<span class="sr-only"> Cobalt</span></button><button class="th-fav" type="button" aria-pressed="false" aria-label="Make Cobalt my favourite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg><span> Love it</span></button></div>
+</li><li class="th-card" data-theme="cocoa" data-id="cocoa" data-name="Chocolate &amp; Cream">
+<div class="th-mini" aria-hidden="true"><span class="th-dots"><i style="background:var(--bg)"></i><i style="background:var(--accent)"></i><i style="background:var(--accent-2)"></i><i style="background:var(--inv-bg)"></i></span><span class="aa">A<em>a</em></span><span class="ln"></span><span class="ln s"></span><span class="bt">Book now</span><span class="now">Showing</span></div>
+<div class="th-meta"><b>Chocolate &amp; Cream</b><small>Chocolate brown, cream and burnt orange</small></div>
+<div class="th-act"><button class="th-try" type="button" aria-pressed="false">Preview<span class="sr-only"> Chocolate &amp; Cream</span></button><button class="th-fav" type="button" aria-pressed="false" aria-label="Make Chocolate &amp; Cream my favourite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg><span> Love it</span></button></div>
+</li><li class="th-card" data-theme="rose" data-id="rose" data-name="Burgundy Rose">
+<div class="th-mini" aria-hidden="true"><span class="th-dots"><i style="background:var(--bg)"></i><i style="background:var(--accent)"></i><i style="background:var(--accent-2)"></i><i style="background:var(--inv-bg)"></i></span><span class="aa">A<em>a</em></span><span class="ln"></span><span class="ln s"></span><span class="bt">Book now</span><span class="now">Showing</span></div>
+<div class="th-meta"><b>Burgundy Rose</b><small>Burgundy, cream and dusty pink</small></div>
+<div class="th-act"><button class="th-try" type="button" aria-pressed="false">Preview<span class="sr-only"> Burgundy Rose</span></button><button class="th-fav" type="button" aria-pressed="false" aria-label="Make Burgundy Rose my favourite"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.5-7 10-7 10z"/></svg><span> Love it</span></button></div>
+</li></ul>
+<div class="th-pick rise" aria-live="polite"><p>Your favourite: <b class="th-name">none yet</b></p><label class="sr-only" for="th-text">Your theme choice</label><input class="th-text" id="th-text" readonly value="" placeholder="Mark a favourite above"><button class="btn th-copy" type="button" disabled>Copy my choice</button><span class="th-note"></span></div>
+</div></section>
+```
+
+  Links with `?theme=<id>` open the page in that theme (HEAD_JS). The client copies their choice and emails it to us; no form or address.
 - **Visit band:** `<section class="inverse" id="visit">` with head, masked name, `<address class="addr">`, `.ctas` and `<div class="facts-list">` rows (icon, label, value).
 - **Footer:** `<footer class="site">` with `.foot-top` (`<p class="wordmark"><span class="line"><span>Name</span></span></p>`, `.foot-tag`, primary button) and `.foot-cols`, then `.foot-bottom` with the concept credit.
 - **Inner pages:** `<section class="page-top">` (eyebrow, masked h1, lead, parallax photo), then content blocks, the visit band and the footer.
