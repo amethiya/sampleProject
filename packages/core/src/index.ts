@@ -7,6 +7,7 @@ export * from "./extract";
 export * from "./pipeline";
 export * from "./activity";
 export * from "./findings";
+export * from "./insights";
 export { renderRedesign, renderSitePage, snapshotFromLead, writeStarter, type RedesignInput } from "./redesign/render";
 export { THEMES } from "./redesign/themes";
 export * from "./outreach";
