@@ -62,6 +62,13 @@ TypeScript npm-workspaces monorepo. See README.md for the architecture.
   runs its local search (`apps/cli/src/uiux.ts`, needs python3) and write `uiux.md` into each job;
   the brief and the website-redesign skill take precedence over it.
 
+## How we work (owner's standing request, 2026-10-12)
+
+Use the `subagent-workflow` skill (in the owner's account skills) for every non-trivial task: plan, delegate research,
+fact-checking and an independent review of the diff to sub-agents in the background, implement, verify (tests,
+typecheck, browser), ship through a branch and PR, and ask before merging, deploying or touching production. Write
+plans and proposals up as an artifact. **After every change, update this file** (durable rules) and memory (decisions).
+
 Commands:
 - `npm test` — vitest for core
 - `npm run typecheck` — all workspaces
