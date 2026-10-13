@@ -435,3 +435,6 @@ table.qa .meter { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Website tab: at-a-glance tiles hold short text, not big numbers */
+.kpi-value.sm { font-size: 20px; letter-spacing: -0.02em; }

@@ -515,8 +515,32 @@ function WebsiteTab({ lead, onError }: { lead: LeadRow; onError(e: unknown): voi
   if (!d) return <p className="muted">{busy ? "Checking the website (live status, domain, archive, popularity, Google)… this takes up to a minute the first time." : "No details yet."}</p>;
   const score = (v?: number) => (v === undefined ? "–" : `${v}/100`);
   const row = (label: string, value: React.ReactNode) => <li><b>{label}:</b> {value}</li>;
+  const act = lead.profile?.activity;
+  const updated = act?.lastActivity
+    ? { value: act.lastActivity, note: act.evidence.find((e) => e.date === act.lastActivity)?.detail ?? "Latest change found on the site" }
+    : act?.evidence.some((e) => e.kind === "live-service")
+      ? { value: "In use", note: act.evidence.find((e) => e.kind === "live-service")!.detail }
+      : { value: "Unknown", note: lead.profile ? "No dated change found on the site" : "Checked before activity tracking existed" };
+  const traffic = d.traffic.label.includes(":")
+    ? { value: d.traffic.label.split(":")[0], note: d.traffic.label.split(":").slice(1).join(":").trim() }
+    : { value: d.traffic.level === "unknown" ? "Unknown" : d.traffic.label, note: d.traffic.level === "unknown" ? d.traffic.explanation : "from public signals" };
+  const archived = d.archive.last
+    ? { value: d.archive.last, note: "Latest Internet Archive snapshot" }
+    : d.archive.first
+      ? { value: "Unknown", note: `First snapshot ${d.archive.first}; the full history didn't load` }
+      : { value: "Unknown", note: d.archive.error ? "The Internet Archive didn't answer" : "No snapshots in the Internet Archive" };
   return (
     <div className="stack">
+      <div>
+        <h3>At a glance</h3>
+        <div className="kpis glance">
+          <div className="kpi"><span className="kpi-label">Online now</span><span className="kpi-value sm">{d.live.up ? "Yes" : "No"}</span><span className="muted small">checked {ago(d.checkedAt)}</span></div>
+          <div className="kpi"><span className="kpi-label">Traffic (estimate)</span><span className="kpi-value sm">{traffic.value}</span><span className="muted small">{traffic.note}</span></div>
+          <div className="kpi"><span className="kpi-label">Last updated</span><span className="kpi-value sm">{updated.value}</span><span className="muted small">{updated.note}</span></div>
+          <div className="kpi"><span className="kpi-label">Last archived</span><span className="kpi-value sm">{archived.value}</span><span className="muted small">{archived.note}</span></div>
+        </div>
+        <p className="muted small">Exact visit counts and the time of the last visit are private: only the owner sees them in their own Google Analytics. "Last updated" is the newest dated change we found on the site (sitemap, blog, page dates).</p>
+      </div>
       <div>
         <h3>Live status</h3>
         <ul className="list plain">
