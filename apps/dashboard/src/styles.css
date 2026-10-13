@@ -435,3 +435,7 @@ table.qa .meter { margin-top: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Website tab: at-a-glance tiles hold short text, not big numbers */
+.kpi-value.sm { font-size: 20px; letter-spacing: -0.02em; }
+@media (max-width: 760px) { .kpis.glance { grid-template-columns: repeat(2, minmax(0, 1fr)); } .kpis.glance .kpi:nth-child(3) { border-left: 0; } .kpis.glance .kpi:nth-child(n+3) { border-top: 1px solid var(--line); } }
