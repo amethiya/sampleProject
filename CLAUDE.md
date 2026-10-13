@@ -46,7 +46,8 @@ TypeScript npm-workspaces monorepo. See README.md for the architecture.
   history (often 503: degrade to the first capture), Tranco top-1M rank, Google PageSpeed + real-user data (needs the
   `GOOGLE_API_KEY` Worker secret; Google refuses keyless calls). Exact visit counts are private to the site owner:
   label traffic as an estimate from public signals, never as visits. Cloudflare Radar is not used (non-commercial
-  licence).
+  licence). The tab opens with "At a glance" (online now, traffic estimate, last updated = newest dated change from
+  the lead's activity check, last archived); "last visited" is not knowable from outside, so it is never shown.
 - QA scorecard and retry policy: `packages/core/src/redesign/quality.ts` (pure); browser measurement in
   `apps/cli/src/qa.ts`, research in `apps/cli/src/research.ts`, both through `apps/cli/src/browser.ts`, which refuses
   private/loopback/metadata addresses (lead websites are untrusted). Needs Chrome or `RR_CHROMIUM`.
